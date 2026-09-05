@@ -1,4 +1,8 @@
-# gantry-pendant
+# <img src="assets/logo.svg" alt="" width="40" height="40"> gantry-pendant
+
+<p align="center">
+  <img src="assets/banner.svg" alt="Handheld control for the crane — phone and crane both dial in, nothing listens" width="100%">
+</p>
 
 <p align="center">
   <a href="https://github.com/shotah/gantry-pendant/actions/workflows/ci.yml"><img src="https://github.com/shotah/gantry-pendant/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
