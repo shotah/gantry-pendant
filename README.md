@@ -49,6 +49,7 @@ Every screen, Day theme, crane stand-in: [docs/screens.md](docs/screens.md).
 | File | What it is |
 | --- | --- |
 | [todo.md](todo.md) | Phases, walks, which repo |
+| [docs/todo_next_features.md](docs/todo_next_features.md) | After the mouth talks — GPS polish, push, maps, Expo |
 | [docs/screens.md](docs/screens.md) | What the mouth looks like (phone shots) |
 | [docs/setup.md](docs/setup.md) | Admin / user / connect — what you paste where |
 | [docs/edgecases.md](docs/edgecases.md) | Gotchas across pendant + gantree + ai-gantry |

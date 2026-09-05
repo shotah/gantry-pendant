@@ -8,7 +8,8 @@ Pitch: [README.md](README.md). Why:
 [docs/security.md](docs/security.md). Who talks:
 [docs/setup.md](docs/setup.md). Looks like:
 [docs/screens.md](docs/screens.md). Misses:
-[docs/edgecases.md](docs/edgecases.md).
+[docs/edgecases.md](docs/edgecases.md). After the mouth:
+[docs/todo_next_features.md](docs/todo_next_features.md).
 
 KISS: Vinext on Workers, one Durable Object per crane, `CHANNEL=pendant`
 in the harness. Telegram stays the production mouth until a phase’s
@@ -205,6 +206,8 @@ until the walk is real.
 ---
 
 ## Later
+
+How-to and checkboxes: [docs/todo_next_features.md](docs/todo_next_features.md).
 
 - Expo wrap (sideload / TestFlight) when PWA feels like a bookmark
 - APNs / FCM (lock screen while the app is dead)
