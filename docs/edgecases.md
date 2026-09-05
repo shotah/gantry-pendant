@@ -159,8 +159,9 @@ You cannot run telegram + pendant in the same process.
 
 | Gotcha | What happens | Cover |
 | --- | --- | --- |
-| iPhone “Add to Home Screen” | installable; background is still weak | confirm on-device (P5 walk still open) |
-| Android Chrome PWA | needs HTTPS (`workers.dev` is) | same walk |
+| iPhone “Add to Home Screen” | installable; background is still weak | confirm on-device (P5 walk still open); needs `apple-touch-icon` PNG |
+| Android / desktop Chrome Install | needs HTTPS (`workers.dev` is; loopback counts) plus 192×192 and 512×512 **PNG** icons | Vinext `app/manifest.ts` → `/manifest.webmanifest`; SVG-only fails Chromium’s rule |
+| Chrome Install never appears | already installed, or no click + 30s on the page (engagement heuristic) | DevTools → Application → Manifest still shows Install |
 | GPS denied / HTTP / no gesture | message still sends; no `context.geo` | expected; do not block send |
 | iOS `watchPosition` | killed in the background | we only `getCurrentPosition` on send |
 | HEIC / iPhone photo | `image/heic` is rejected | ask the OS for JPEG, or convert later |

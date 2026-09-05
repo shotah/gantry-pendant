@@ -1,3 +1,4 @@
+import type { SlashCommand } from "@/lib/mailbox/cmds";
 import type { Role } from "@/lib/mailbox/frame";
 
 export const DEV_USER = {
@@ -5,7 +6,7 @@ export const DEV_USER = {
   email: "ada@example.com",
 };
 
-export const SAMPLE_IDS = ["unsigned", "empty", "thread", "ping", "photo", "down", "crane"] as const;
+export const SAMPLE_IDS = ["unsigned", "empty", "cmds", "thread", "ping", "photo", "down", "crane"] as const;
 
 export type SampleId = (typeof SAMPLE_IDS)[number];
 
@@ -23,6 +24,8 @@ export type SampleScene = {
   messages: SampleBubble[];
   status: "idle" | "up" | "down";
   gpsHint?: string;
+  draft?: string;
+  catalog?: SlashCommand[];
 };
 
 export const SAMPLE_LINES = {
@@ -37,6 +40,13 @@ export const SAMPLE_LINES = {
   photoKit: "Yes — port side, yellow tape. Don't step the wet plate.",
   craneKit: "Gate's on the latch until 21:00.",
 } as const;
+
+/** Shot/loopback stand-in only. Live catalog comes from the crane cmds frame. */
+export const SAMPLE_COMMANDS: SlashCommand[] = [
+  { name: "new", hint: "reset this session's history" },
+  { name: "status", hint: "uptime, model, history, tools, turns" },
+  { name: "brief", hint: "hold a prefix ~6h", args: true },
+];
 
 export const MOCK_REPLIES = [
   "Heard. I'll watch the latch.",
@@ -86,6 +96,16 @@ export function sampleScene(id: SampleId, role: Role): SampleScene {
       messages: [],
       status: "up",
       gpsHint: role === "phone" ? "GPS attaches on send if the OS allows it." : undefined,
+    };
+  }
+  if (id === "cmds") {
+    return {
+      id,
+      messages: [],
+      status: "up",
+      gpsHint: role === "phone" ? "GPS attaches on send if the OS allows it." : undefined,
+      draft: "/",
+      catalog: SAMPLE_COMMANDS,
     };
   }
   if (id === "down") {

@@ -35,6 +35,7 @@ describe("PhoneShell", () => {
     render(<PhoneShell />);
     expect(await screen.findByText(SAMPLE_LINES.threadKit)).toBeTruthy();
     expect(screen.getByText(SAMPLE_LINES.threadYou)).toBeTruthy();
+    expect(screen.getByText("Kit")).toBeTruthy();
     expect(screen.queryByText("dev")).toBeNull();
   });
 
@@ -52,17 +53,28 @@ describe("PhoneShell", () => {
     render(<PhoneShell />);
     expect(await screen.findByText("Sign in with Google to talk.")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Continue with Google" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Change Kit's photo" })).toBeNull();
   });
 
   it("echoes a canned Kit reply in dev without a socket", async () => {
     stubAuth(true);
     render(<PhoneShell />);
     expect(await screen.findByText("live")).toBeTruthy();
-    const box = screen.getByPlaceholderText("Message Kit");
+    const box = screen.getByPlaceholderText(/Message Kit/);
     fireEvent.change(box, { target: { value: "hello kit" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("hello kit")).toBeTruthy();
     expect(await screen.findByText(MOCK_REPLIES[0], {}, { timeout: 1000 })).toBeTruthy();
-    expect(screen.getByText("dev")).toBeTruthy();
+    expect(screen.getByText(/dev/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Change Kit's photo" })).toBeTruthy();
+  });
+
+  it("paints the harness command picker for the cmds sample", async () => {
+    window.history.replaceState({}, "", "/?sample=cmds");
+    stubAuth(true);
+    render(<PhoneShell />);
+    expect(await screen.findByText("These go to the crane, not the chat model.")).toBeTruthy();
+    expect(screen.getByRole("option", { name: /^\/new / })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "harness commands" })).toBeTruthy();
   });
 });

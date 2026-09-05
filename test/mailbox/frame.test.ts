@@ -87,4 +87,13 @@ describe("frame", () => {
     const fromBuf = parseFrame(new TextEncoder().encode('{"text":"buf"}'));
     expect(fromBuf.ok && fromBuf.frame.text).toBe("buf");
   });
+
+  it("accepts a crane cmds catalog", () => {
+    const got = parseFrame(JSON.stringify({
+      kind: "cmds",
+      commands: [{ name: "NEW", hint: "reset this session", args: true }, { name: "nope" }],
+    }));
+    expect(got.ok && got.frame.kind).toBe("cmds");
+    expect(got.ok && got.frame.commands).toEqual([{ name: "new", hint: "reset this session", args: true }]);
+  });
 });

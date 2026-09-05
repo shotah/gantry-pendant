@@ -57,7 +57,10 @@ The Vinext app is the front door (chat UI + Google login). The Durable
 Object is the room. Phone and crane both **connect in**. Hibernation
 keeps the sockets without billing idle CPU. A short SQLite queue on
 the DO holds messages while the other side is gone (Mini reboot, app
-backgrounded).
+backgrounded). Kit’s face is a JPEG blob on that same DO (`GET/POST
+/api/avatar`) — not a chat `images[]` turn. Gantree’s Photo fold writes
+`persona/avatar.jpg` and, for `CHANNEL=pendant`, POSTs it here the way
+it calls `setMyProfilePhoto` for Telegram.
 
 This is not Gantree’s `app/` deployed to Workers. Gantree stays Node on
 the Mini. Vinext’s Workers target is what this second app uses because
@@ -106,6 +109,12 @@ channel.Push →  Outbound           → cron / spark / watch
 `ThreadID`. Streaming is optional (`ReplyWriter` on the context). A first
 relay channel can send whole replies; placeholder + edit can wait. A DO
 WebSocket makes that edit cheap later.
+
+Slash commands are the same list Telegram registers (`setMyCommands`).
+The catalog lives in ai-gantry `internal/slash`. `/help`, stdio’s ready
+line, Telegram’s `/` menu, and pendant’s picker all read it. The crane
+publishes a `cmds` frame when it dials the mailbox; the DO remembers it
+for the next phone connect. Pendant does not keep a second copy.
 
 Phone **context** is extra on the mailbox frame, not a second chat
 API. GPS (and later battery / net) ride next to `text`. The relay
@@ -172,6 +181,11 @@ The architecture does not care about stores. The client is a WebSocket
 (and later HTTP for history/media) consumer of the Worker. Location
 uses the browser Geolocation API on send; Expo later if we want
 background or motion.
+
+Vinext is Next-shaped on Vite: `app/manifest.ts` is a metadata route
+(`/manifest.webmanifest`, `application/manifest+json`). Icons and
+`public/sw.js` are static. Chrome Install is that manifest + 192/512
+PNGs on HTTPS (or loopback). No extra PWA plugin. Expo is later.
 
 ```text
 PWA (both phones)  ─┐

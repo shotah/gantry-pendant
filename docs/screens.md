@@ -12,6 +12,9 @@ canned Ada/Kit turns — not a live crane.
 ## Phone
 
 The product viewport is a pocket (390×844). Theme defaults to Night.
+Kit’s face sits in the header (tap to replace it). Empty and unsigned
+screens use the same mark. Fallback is the pendant glyph until a JPEG
+is saved on the Durable Object.
 
 <p align="center">
   <img src="../assets/docs/login.png" alt="Sign in with Google" width="220">
@@ -41,7 +44,8 @@ The product viewport is a pocket (390×844). Theme defaults to Night.
 | --- | --- | --- |
 | `login` | `/login` | Google door. Allowlisted accounts only. |
 | `unsigned` | `/?sample=unsigned` | Same gate inside the shell. |
-| `empty` | `/?sample=empty` | Live, nothing said yet. GPS attaches on send. |
+| `empty` | `/?sample=empty` | Live, nothing said yet. GPS attaches on send. Type `/` for harness commands. |
+| `cmds` | `/?sample=cmds` | Command picker. Live list is published by the crane (`cmds` frame); this sample paints a short stand-in. |
 | `thread` | `/?sample=thread` | Ada ↔ Kit. Pin is this-send. |
 | `ping` | `/?sample=ping` | Cron `Push` — labeled **ping**. |
 | `photo` | `/?sample=photo` | Inbound image + text. |
@@ -57,7 +61,7 @@ The product viewport is a pocket (390×844). Theme defaults to Night.
 
 ```bash
 cp .dev.vars.example .dev.vars
-npm run dev                      # http://127.0.0.1:3000
+npm run dev                      # http://127.0.0.1:3000 (Chrome Install works on loopback)
 ```
 
 `PENDANT_DEV=1` on loopback:

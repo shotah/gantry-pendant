@@ -8,7 +8,13 @@ export const metadata: Metadata = {
   description: "Handheld mouth for an ai-gantry crane",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "pendant", statusBarStyle: "black-translucent" },
-  icons: { icon: [{ url: "/icon.svg", type: "image/svg+xml" }] },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -25,7 +31,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <style dangerouslySetInnerHTML={{ __html: themeCss() }} />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/icon.svg" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="min-h-dvh bg-canvas text-body antialiased">
         <RegisterSW />

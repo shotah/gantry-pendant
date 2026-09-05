@@ -27,4 +27,46 @@ describe("Compose", () => {
     fireEvent.change(input, { target: { files: [file] } });
     expect(onPhoto).toHaveBeenCalled();
   });
+
+  it("lists harness commands from a supplied catalog", () => {
+    const onSend = vi.fn();
+    const catalog = [
+      { name: "new", hint: "reset this session" },
+      { name: "tools", hint: "prefixed tool catalog" },
+      { name: "tokens", hint: "prompt token breakdown" },
+      { name: "toolstats", hint: "per-tool call ledger" },
+    ];
+    render(<Compose onSend={onSend} commands catalog={catalog} placeholder="Message Kit" />);
+    expect(screen.queryByRole("listbox", { name: "Harness commands" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "harness commands" }));
+    expect(screen.getByText("These go to the crane, not the chat model.")).toBeTruthy();
+    expect(screen.getByRole("option", { name: /^\/new / })).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText("Message Kit"), { target: { value: "/to" } });
+    expect(screen.getByRole("option", { name: /^\/tools / })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /^\/tokens / })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /^\/new / })).toBeNull();
+    fireEvent.click(screen.getByRole("option", { name: /^\/tools / }));
+    expect(onSend).not.toHaveBeenCalled();
+    expect((screen.getByPlaceholderText("Message Kit") as HTMLTextAreaElement).value).toBe("/tools");
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(onSend).toHaveBeenCalledWith("/tools");
+  });
+
+  it("inserts a trailing space for arg commands and Enter picks the highlight", () => {
+    const onSend = vi.fn();
+    const catalog = [
+      { name: "new", hint: "reset this session" },
+      { name: "cancel", hint: "stop the in-flight turn" },
+      { name: "brief", hint: "hold a prefix ~6h", args: true },
+    ];
+    render(<Compose onSend={onSend} commands catalog={catalog} initialText="/" placeholder="Message Kit" />);
+    const box = screen.getByPlaceholderText("Message Kit");
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(onSend).not.toHaveBeenCalled();
+    expect((box as HTMLTextAreaElement).value).toBe("/cancel");
+    fireEvent.change(box, { target: { value: "/brief" } });
+    fireEvent.click(screen.getByRole("option", { name: /^\/brief / }));
+    expect((box as HTMLTextAreaElement).value).toBe("/brief ");
+  });
 });

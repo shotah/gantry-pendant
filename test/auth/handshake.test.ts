@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { handshake, rateId, roleFromQuery, stampUserId } from "@/lib/auth/handshake";
+import { handshake, handshakeSlug, rateId, roleFromQuery, stampUserId } from "@/lib/auth/handshake";
 import { mintSession, SESSION_COOKIE } from "@/lib/auth/session";
 
 describe("handshake", () => {
@@ -109,5 +109,40 @@ describe("handshake", () => {
     expect(stampUserId({ kind: "phone", sub: "1182" })).toBe("1182");
     expect(stampUserId({ kind: "spike", role: "phone" })).toBe("spike");
     expect(stampUserId({ kind: "crane", slug: "kit" })).toBeUndefined();
+  });
+});
+
+describe("handshakeSlug", () => {
+  it("accepts the spike secret without a role", async () => {
+    const env = { MAILBOX_SECRET: "shared" };
+    const ok = await handshakeSlug({ env, slug: "kit", querySecret: "shared" });
+    expect(ok.ok && ok.principal.kind).toBe("spike");
+    const bad = await handshakeSlug({ env, slug: "kit", querySecret: "nope" });
+    expect(bad).toEqual({ ok: false, error: "unauthorized" });
+  });
+
+  it("accepts a phone cookie or a crane bearer", async () => {
+    const env = {
+      GOOGLE_CLIENT_ID: "id",
+      ALLOWED_SUBS: "1182:ada@x.com",
+      SESSION_SECRET: "sess-secret",
+      CRANE_BEARERS: "kit:crane-tok",
+    };
+    const now = Date.UTC(2026, 8, 4);
+    const session = await mintSession(env.SESSION_SECRET, { sub: "1182", email: "ada@x.com" }, now);
+    const phone = await handshakeSlug({
+      env,
+      slug: "kit",
+      cookieHeader: `${SESSION_COOKIE}=${encodeURIComponent(session)}`,
+      now,
+    });
+    expect(phone.ok && phone.principal.kind === "phone" && phone.principal.sub).toBe("1182");
+    const crane = await handshakeSlug({
+      env,
+      slug: "kit",
+      authorization: "Bearer crane-tok",
+      now,
+    });
+    expect(crane).toEqual({ ok: true, principal: { kind: "crane", slug: "kit" } });
   });
 });

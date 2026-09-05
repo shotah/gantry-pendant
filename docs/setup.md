@@ -136,6 +136,11 @@ the three `PENDANT_*` keys (or change mouth from telegram). Save.
 Then **recreate**, not restart. ai-gantry reads the list at boot. An
 empty `PENDANT_ALLOWED_USERS` fails boot (same as Telegram).
 
+Kit’s photo is `persona/avatar.jpg` on the Mini (Photo fold), same JPEG
+gate as Telegram. When `CHANNEL=pendant`, Gantree also POSTs that file
+to this Worker (`/api/avatar?slug=`). The phone can replace it from the
+header. Chat photos never become the face.
+
 Gantree does **not** push `ALLOWED_SUBS` or `CRANE_BEARERS` to
 Cloudflare. After you add a human, you still `wrangler secret put
 ALLOWED_SUBS` (or the dashboard) with the **same** `sub`.
@@ -165,12 +170,17 @@ exists, that is the whole admin path.
 The human does **not** need a Gantree login.
 
 1. Admin has already pasted their `sub` on both lists and recreated.
-2. Open the pendant origin on the phone (HTTPS). Optional: Add to Home
-   Screen.
+2. Open the pendant origin (HTTPS, or `http://127.0.0.1:3000` on a
+   laptop). Chrome: **Install** in the address bar (desktop) or the
+   menu (Android). iPhone Safari: Share → Add to Home Screen. Vinext
+   serves the web app manifest at `/manifest.webmanifest`.
 3. Sign in with Google (the account whose `sub` is on the list).
 4. Grant location if they want `[last pin]` this-send. Denied still
    sends text.
 5. Type. Kit answers when the crane socket is up.
+6. Tap Kit’s face in the header to set the same `avatar.jpg` the yard
+   Photo fold uploads (JPEG, 5MB). The Worker stores it; a chat photo
+   is still a turn, not a face change.
 
 If Google works but Kit never answers: they are on the Worker list and
 missing from the crane, or the crane was restarted instead of

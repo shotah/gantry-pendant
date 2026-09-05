@@ -65,7 +65,7 @@ remote, same pattern as `repos/ai-gantry`.
 cp .dev.vars.example .dev.vars   # MAILBOX_SECRET + PENDANT_DEV
 npm install
 npm test
-npm run dev                      # http://127.0.0.1:3000
+npm run dev                      # http://127.0.0.1:3000 — Chrome can Install from here
 ```
 
 Loopback with `PENDANT_DEV=1`: mock Ada, no Google. `/?sample=thread`

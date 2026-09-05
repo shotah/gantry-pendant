@@ -62,6 +62,25 @@ export async function handshake(input: HandshakeInput): Promise<HandshakeResult>
   return oidcHandshake(input, now);
 }
 
+export type HandshakeSlugInput = Omit<HandshakeInput, "role">;
+
+/** HTTP face: phone cookie or crane bearer (or the spike secret). */
+export async function handshakeSlug(input: HandshakeSlugInput): Promise<HandshakeResult> {
+  const mode = resolveAuthMode(input.env);
+  if (!mode.ok) {
+    return { ok: false, error: "config" };
+  }
+  const now = input.now ?? Date.now();
+  if (mode.mode === "spike") {
+    return spikeHandshake(input.env, "phone", { ...input, role: "phone" });
+  }
+  const phone = await oidcHandshake({ ...input, role: "phone" }, now);
+  if (phone.ok) {
+    return phone;
+  }
+  return oidcHandshake({ ...input, role: "crane" }, now);
+}
+
 function spikeHandshake(env: AuthEnv, role: Role, input: HandshakeInput): HandshakeResult {
   const want = env.MAILBOX_SECRET?.trim() ?? "";
   const presented = bearerFrom(input.authorization, input.querySecret);

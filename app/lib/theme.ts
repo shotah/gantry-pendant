@@ -55,7 +55,7 @@ export const THEMES = [
       ok: "#6ee7b7",
       info: "#7dd3fc",
       you: "#3f2e14",
-      kit: "#1c1917",
+      kit: "#292524",
     } satisfies ThemeTokens,
   },
   {
@@ -84,7 +84,7 @@ export const THEMES = [
       ok: "#fbbf24",
       info: "#fdba74",
       you: "#4a1d18",
-      kit: "#241614",
+      kit: "#3a1f18",
     } satisfies ThemeTokens,
   },
   {
@@ -113,7 +113,7 @@ export const THEMES = [
       ok: "#047857",
       info: "#0f4c81",
       you: "#f0e4d4",
-      kit: "#fffdf8",
+      kit: "#efe6d8",
     } satisfies ThemeTokens,
   },
   {
@@ -142,7 +142,7 @@ export const THEMES = [
       ok: "#0f766e",
       info: "#0369a1",
       you: "#d4e8ec",
-      kit: "#f7fafc",
+      kit: "#dce6ee",
     } satisfies ThemeTokens,
   },
   {

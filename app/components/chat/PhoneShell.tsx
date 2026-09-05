@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ThemeSelect } from "../shared/ThemeSelect";
+import type { SlashCommand } from "@/app/lib/slash";
 import { Compose } from "./Compose";
+import { KitAvatar } from "./KitAvatar";
 import { Thread, type ChatBubble } from "./Thread";
 import { mailboxUrl, parseIncoming } from "@/app/lib/socket";
 import { browserGeo } from "@/app/lib/geo";
 import { fileToPhoto } from "@/app/lib/photo";
 import { applyTheme, themeFromQuery } from "@/app/lib/theme";
+import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
 import { buildContext } from "@/lib/phone/context";
 import { encodeFrame, type Role } from "@/lib/mailbox/frame";
 import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
@@ -25,6 +28,10 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [status, setStatus] = useState<"idle" | "up" | "down">("idle");
   const [gpsHint, setGpsHint] = useState("GPS attaches on send if the OS allows it.");
   const [messages, setMessages] = useState<ChatBubble[]>([]);
+  const [draft, setDraft] = useState("");
+  const [catalog, setCatalog] = useState<SlashCommand[]>([]);
+  const [avatarRev, setAvatarRev] = useState(0);
+  const [faceHint, setFaceHint] = useState("");
   const wsRef = useRef<WebSocket | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const echoTimer = useRef(0);
@@ -62,6 +69,8 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     const scene = sampleScene(sampleId, role);
     setMessages(scene.messages);
     setStatus(scene.status);
+    setDraft(scene.draft ?? "");
+    setCatalog(scene.catalog ?? []);
     if (scene.gpsHint) {
       setGpsHint(scene.gpsHint);
     }
@@ -70,6 +79,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   useEffect(() => {
     scroller.current?.scrollTo?.({ top: scroller.current.scrollHeight });
   }, [messages]);
+
+  useEffect(() => {
+    setAvatarRev(0);
+    setFaceHint("");
+  }, [slug]);
 
   useEffect(() => {
     return () => window.clearTimeout(echoTimer.current);
@@ -104,6 +118,15 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     ws.onmessage = (ev) => {
       const frame = parseIncoming(String(ev.data));
       if (!frame) {
+        return;
+      }
+      const face = faceRevFromUnknown(frame);
+      if (face) {
+        setAvatarRev(face);
+        return;
+      }
+      if (frame.kind === "cmds") {
+        setCatalog(frame.commands ?? []);
         return;
       }
       const from = phone ? "kit" : "you";
@@ -194,19 +217,41 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     await sendText("", got.url);
   }
 
-  const title = useMemo(() => phone ? "Pendant" : "Crane stand-in", [phone]);
+  const title = useMemo(() => displaySlug(slug), [slug]);
   const hideSecrets = painting;
+  const faceAuth = hideSecrets
+    ? {}
+    : {
+        secret: cfg?.mode === "spike" ? secret || undefined : undefined,
+        bearer: !phone && cfg?.mode === "oidc" ? bearer || undefined : undefined,
+      };
+  const canEditFace = Boolean(slug) && !needGoogle;
+
+  const faceProps = {
+    slug: slug || "kit",
+    rev: avatarRev,
+    editable: canEditFace,
+    onRev: setAvatarRev,
+    onError: setFaceHint,
+    ...faceAuth,
+  };
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas" data-shot={phone ? "phone" : "crane"}>
       <header className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-2">
-        <p className="text-sm font-medium text-fg">{title}</p>
-        <span className={`text-[11px] ${status === "up" ? "text-ok" : "text-dim"}`}>
-          {status === "up" ? "live" : status === "down" ? "down" : "idle"}
-        </span>
-        {cfg?.dev && !painting
-          ? <span className="text-[11px] text-dim">dev</span>
-          : null}
+        <div className="flex min-w-0 items-center gap-2">
+          <KitAvatar {...faceProps} size="md" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-fg">{title}</p>
+            <p className="text-[11px] text-dim">
+              <span className={status === "up" ? "text-ok" : "text-dim"}>
+                {status === "up" ? "live" : status === "down" ? "down" : "idle"}
+              </span>
+              {cfg?.dev && !painting ? " · dev" : null}
+              {phone ? null : " · stand-in"}
+            </p>
+          </div>
+        </div>
         <label className="ml-auto flex items-center gap-1 text-xs text-muted">
           slug
           <input
@@ -259,9 +304,13 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           : null}
         <ThemeSelect />
       </header>
+      {faceHint
+        ? <p className="border-b border-line px-3 py-1 text-[11px] text-danger">{faceHint}</p>
+        : null}
       {needGoogle
         ? (
             <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+              <KitAvatar {...faceProps} size="lg" editable={false} />
               <p className="text-sm text-body">Sign in with Google to talk.</p>
               <a className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark" href="/api/auth/google">
                 Continue with Google
@@ -271,12 +320,26 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         : (
             <>
               <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
-                <Thread messages={messages} />
+                <Thread
+                  messages={messages}
+                  empty={(
+                    <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
+                      <KitAvatar {...faceProps} size="lg" editable={false} />
+                      <p className="text-sm text-dim">
+                        Nothing yet. Type below — or / for harness commands.
+                      </p>
+                    </div>
+                  )}
+                />
               </div>
               <Compose
+                key={`${sampleId ?? "live"}:${draft}`}
                 disabled={status !== "up"}
-                placeholder={phone ? "Message Kit" : "Reply as the crane"}
+                placeholder={phone ? `Message ${title} · / for commands` : "Reply as the crane"}
                 gpsHint={phone ? gpsHint : undefined}
+                commands={phone}
+                catalog={catalog}
+                initialText={draft}
                 onSend={(t) => void sendText(t)}
                 onPhoto={phone ? (f) => void sendPhoto(f) : undefined}
               />

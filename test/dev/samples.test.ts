@@ -51,6 +51,9 @@ describe("samples", () => {
     expect(sampleScene("down", "phone").status).toBe("down");
     expect(sampleScene("crane", "crane").messages[1]?.text).toBe(SAMPLE_LINES.craneKit);
     expect(sampleScene("thread", "crane").gpsHint).toBeUndefined();
+    expect(sampleScene("cmds", "phone").draft).toBe("/");
+    expect(sampleScene("cmds", "phone").catalog?.map((c) => c.name)).toEqual(["new", "status", "brief"]);
+    expect(sampleScene("empty", "phone").draft).toBeUndefined();
   });
 
   it("rotates canned Kit replies", () => {

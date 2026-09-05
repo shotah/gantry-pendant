@@ -31,6 +31,12 @@ const SHOTS = {
     phone: true,
   },
   empty: { path: "/?sample=empty", sel: "[data-shot=phone]", text: "Nothing yet", phone: true },
+  cmds: {
+    path: "/?sample=cmds",
+    sel: "[data-shot=phone]",
+    text: "These go to the crane, not the chat model",
+    phone: true,
+  },
   thread: {
     path: "/?sample=thread",
     sel: "[data-shot=phone]",

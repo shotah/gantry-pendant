@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 export type ChatBubble = {
   id: string;
   from: "you" | "kit";
@@ -9,9 +11,9 @@ export type ChatBubble = {
   photo?: string;
 };
 
-export function Thread({ messages }: { messages: ChatBubble[] }) {
+export function Thread({ messages, empty }: { messages: ChatBubble[]; empty?: ReactNode }) {
   if (!messages.length) {
-    return (
+    return empty ?? (
       <p className="px-4 py-8 text-center text-sm text-dim">
         Nothing yet. Type below — the other side of this room hears it.
       </p>
@@ -27,7 +29,7 @@ export function Thread({ messages }: { messages: ChatBubble[] }) {
               className={`max-w-[85%] rounded-2xl border px-3 py-2 text-sm leading-relaxed ${
                 mine
                   ? "border-accent-line bg-you text-fg"
-                  : "border-line bg-kit text-body"
+                  : "border-line bg-kit text-body shadow-sm"
               }`}
             >
               {m.kind === "push"
