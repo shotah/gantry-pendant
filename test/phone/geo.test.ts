@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readGeo } from "@/lib/phone/geo";
+import { geoHint, readGeo } from "@/lib/phone/geo";
 
 describe("readGeo", () => {
   it("omits when the API is missing", async () => {
@@ -37,5 +37,11 @@ describe("readGeo", () => {
       },
     });
     expect(denied).toEqual({ ok: false, reason: "denied" });
+  });
+
+  it("formats a compose hint", () => {
+    expect(geoHint(false, null)).toBe("GPS off");
+    expect(geoHint(true, { ok: false, reason: "denied" })).toBe("GPS omitted (denied or unavailable)");
+    expect(geoHint(true, { ok: true, geo: { lat: 1, lon: 2, accuracy_m: 12.4 } })).toBe("pin ±12m this send");
   });
 });

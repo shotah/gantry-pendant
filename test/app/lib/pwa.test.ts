@@ -9,6 +9,7 @@ describe("pwa", () => {
     expect(PENDANT_MANIFEST.display).toBe("standalone");
     expect(PENDANT_MANIFEST.start_url).toBe("/");
     expect(PENDANT_MANIFEST.icons.some((i) => i.src === "/icon.svg")).toBe(true);
+    expect(PENDANT_MANIFEST.shortcuts.map((s) => s.url)).toEqual(["/#compose", "/?pin=1"]);
   });
 
   it("names the gaps Chromium cares about", () => {

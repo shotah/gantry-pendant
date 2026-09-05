@@ -27,5 +27,12 @@ describe("shouldPassthroughJpeg", () => {
     expect(shouldPassthroughJpeg({ type: "image/jpeg", size: 100, width: 64, height: 64 })).toBe(true);
     expect(shouldPassthroughJpeg({ type: "image/png", size: 100, width: 64, height: 64 })).toBe(false);
     expect(shouldPassthroughJpeg({ type: "image/jpeg", size: 100, width: 2000, height: 64 })).toBe(false);
+    expect(shouldPassthroughJpeg({
+      type: "image/jpeg",
+      size: 2_000_000,
+      width: 64,
+      height: 64,
+      maxBytes: 1_500_000,
+    })).toBe(false);
   });
 });

@@ -162,10 +162,10 @@ You cannot run telegram + pendant in the same process.
 | iPhone “Add to Home Screen” | installable; background is still weak | confirm on-device (P5 walk still open); needs `apple-touch-icon` PNG |
 | Android / desktop Chrome Install | needs HTTPS (`workers.dev` is; loopback counts) plus 192×192 and 512×512 **PNG** icons | Vinext `app/manifest.ts` → `/manifest.webmanifest`; SVG-only fails Chromium’s rule |
 | Chrome Install never appears | already installed, or no click + 30s on the page (engagement heuristic) | DevTools → Application → Manifest still shows Install |
-| GPS denied / HTTP / no gesture | message still sends; no `context.geo` | expected; do not block send |
+| GPS denied / HTTP / no gesture / toggle off | message still sends; no `context.geo` | expected; do not block send |
 | iOS `watchPosition` | killed in the background | we only `getCurrentPosition` on send |
-| HEIC / iPhone photo | `image/heic` is rejected | ask the OS for JPEG, or convert later |
-| Photo > ~1.5 MB | 413 / “too large” | compress in-app (Later) or a smaller shot |
+| HEIC / iPhone photo | canvas JPEG when `createImageBitmap` can decode | otherwise “bad photo” |
+| Photo > ~1.5 MB | compress in-app to the chat cap | still 413 if encode cannot shrink enough |
 | Lock screen ping while app is dead | no APNs / FCM | cron only lands if the socket is up |
 | Queue while Mini reboots | ≤50 frames, 1 hour TTL, then drop | short note, not `gantry.db` |
 | Rate limit (30 frames / 256 KB per min) | socket stays up, frames return `rate` | looks like “she ignored me” |
@@ -173,7 +173,7 @@ You cannot run telegram + pendant in the same process.
 | Service worker | no chat cache (good) | also no offline compose |
 
 SSID / BSSID / Bluetooth / clipboard must never go on the wire. Battery
-and `net` may be sent later; the prompt stays stingy.
+and `net` attach on send when the OS exposes them; the prompt stays stingy.
 
 ---
 

@@ -10,6 +10,16 @@ type GeoApi = {
   ) => void;
 };
 
+export function geoHint(enabled: boolean, geo: GeoResult | null): string {
+  if (!enabled) {
+    return "GPS off";
+  }
+  if (geo?.ok) {
+    return `pin ±${Math.round(geo.geo.accuracy_m ?? 0)}m this send`;
+  }
+  return "GPS omitted (denied or unavailable)";
+}
+
 /** One-shot fix on send. Denied or missing API → omit geo. Never watchPosition. */
 export function readGeo(api: GeoApi | null | undefined, timeoutMs = 8_000): Promise<GeoResult> {
   if (!api) {

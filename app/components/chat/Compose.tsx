@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { matchSlash, slashInsert, slashToken, type SlashCommand } from "@/app/lib/slash";
 
 export function Compose({
@@ -8,7 +8,10 @@ export function Compose({
   placeholder,
   onSend,
   onPhoto,
+  onPin,
   gpsHint,
+  gpsOn = true,
+  onGpsToggle,
   commands,
   catalog = [],
   initialText = "",
@@ -17,7 +20,10 @@ export function Compose({
   placeholder?: string;
   onSend: (text: string) => void;
   onPhoto?: (file: File) => void;
+  onPin?: () => void;
   gpsHint?: string;
+  gpsOn?: boolean;
+  onGpsToggle?: () => void;
   commands?: boolean;
   catalog?: readonly SlashCommand[];
   initialText?: string;
@@ -32,6 +38,12 @@ export function Compose({
   const waiting = Boolean(commands && catalog.length === 0 && slashToken(text) != null);
   const open = Boolean(commands && !disabled && !dismissed && (matches.length > 0 || waiting));
   const highlight = matches[Math.min(active, Math.max(0, matches.length - 1))];
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash === "#compose") {
+      boxRef.current?.focus();
+    }
+  }, []);
 
   function setDraft(next: string) {
     setText(next);
@@ -70,8 +82,30 @@ export function Compose({
 
   return (
     <form onSubmit={submit} className="relative border-t border-line bg-panel p-3">
-      {gpsHint
-        ? <p className="mb-2 text-[11px] text-dim">{gpsHint}</p>
+      {gpsHint || onGpsToggle
+        ? (
+            <div className="mb-2 flex items-center justify-between gap-2">
+              {gpsHint
+                ? <p className="min-w-0 text-[11px] text-dim">{gpsHint}</p>
+                : <span />}
+              {onGpsToggle
+                ? (
+                    <button
+                      type="button"
+                      aria-pressed={gpsOn}
+                      aria-label={gpsOn ? "GPS on" : "GPS off"}
+                      title={gpsOn ? "GPS on — tap to skip the pin" : "GPS off — tap to attach a pin"}
+                      className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${
+                        gpsOn ? "border-accent-line text-mark" : "border-line text-muted"
+                      }`}
+                      onClick={onGpsToggle}
+                    >
+                      GPS
+                    </button>
+                  )
+                : null}
+            </div>
+          )
         : null}
       {open
         ? (
@@ -118,7 +152,7 @@ export function Compose({
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -139,6 +173,20 @@ export function Compose({
               </>
             )
           : null}
+        {onPin
+          ? (
+              <button
+                type="button"
+                aria-label="drop pin"
+                title="Silent pin — update Kit's last pin, no reply"
+                className="rounded border border-line px-2 text-sm text-muted"
+                disabled={disabled || !gpsOn}
+                onClick={onPin}
+              >
+                pin
+              </button>
+            )
+          : null}
         {commands
           ? (
               <button
@@ -157,6 +205,7 @@ export function Compose({
           : null}
         <textarea
           ref={boxRef}
+          id="compose"
           className="min-h-11 flex-1 resize-none rounded-xl border border-edge bg-canvas px-3 py-2 text-sm text-fg"
           rows={2}
           value={text}

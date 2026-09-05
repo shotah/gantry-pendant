@@ -22,8 +22,12 @@ export function shouldPassthroughJpeg(opts: {
   size: number;
   width: number;
   height: number;
+  edge?: number;
+  maxBytes?: number;
 }): boolean {
+  const limit = opts.edge ?? AVATAR_EDGE;
+  const maxBytes = opts.maxBytes ?? AVATAR_MAX_BYTES;
   const edge = Math.max(opts.width, opts.height);
-  const scale = Math.min(1, AVATAR_EDGE / Math.max(1, edge));
-  return opts.type === "image/jpeg" && scale === 1 && opts.size <= AVATAR_MAX_BYTES;
+  const scale = Math.min(1, limit / Math.max(1, edge));
+  return opts.type === "image/jpeg" && scale === 1 && opts.size <= maxBytes;
 }

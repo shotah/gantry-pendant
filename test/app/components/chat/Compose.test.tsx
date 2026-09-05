@@ -69,4 +69,20 @@ describe("Compose", () => {
     fireEvent.click(screen.getByRole("option", { name: /^\/brief / }));
     expect((box as HTMLTextAreaElement).value).toBe("/brief ");
   });
+
+  it("toggles GPS and pins when asked", () => {
+    const onPin = vi.fn();
+    const onGpsToggle = vi.fn();
+    const { rerender } = render(
+      <Compose onSend={vi.fn()} onPin={onPin} gpsOn onGpsToggle={onGpsToggle} gpsHint="GPS on send" />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "GPS on" }));
+    expect(onGpsToggle).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "drop pin" }));
+    expect(onPin).toHaveBeenCalledOnce();
+    rerender(
+      <Compose onSend={vi.fn()} onPin={onPin} gpsOn={false} onGpsToggle={onGpsToggle} gpsHint="GPS off" />,
+    );
+    expect((screen.getByRole("button", { name: "drop pin" }) as HTMLButtonElement).disabled).toBe(true);
+  });
 });

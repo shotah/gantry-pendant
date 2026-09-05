@@ -1,5 +1,8 @@
 import { IMAGE_BYTES_MAX } from "../mailbox/caps";
 
+/** Chat photos: smaller than avatar face edge; still under IMAGE_BYTES_MAX after encode. */
+export const CHAT_PHOTO_EDGE = 1600;
+
 export type PhotoOk = { ok: true; url: string };
 export type PhotoErr = { ok: false; error: "too large" | "bad photo" };
 export type PhotoResult = PhotoOk | PhotoErr;

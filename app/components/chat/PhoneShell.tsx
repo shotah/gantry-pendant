@@ -7,11 +7,18 @@ import { Compose } from "./Compose";
 import { KitAvatar } from "./KitAvatar";
 import { Thread, type ChatBubble } from "./Thread";
 import { mailboxUrl, parseIncoming } from "@/app/lib/socket";
+import { browserBattery } from "@/app/lib/battery";
+import { browserBumpBadge, browserClearBadge } from "@/app/lib/badge";
 import { browserGeo } from "@/app/lib/geo";
+import { browserBuzzPush } from "@/app/lib/haptic";
+import { browserNet } from "@/app/lib/net";
 import { fileToPhoto } from "@/app/lib/photo";
+import { browserGeoPref, saveGeoPref } from "@/app/lib/prefs";
 import { applyTheme, themeFromQuery } from "@/app/lib/theme";
+import { browserWakeLock, releaseScreenWake, type WakeLockSentinel } from "@/app/lib/wake";
 import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
 import { buildContext } from "@/lib/phone/context";
+import { geoHint } from "@/lib/phone/geo";
 import { encodeFrame, type Role } from "@/lib/mailbox/frame";
 import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
 
@@ -27,6 +34,8 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [sampleId, setSampleId] = useState<SampleId | null>(null);
   const [status, setStatus] = useState<"idle" | "up" | "down">("idle");
   const [gpsHint, setGpsHint] = useState("GPS attaches on send if the OS allows it.");
+  const [gpsOn, setGpsOn] = useState(true);
+  const [prefsReady, setPrefsReady] = useState(false);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
   const [draft, setDraft] = useState("");
   const [catalog, setCatalog] = useState<SlashCommand[]>([]);
@@ -36,6 +45,10 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const scroller = useRef<HTMLDivElement>(null);
   const echoTimer = useRef(0);
   const echoCount = useRef(0);
+  const wakeRef = useRef<WakeLockSentinel | null>(null);
+  const badgeRef = useRef(0);
+  const pinConsumed = useRef(false);
+  const sendPinRef = useRef<() => Promise<void>>(async () => {});
   const phone = role === "phone";
   const painting = Boolean(cfg?.dev && sampleId);
   const localEcho = Boolean(cfg?.dev && !sampleId && phone);
@@ -86,8 +99,40 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   }, [slug]);
 
   useEffect(() => {
-    return () => window.clearTimeout(echoTimer.current);
+    if (!phone) {
+      setPrefsReady(true);
+      return;
+    }
+    const on = browserGeoPref();
+    setGpsOn(on);
+    if (!on) {
+      setGpsHint("GPS off");
+    }
+    setPrefsReady(true);
+  }, [phone]);
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(echoTimer.current);
+      void releaseScreenWake(wakeRef.current);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!phone) {
+      return;
+    }
+    function onVis() {
+      if (document.hidden) {
+        void releaseScreenWake(wakeRef.current);
+        wakeRef.current = null;
+      } else {
+        badgeRef.current = browserClearBadge();
+      }
+    }
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [phone]);
 
   const needGoogle = Boolean(
     phone && (
@@ -113,7 +158,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     const ws = new WebSocket(url);
     wsRef.current = ws;
     ws.onopen = () => setStatus("up");
-    ws.onclose = () => setStatus("down");
+    ws.onclose = () => {
+      setStatus("down");
+      void releaseScreenWake(wakeRef.current);
+      wakeRef.current = null;
+    };
     ws.onerror = () => setStatus("down");
     ws.onmessage = (ev) => {
       const frame = parseIncoming(String(ev.data));
@@ -141,6 +190,12 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           photo: frame.images?.[0]?.url,
         },
       ]);
+      if (phone) {
+        void releaseScreenWake(wakeRef.current);
+        wakeRef.current = null;
+        browserBuzzPush(frame.kind);
+        badgeRef.current = browserBumpBadge(badgeRef.current, frame.kind);
+      }
     };
   }, [bearer, canSocket, cfg?.mode, phone, role, secret, slug]);
 
@@ -161,36 +216,79 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     setStatus("up");
   }, [painting, canSocket, localEcho]);
 
-  async function sendText(text: string, photo?: string) {
-    const geo = phone ? await browserGeo() : { ok: false as const, reason: "unavailable" as const };
-    if (phone) {
-      setGpsHint(geo.ok ? `pin ±${Math.round(geo.geo.accuracy_m ?? 0)}m this send` : "GPS omitted (denied or unavailable)");
+  useEffect(() => {
+    if (!phone || painting || !prefsReady || status !== "up" || pinConsumed.current) {
+      return;
     }
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("pin") !== "1") {
+      return;
+    }
+    pinConsumed.current = true;
+    q.delete("pin");
+    const qs = q.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
+    void sendPinRef.current();
+  }, [phone, painting, prefsReady, status]);
+
+  async function dropWake() {
+    await releaseScreenWake(wakeRef.current);
+    wakeRef.current = null;
+  }
+
+  async function takeWake() {
+    await dropWake();
+    wakeRef.current = await browserWakeLock();
+  }
+
+  async function phoneContext(wantGeo: boolean) {
+    const [geo, battery] = await Promise.all([
+      wantGeo ? browserGeo() : Promise.resolve({ ok: false as const, reason: "unavailable" as const }),
+      browserBattery(),
+    ]);
+    return {
+      geo,
+      context: buildContext({
+        geo: geo.ok ? geo.geo : null,
+        battery: battery.ok ? battery.battery : null,
+        net: browserNet(),
+      }),
+    };
+  }
+
+  async function sendText(text: string, photo?: string) {
+    const wantGeo = phone && gpsOn;
+    const { geo, context } = phone
+      ? await phoneContext(wantGeo)
+      : { geo: { ok: false as const, reason: "unavailable" as const }, context: undefined };
+    if (phone) {
+      setGpsHint(geoHint(wantGeo, geo));
+      badgeRef.current = browserClearBadge();
+      void takeWake();
+    }
+    const trimmed = text.trim();
     const frame = {
-      text,
+      text: trimmed || undefined,
       kind: phone ? "inbound" as const : "reply" as const,
       images: photo ? [{ url: photo }] : undefined,
-      context: phone
-        ? buildContext({
-            geo: geo.ok ? geo.geo : null,
-            net: undefined,
-          })
-        : undefined,
+      context,
     };
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(encodeFrame(frame));
     }
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `${Date.now()}-out`,
-        from: phone ? "you" : "kit",
-        text,
-        at: Date.now(),
-        photo,
-      },
-    ]);
-    if (localEcho && !canSocket && !painting) {
+    if (trimmed || photo) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-out`,
+          from: phone ? "you" : "kit",
+          text: trimmed,
+          at: Date.now(),
+          photo,
+        },
+      ]);
+    }
+    if (localEcho && !canSocket && !painting && (trimmed || photo)) {
       const n = echoCount.current;
       echoCount.current += 1;
       window.clearTimeout(echoTimer.current);
@@ -204,8 +302,37 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             at: Date.now(),
           },
         ]);
+        void dropWake();
       }, 400);
     }
+  }
+
+  async function sendPin() {
+    if (!phone || !gpsOn) {
+      if (phone && !gpsOn) {
+        setGpsHint("GPS off");
+      }
+      return;
+    }
+    const { geo, context } = await phoneContext(true);
+    setGpsHint(geoHint(true, geo));
+    if (!geo.ok) {
+      return;
+    }
+    const frame = { kind: "pin" as const, context };
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(encodeFrame(frame));
+    }
+  }
+  sendPinRef.current = sendPin;
+
+  function toggleGps() {
+    setGpsOn((on) => {
+      const next = !on;
+      saveGeoPref(next);
+      setGpsHint(next ? "GPS attaches on send if the OS allows it." : "GPS off");
+      return next;
+    });
   }
 
   async function sendPhoto(file: File) {
@@ -337,11 +464,14 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                 disabled={status !== "up"}
                 placeholder={phone ? `Message ${title} · / for commands` : "Reply as the crane"}
                 gpsHint={phone ? gpsHint : undefined}
+                gpsOn={gpsOn}
+                onGpsToggle={phone ? toggleGps : undefined}
                 commands={phone}
                 catalog={catalog}
                 initialText={draft}
                 onSend={(t) => void sendText(t)}
                 onPhoto={phone ? (f) => void sendPhoto(f) : undefined}
+                onPin={phone ? () => void sendPin() : undefined}
               />
             </>
           )}

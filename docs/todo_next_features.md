@@ -10,7 +10,7 @@ Chrome Install does **not** unlock extra sensors. HTTPS + an OS
 permission does. Install is a home-screen icon, standalone chrome, and
 a better shot at Web Push. GPS-on-send is already in.
 
-**Wire generous. Prompt stingy.** Coords (and later battery / net) ride
+**Wire generous. Prompt stingy.** Coords, battery, and net ride
 on `context`. Do **not** stuff them into `Message.Text`. Reverse-geocode
 is a maps **tool** on the crane, not a client field. Never on the wire:
 SSID / BSSID, Bluetooth neighbors, clipboard, contacts.
@@ -29,12 +29,17 @@ painful.
 | `at` + `tz` | `lib/phone/context.ts` | phone clock / IANA zone on every phone frame |
 | Geo extras on the type | `lib/mailbox/frame.ts` | `accuracy_m`, `alt_m`, `heading`, `speed_mps` already parse |
 | Bare pin | `isBareGeo` / mailbox `kind: pin` | geo only → silent cursor update, no Completer |
-| Photos | `app/lib/photo.ts` | one JPEG/PNG, ~1.5 MB cap, no compress yet |
+| Photos | `app/lib/photo.ts` | JPEG after in-app compress; HEIC when the OS can decode |
 | PWA install | `app/manifest.ts`, `public/sw.js` | Chrome Install + iPhone Add to Home Screen icons |
 | `here.Set` | ai-gantry pendant channel | `context.geo` → `[last pin]`; Text stays the words |
-| Envelope slots | `PhoneContext` | `battery` and `net` parse today; the phone does not fill them |
+| Envelope slots | `PhoneContext` | `battery` and `net` parse; the phone fills them when the OS exposes the API |
+| GPS toggle | Compose + `pendant.geo` | in-app off skips `getCurrentPosition` without revoking the OS grant |
+| Silent pin | Compose **pin** | `kind: pin`, no bubble, no Completer |
+| Wake / haptic / badge | `lib/phone/wake`, `haptic`, `badge` | screen wake while waiting; vibrate + badge on inbound ping |
+| Shortcuts | `PENDANT_MANIFEST.shortcuts` | Message (`/#compose`) and Pin (`/?pin=1`) |
+| Photo compress | `fileToPhoto` → `jpegFromFile` | HEIC/PNG/oversize → JPEG under `IMAGE_BYTES_MAX` |
 
-`PhoneShell` currently passes `net: undefined` and never reads battery.
+`PhoneShell` attaches `battery` / `net` on send when the browser has the API.
 
 ---
 
@@ -62,10 +67,10 @@ Foreground APIs. Same origin, same socket. Omit when the OS has no API.
 **Prompt:** only if a recipe cares. Do not print `%` on every Completer
 call.
 
-- [ ] `lib/phone/battery.ts` — `navigator.getBattery?.()`; `{ pct, charging }` or `null`
-- [ ] Timeout / missing API → omit (same shape as `readGeo`)
-- [ ] `buildContext({ battery })` from `PhoneShell` on send
-- [ ] Tests: present, missing, `pct` clamped 0–100
+- [x] `lib/phone/battery.ts` — `navigator.getBattery?.()`; `{ pct, charging }` or `null`
+- [x] Timeout / missing API → omit (same shape as `readGeo`)
+- [x] `buildContext({ battery })` from `PhoneShell` on send
+- [x] Tests: present, missing, `pct` clamped 0–100
 - [ ] **Walk:** Chrome desktop or installed Android PWA; send; crane frame has `context.battery`. iPhone omit is OK
 
 Safari has no Battery Status API. Chrome may hide it outside an
@@ -76,10 +81,10 @@ installed PWA. Never block send.
 **Why:** “don’t pull a huge photo on LTE” later; not for the prompt.
 **API:** `navigator.connection` (Chrome Android). iOS: omit.
 
-- [ ] `lib/phone/net.ts` — map `type` / `effectiveType` → `wifi` \| `cellular` \| `unknown`
-- [ ] Unknown / missing → omit or `"unknown"`, never guess from IP
-- [ ] Pass into `buildContext` (replace `net: undefined` in `PhoneShell`)
-- [ ] Tests: wifi, cellular, absent
+- [x] `lib/phone/net.ts` — map `type` / `effectiveType` → `wifi` \| `cellular` \| `unknown`
+- [x] Unknown / missing → omit or `"unknown"`, never guess from IP
+- [x] Pass into `buildContext` (replace `net: undefined` in `PhoneShell`)
+- [x] Tests: wifi, cellular, absent
 - [ ] **Walk:** Android Chrome on LTE vs wifi; iPhone send has no `net`
 
 Do **not** send SSID, BSSID, or cell tower ids.
@@ -89,11 +94,11 @@ Do **not** send SSID, BSSID, or cell tower ids.
 **Why:** OS permission is once; a pendant toggle lets you drop the pin
 without revoking Chrome’s grant.
 
-- [ ] `localStorage` (or cookie-less) flag `pendant.geo=off`
-- [ ] Compose (or header) control: on / off; default on
-- [ ] Off → skip `browserGeo()`, hint “GPS off”
-- [ ] On + denied → keep today’s “omitted” hint; still send
-- [ ] Tests: off never calls geolocation; on denied still sends text
+- [x] `localStorage` (or cookie-less) flag `pendant.geo=off`
+- [x] Compose (or header) control: on / off; default on
+- [x] Off → skip `browserGeo()`, hint “GPS off”
+- [x] On + denied → keep today’s “omitted” hint; still send
+- [x] Tests: off never calls geolocation; on denied still sends text
 - [ ] **Walk:** toggle off, send, crane `here` unchanged; toggle on, send, pin refreshes
 
 ### 1.4 Silent pin button
@@ -101,11 +106,11 @@ without revoking Chrome’s grant.
 **Why:** Telegram bare pin updates `here` with no model turn. The wire
 already has `isBareGeo`. Compose currently requires trimmed text.
 
-- [ ] Pin control next to photo: send `{ context.geo }` with empty text
-- [ ] Do not open Completer (harness already treats bare geo as silent)
-- [ ] Disabled when GPS toggle is off or status is down
-- [ ] Hint updates to `pin ±Nm this send` like a text send
-- [ ] Tests: `isBareGeo` true; UI does not append an empty bubble of words
+- [x] Pin control next to photo: send `{ context.geo }` with empty text
+- [x] Do not open Completer (harness already treats bare geo as silent)
+- [x] Disabled when GPS toggle is off or status is down
+- [x] Hint updates to `pin ±Nm this send` like a text send
+- [x] Tests: `isBareGeo` true; UI does not append an empty bubble of words
 - [ ] **Walk:** tap pin, Kit stays quiet, next text send’s `[last pin]` is fresh
 
 ### 1.5 Wake lock while Kit is thinking
@@ -114,9 +119,9 @@ already has `isBareGeo`. Compose currently requires trimmed text.
 **API:** `navigator.wakeLock.request("screen")`. Drop on reply, hide, or
 error.
 
-- [ ] Request after send when waiting for a `reply`
-- [ ] Release on inbound bubble, socket down, or `visibilitychange`
-- [ ] Ignore failures (desktop, denied, unsupported)
+- [x] Request after send when waiting for a `reply`
+- [x] Release on inbound bubble, socket down, or `visibilitychange`
+- [x] Ignore failures (desktop, denied, unsupported)
 - [ ] **Walk:** send on Android; screen stays on until the bubble lands
 
 ### 1.6 Vibrate on inbound ping
@@ -124,8 +129,8 @@ error.
 **Why:** haptic when a cron `push` lands with the app open.
 **API:** `navigator.vibrate`. Android Chrome only.
 
-- [ ] On `kind === "push"` (and maybe `reply` if you want every turn)
-- [ ] Short pattern; no vibrate when the document is hidden (Push will
+- [x] On `kind === "push"` (and maybe `reply` if you want every turn)
+- [x] Short pattern; no vibrate when the document is hidden (Push will
       own the lock-screen case)
 - [ ] **Walk:** crane stand-in `push`; phone buzzes. iPhone no-op is OK
 
@@ -134,8 +139,8 @@ error.
 **Why:** unread pings on the icon (Chrome Android installed PWA).
 **API:** `navigator.setAppBadge` / `clearAppBadge`.
 
-- [ ] Increment on `push` (and replies while hidden)
-- [ ] Clear when the thread is visible / user sends
+- [x] Increment on `push` (and replies while hidden)
+- [x] Clear when the thread is visible / user sends
 - [ ] **Walk:** background the PWA, send a ping from the crane tab, icon
       shows a count; open the app, badge clears
 
@@ -156,10 +161,10 @@ is weak.
 
 **Why:** long-press icon → Message / Pin.
 
-- [ ] `shortcuts` on `PENDANT_MANIFEST` (`app/lib/pwa.ts`)
-- [ ] `start_url` values the shell can read (`/?pin=1` or `/#compose`)
-- [ ] Pin shortcut only useful after 1.4
-- [ ] Extend `chromeInstallIssues` only if a shortcut would break install
+- [x] `shortcuts` on `PENDANT_MANIFEST` (`app/lib/pwa.ts`)
+- [x] `start_url` values the shell can read (`/?pin=1` or `/#compose`)
+- [x] Pin shortcut only useful after 1.4
+- [x] Extend `chromeInstallIssues` only if a shortcut would break install
       (it should not)
 - [ ] **Walk:** installed Chrome PWA; long-press shows the actions
 
@@ -278,10 +283,10 @@ native wrapper is only the delivery truck. See §6.
 **How:** reuse `jpegFromFile` (avatar canvas path) with chat caps from
 `lib/mailbox/caps.ts`, not avatar 5 MB / face edge.
 
-- [ ] `fileToPhoto`: decode via `createImageBitmap`, JPEG encode, shrink
+- [x] `fileToPhoto`: decode via `createImageBitmap`, JPEG encode, shrink
       until `IMAGE_BYTES_MAX`
-- [ ] HEIC: if bitmap works, convert; else keep a clear error
-- [ ] Tests: oversized JPEG shrinks; tiny JPEG passthrough; bad type
+- [x] HEIC: if bitmap works, convert; else keep a clear error
+- [x] Tests: oversized JPEG shrinks; tiny JPEG passthrough; bad type
 - [ ] **Walk:** iPhone Camera roll → send; Android big PNG → send
 
 ### 4.2 Streaming placeholder + edit
@@ -398,8 +403,8 @@ screen consumes a moving pin.
 
 ## Suggested first three PRs
 
-1. **This repo:** battery + net collect (1.1–1.2) — types already parse
-2. **This repo:** GPS toggle + silent pin (1.3–1.4) — uses `isBareGeo`
+1. ~~**This repo:** battery + net collect (1.1–1.2)~~ **in**
+2. ~~**This repo:** GPS toggle + silent pin (1.3–1.4)~~ **in** (plus wake / vibrate / badge / shortcuts / photo compress)
 3. **ai-gantry + maps:** pin in tool args (2.1) — no new phone API
 
 Push (3.1) is the first item that changes the product when the app is

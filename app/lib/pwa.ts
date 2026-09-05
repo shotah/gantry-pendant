@@ -9,6 +9,13 @@ export type ManifestIcon = {
   purpose?: string;
 };
 
+export type ManifestShortcut = {
+  name: string;
+  short_name?: string;
+  url: string;
+  icons?: ManifestIcon[];
+};
+
 export type WebAppManifest = {
   name?: string;
   short_name?: string;
@@ -21,6 +28,7 @@ export type WebAppManifest = {
   theme_color?: string;
   prefer_related_applications?: boolean;
   icons?: ManifestIcon[];
+  shortcuts?: ManifestShortcut[];
 };
 
 const INSTALLABLE_DISPLAY = new Set<WebAppManifest["display"]>([
@@ -47,6 +55,10 @@ export const PENDANT_MANIFEST = {
     { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
     { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+  ],
+  shortcuts: [
+    { name: "Message", short_name: "Message", url: "/#compose" },
+    { name: "Pin", short_name: "Pin", url: "/?pin=1" },
   ],
 } as const satisfies WebAppManifest;
 

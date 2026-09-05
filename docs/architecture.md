@@ -117,7 +117,7 @@ publishes a `cmds` frame when it dials the mailbox; the DO remembers it
 for the next phone connect. Pendant does not keep a second copy.
 
 Phone **context** is extra on the mailbox frame, not a second chat
-API. GPS (and later battery / net) ride next to `text`. The relay
+API. GPS, battery, and net ride next to `text`. The relay
 channel maps `context.geo` → `here.Set` (same pin the clock footer
 already prints). It does **not** prepend `[location]` to `Text` —
 Telegram does that for an explicit pin, and putting it on every turn

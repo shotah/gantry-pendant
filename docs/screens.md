@@ -44,7 +44,7 @@ is saved on the Durable Object.
 | --- | --- | --- |
 | `login` | `/login` | Google door. Allowlisted accounts only. |
 | `unsigned` | `/?sample=unsigned` | Same gate inside the shell. |
-| `empty` | `/?sample=empty` | Live, nothing said yet. GPS attaches on send. Type `/` for harness commands. |
+| `empty` | `/?sample=empty` | Live, nothing said yet. GPS toggle + silent pin on compose. Type `/` for harness commands. |
 | `cmds` | `/?sample=cmds` | Command picker. Live list is published by the crane (`cmds` frame); this sample paints a short stand-in. |
 | `thread` | `/?sample=thread` | Ada ↔ Kit. Pin is this-send. |
 | `ping` | `/?sample=ping` | Cron `Push` — labeled **ping**. |

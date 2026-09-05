@@ -38,7 +38,7 @@ describe("jpegFromFile", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (cb) {
       cb(new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: "image/jpeg" }));
     });
-    const blob = await jpegFromFile(jpegFile({ type: "image/png" }));
+    const blob = await jpegFromFile(jpegFile({ type: "image/png" }), { edge: 1600, maxBytes: 1_500_000 });
     expect(blob.type).toBe("image/jpeg");
   });
 

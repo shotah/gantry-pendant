@@ -165,8 +165,8 @@ near me” / leave-by / directions should not require a ritual pin.
 | --- | --- | --- |
 | `geo`: lat, lon, `accuracy_m` | `here.Set` every turn → existing `[last pin]` footer | **Not** copied into `Message.Text` |
 | `at` + IANA `tz` from the phone | Already have a clock footer; phone tz can beat a stale profile | No |
-| `battery` pct + charging | Later, if cron should hush at 4% | No |
-| `net`: wifi / cellular | Later | No |
+| `battery` pct + charging | On the wire when the OS exposes it; prompt only if cron cares | No |
+| `net`: wifi / cellular | On the wire when `navigator.connection` exists (Chrome Android) | No |
 
 Do **not** stuff `[location]` into the user text on every send. That
 is how Telegram location messages work, and it would re-bill coords

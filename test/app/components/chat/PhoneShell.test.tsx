@@ -20,12 +20,15 @@ function stubAuth(dev: boolean) {
 
 beforeEach(() => {
   window.history.replaceState({}, "", "/");
+  window.localStorage.removeItem("pendant.geo");
 });
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   window.history.replaceState({}, "", "/");
+  window.localStorage.removeItem("pendant.geo");
+  Reflect.deleteProperty(navigator, "geolocation");
 });
 
 describe("PhoneShell", () => {
@@ -76,5 +79,32 @@ describe("PhoneShell", () => {
     expect(await screen.findByText("These go to the crane, not the chat model.")).toBeTruthy();
     expect(screen.getByRole("option", { name: /^\/new / })).toBeTruthy();
     expect(screen.getByRole("button", { name: "harness commands" })).toBeTruthy();
+  });
+
+  it("skips geolocation when GPS is toggled off", async () => {
+    const geo = vi.fn();
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: { getCurrentPosition: geo },
+    });
+    stubAuth(true);
+    render(<PhoneShell />);
+    expect(await screen.findByText("live")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "GPS on" }));
+    expect(screen.getByRole("button", { name: "GPS off" })).toBeTruthy();
+    expect(screen.getByText("GPS off")).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText(/Message Kit/), { target: { value: "hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("hi")).toBeTruthy();
+    expect(geo).not.toHaveBeenCalled();
+  });
+
+  it("does not append a bubble for a silent pin without a fix", async () => {
+    stubAuth(true);
+    render(<PhoneShell />);
+    expect(await screen.findByText("live")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "drop pin" }));
+    expect(await screen.findByText("GPS omitted (denied or unavailable)")).toBeTruthy();
+    expect(screen.getByText(/Nothing yet/)).toBeTruthy();
   });
 });

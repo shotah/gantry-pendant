@@ -1,7 +1,14 @@
 import { AVATAR_EDGE, AVATAR_MAX_BYTES, shouldPassthroughJpeg } from "@/lib/avatar/jpeg";
 
+export type JpegLimits = {
+  edge?: number;
+  maxBytes?: number;
+};
+
 /** Browser canvas → JPEG, same as gantree `app/lib/jpegFromFile.ts`. */
-export async function jpegFromFile(file: File): Promise<Blob> {
+export async function jpegFromFile(file: File, limits: JpegLimits = {}): Promise<Blob> {
+  const edge = limits.edge ?? AVATAR_EDGE;
+  const maxBytes = limits.maxBytes ?? AVATAR_MAX_BYTES;
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
@@ -14,10 +21,12 @@ export async function jpegFromFile(file: File): Promise<Blob> {
       size: file.size,
       width: bitmap.width,
       height: bitmap.height,
+      edge,
+      maxBytes,
     })) {
       return file;
     }
-    const scale = Math.min(1, AVATAR_EDGE / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(1, edge / Math.max(bitmap.width, bitmap.height));
     const w = Math.max(1, Math.round(bitmap.width * scale));
     const h = Math.max(1, Math.round(bitmap.height * scale));
     const canvas = document.createElement("canvas");
@@ -29,8 +38,8 @@ export async function jpegFromFile(file: File): Promise<Blob> {
     }
     ctx.drawImage(bitmap, 0, 0, w, h);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
-    if (!blob || blob.size > AVATAR_MAX_BYTES) {
-      throw new Error(blob ? "image too large (max 5MB)" : "could not encode jpeg");
+    if (!blob || blob.size > maxBytes) {
+      throw new Error(blob ? "image too large" : "could not encode jpeg");
     }
     return blob;
   } finally {
