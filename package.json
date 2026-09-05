@@ -18,6 +18,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "secret": "node -e \"console.log(crypto.randomBytes(32).toString('base64url'))\"",
+    "release": "node scripts/release.mjs",
+    "release:dry": "node scripts/release.mjs --dry-run",
     "prepare": "husky"
   },
   "dependencies": {

@@ -13,6 +13,7 @@ export default tseslint.config(
       ".vinext/**",
       ".wrangler/**",
       "public/**",
+      "scripts/**",
     ],
   },
   eslint.configs.recommended,

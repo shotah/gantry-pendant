@@ -1,5 +1,12 @@
 # gantry-pendant
 
+<p align="center">
+  <a href="https://github.com/shotah/gantry-pendant/actions/workflows/ci.yml"><img src="https://github.com/shotah/gantry-pendant/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/shotah/gantry-pendant/actions/workflows/ci.yml"><img src="https://github.com/shotah/gantry-pendant/raw/gh-pages/badges/coverage.svg" alt="Coverage"></a>
+  <a href="https://github.com/shotah/gantry-pendant"><img src="https://img.shields.io/github/package-json/v/shotah/gantry-pendant?label=version" alt="Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/shotah/gantry-pendant" alt="License"></a>
+</p>
+
 > **gantry** *(n.)* — the rigid frame that holds and positions tools.
 >
 > **pendant** *(n.)* — the handheld control on that crane. You walk the
@@ -50,6 +57,8 @@ same secret. Type in one, see it in the other.
 ```bash
 npm run secret                   # mint a bearer / mailbox secret
 npm run deploy                   # after `npm run build` — workers.dev
+npm run release                  # bump patch, tag, push (GitHub Release)
+npm run release:dry              # print the next tag only
 ```
 
 Google login is a **new Web application** client on the same GCP

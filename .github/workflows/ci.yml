@@ -4,16 +4,72 @@ on:
   push:
   pull_request:
 
+# contents:write needed to push the coverage badge to gh-pages on main.
+permissions:
+  contents: write
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
-      - run: npm ci
+      - run: HUSKY=0 npm ci
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/coverage-summary.json
+
+      - name: Generate coverage badge
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          mkdir -p badges
+          chmod +x scripts/coverage-badge.sh
+          ./scripts/coverage-badge.sh coverage/coverage-summary.json badges/coverage.svg
+
+      # gh-pages hosts:
+      #   badges/coverage.svg  → README coverage badge
+      # Pages source: branch gh-pages / (root). Enable once in repo Settings → Pages.
+      - name: Push gh-pages (coverage badge)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          BADGE="${GITHUB_WORKSPACE}/badges/coverage.svg"
+          WORKDIR=$(mktemp -d)
+          cd "$WORKDIR"
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git"
+
+          if git fetch --depth 1 origin gh-pages; then
+            git checkout -B gh-pages FETCH_HEAD
+          else
+            git checkout --orphan gh-pages
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
+
+          mkdir -p badges
+          cp "$BADGE" badges/coverage.svg
+          touch .nojekyll
+
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No gh-pages change; skipping push."
+          else
+            git commit -m "chore: publish coverage badge [skip ci]"
+            git push origin HEAD:gh-pages
+          fi
