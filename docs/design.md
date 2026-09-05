@@ -3,6 +3,7 @@
 A phone we own, talking to a crane, without opening a port on the
 harness. Pitch: [root readme](../README.md). Diagrams:
 [architecture.md](architecture.md). Authn: [security.md](security.md).
+Phases: [todo.md](../todo.md).
 
 ## Problem
 

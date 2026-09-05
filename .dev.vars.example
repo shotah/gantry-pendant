@@ -1,0 +1,2 @@
+MAILBOX_SECRET=dev-mailbox-secret-change-me
+SESSION_SECRET=dev-session-secret-change-me

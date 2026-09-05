@@ -25,13 +25,53 @@ ports. The Mini does not have to be the mailbox.
 
 | File | What it is |
 | --- | --- |
+| [todo.md](todo.md) | Phases, walks, which repo |
+| [docs/setup.md](docs/setup.md) | Admin / user / connect — what you paste where |
+| [docs/edgecases.md](docs/edgecases.md) | Gotchas across pendant + gantree + ai-gantry |
 | [docs/design.md](docs/design.md) | Why this shape, Worker vs Mini, phone context (GPS), walk |
 | [docs/architecture.md](docs/architecture.md) | How the three pieces talk |
 | [docs/security.md](docs/security.md) | Two principals, Google OIDC in the Vinext app vs Access vs MCP |
 
 Nested checkout under gantree (`repos/gantry-pendant`), own git
-remote, same pattern as `repos/ai-gantry`. Empty of product code until
-the relay spike.
+remote, same pattern as `repos/ai-gantry`.
+
+## Hello
+
+```bash
+cp .dev.vars.example .dev.vars   # MAILBOX_SECRET for the two-tab spike
+npm install
+npm test
+npm run dev                      # http://127.0.0.1:5173
+```
+
+Open two tabs: `/` (phone) and `/crane` (crane stand-in). Same slug,
+same secret. Type in one, see it in the other.
+
+```bash
+npm run secret                   # mint a bearer / mailbox secret
+npm run deploy                   # after `npm run build` — workers.dev
+```
+
+Google login is a **new Web application** client on the same GCP
+project as google-mcp. Scopes: `openid email profile` only. Redirect:
+`https://<this-origin>/api/auth/callback/google` — not the Pages
+`oauth-catch` URI, not `localhost:4100`. Put `GOOGLE_CLIENT_ID` /
+`GOOGLE_CLIENT_SECRET` / `SESSION_SECRET` / `ALLOWED_SUBS` /
+`CRANE_BEARERS` in Worker secrets. Empty allowlist is a config error.
+The spike secret is rejected once Google is on.
+
+Crane env (`CHANNEL=pendant`):
+
+```env
+PENDANT_MAILBOX_URL=wss://gantry-pendant.<account>.workers.dev/ws/kit
+PENDANT_BEARER=<bound to kit>
+PENDANT_ALLOWED_USERS=<google-sub>
+```
+
+Yard: pick **pendant** in the build wizard, paste those three, recreate.
+The console cookie never goes to this Worker. Gantree does **not** write
+Worker secrets and does not store a Google `sub` on the operator.
+End-to-end after deploy: [docs/setup.md](docs/setup.md).
 
 ## This is not
 
@@ -43,6 +83,7 @@ the relay spike.
 - The Gantree **portal** Worker (yard skin). Different Worker, different
   auth, never `docker.sock`.
 - A hosted SaaS or App Store listing.
+- google-mcp OAuth (Gmail/Drive). That is a tool grant, not phone login.
 
 ## Three pieces
 
@@ -53,10 +94,3 @@ the relay spike.
 | Channel | **ai-gantry** `CHANNEL=pendant` | Same `Channel` / `Pusher` as Telegram. Allowlist. Cron can still ping you. |
 
 Telegram stays the production mouth until this path works on one crane.
-
-## Hello (when there is code)
-
-Nothing to run yet. Read [design.md](docs/design.md), then
-[architecture.md](docs/architecture.md) and [security.md](docs/security.md).
-First spike: Vinext on Workers + one Durable Object, two browser tabs,
-then a harness channel that dials that Worker.

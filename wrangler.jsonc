@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gantry-pendant",
+  "compatibility_date": "2026-09-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./worker/index.ts",
+  "assets": {
+    "directory": "dist/client",
+    "not_found_handling": "none",
+    "binding": "ASSETS",
+    "run_worker_first": ["/ws/*", "/api/*"]
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "Mailbox",
+        "name": "MAILBOX"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["Mailbox"]
+    }
+  ]
+}
