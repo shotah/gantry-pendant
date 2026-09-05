@@ -7,4 +7,5 @@ interface Env {
   SESSION_SECRET?: string;
   ALLOWED_SUBS?: string;
   CRANE_BEARERS?: string;
+  PENDANT_DEV?: string;
 }

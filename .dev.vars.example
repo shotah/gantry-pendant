@@ -1,2 +1,4 @@
 MAILBOX_SECRET=dev-mailbox-secret-change-me
 SESSION_SECRET=dev-session-secret-change-me
+# Loopback only. Mock Ada + ?sample= scenes. Ignored on workers.dev.
+PENDANT_DEV=1

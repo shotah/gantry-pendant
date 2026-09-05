@@ -71,9 +71,11 @@ clone) but streaming replies and live “typing” want the DO socket.
 ```text
 gantry-pendant/            this checkout — Vinext app + DO mailbox
   README.md
-  docs/                    design, architecture, security
-  (app later)             Vinext chat shell + /api/auth/google
-  (worker later)          DO class + crane WebSocket route
+  docs/                    design, architecture, security, screens
+  app/                     chat shell + Google login + PWA
+  worker/                  Durable Object mailbox
+  lib/dev/                 loopback mock + canned scenes
+  assets/docs/             phone shots (`npm run shot`)
 
 ai-gantry/                 harness — new internal/channel/ sibling
   internal/channel/        Channel, Pusher, Message, Outbound

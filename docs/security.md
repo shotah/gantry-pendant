@@ -203,6 +203,7 @@ cannot.
 | Spike (two tabs) | One shared secret on the Worker. Not production. |
 | Phone on LTE | Google OIDC for the human + crane bearer |
 | Gantree wizard | Writes crane bearer + allowlist into `.env`; Worker secrets stay with this app |
+| `npm run dev` | `PENDANT_DEV=1` on **loopback only**: mock Ada, canned `?sample=` scenes. Not a session. Ignored on `workers.dev`. |
 
 ---
 

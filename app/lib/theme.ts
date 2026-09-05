@@ -190,6 +190,10 @@ export function parseTheme(v: unknown): ThemeId {
   return typeof v === "string" && THEME_IDS.includes(v) ? (v as ThemeId) : DEFAULT_THEME;
 }
 
+export function themeFromQuery(v: string | null): ThemeId | null {
+  return typeof v === "string" && THEME_IDS.includes(v) ? (v as ThemeId) : null;
+}
+
 export function themeCss(): string {
   return THEMES.map((t) => {
     const sel = t.id === DEFAULT_THEME ? `:root,[data-theme="${t.id}"]` : `[data-theme="${t.id}"]`;

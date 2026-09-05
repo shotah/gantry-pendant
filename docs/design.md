@@ -1,7 +1,8 @@
 # Design
 
 A phone we own, talking to a crane, without opening a port on the
-harness. Pitch: [root readme](../README.md). Diagrams:
+harness. Pitch: [root readme](../README.md). What it looks like:
+[screens.md](screens.md). Diagrams:
 [architecture.md](architecture.md). Authn: [security.md](security.md).
 Phases: [todo.md](../todo.md).
 

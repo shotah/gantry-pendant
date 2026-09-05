@@ -6,7 +6,8 @@ Pitch: [README.md](README.md). Why:
 [docs/design.md](docs/design.md). How:
 [docs/architecture.md](docs/architecture.md). Authn:
 [docs/security.md](docs/security.md). Who talks:
-[docs/setup.md](docs/setup.md). Misses:
+[docs/setup.md](docs/setup.md). Looks like:
+[docs/screens.md](docs/screens.md). Misses:
 [docs/edgecases.md](docs/edgecases.md).
 
 KISS: Vinext on Workers, one Durable Object per crane, `CHANNEL=pendant`

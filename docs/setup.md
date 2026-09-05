@@ -2,7 +2,8 @@
 
 Admin flow, user flow, and the three pastes that actually connect them.
 Gotchas: [edgecases.md](edgecases.md). Auth: [security.md](security.md).
-Shape: [architecture.md](architecture.md).
+Shape: [architecture.md](architecture.md). What it looks like:
+[screens.md](screens.md).
 
 This is **not** “add a field on the Gantree person and they can chat.”
 Gantree operates cranes. The mailbox and the mouth each have their own
@@ -179,6 +180,10 @@ lands while the app is open — no lock-screen push yet.
 
 A stranger who hits Sign in with Google gets the same unauthorized as
 a bad token. They never join the room and they never see a `sub`.
+
+Local mock (`PENDANT_DEV=1` on loopback) is **not** this flow. It
+paints Ada and canned scenes so you can screenshot the mouth. See
+[screens.md](screens.md). Never put that flag on `workers.dev`.
 
 ---
 

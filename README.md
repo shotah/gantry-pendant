@@ -32,11 +32,24 @@ phone  →  Vinext on Cloudflare Workers (Google login + Durable Object)  ←  c
 The phone only needs HTTPS. The crane still opens **zero** inbound
 ports. The Mini does not have to be the mailbox.
 
+<p align="center">
+  <img src="assets/docs/login.png" alt="Sign in with Google" width="180">
+  &nbsp;
+  <img src="assets/docs/thread.png" alt="Ada talking to Kit" width="180">
+  &nbsp;
+  <img src="assets/docs/ping.png" alt="Cron ping in the thread" width="180">
+  &nbsp;
+  <img src="assets/docs/photo.png" alt="Photo on an inbound turn" width="180">
+</p>
+
+Every screen, Day theme, crane stand-in: [docs/screens.md](docs/screens.md).
+
 **Docs (the plan lives here, not in chat):**
 
 | File | What it is |
 | --- | --- |
 | [todo.md](todo.md) | Phases, walks, which repo |
+| [docs/screens.md](docs/screens.md) | What the mouth looks like (phone shots) |
 | [docs/setup.md](docs/setup.md) | Admin / user / connect — what you paste where |
 | [docs/edgecases.md](docs/edgecases.md) | Gotchas across pendant + gantree + ai-gantry |
 | [docs/design.md](docs/design.md) | Why this shape, Worker vs Mini, phone context (GPS), walk |
@@ -49,16 +62,22 @@ remote, same pattern as `repos/ai-gantry`.
 ## Hello
 
 ```bash
-cp .dev.vars.example .dev.vars   # MAILBOX_SECRET for the two-tab spike
+cp .dev.vars.example .dev.vars   # MAILBOX_SECRET + PENDANT_DEV
 npm install
 npm test
-npm run dev                      # http://127.0.0.1:5173
+npm run dev                      # http://127.0.0.1:3000
 ```
+
+Loopback with `PENDANT_DEV=1`: mock Ada, no Google. `/?sample=thread`
+(and `ping`, `photo`, `empty`, …) paints canned scenes.
+Compose without a sample gets canned Kit replies. Type the spike
+secret to join the real room.
 
 Open two tabs: `/` (phone) and `/crane` (crane stand-in). Same slug,
 same secret. Type in one, see it in the other.
 
 ```bash
+npm run shot                     # assets/docs/*.png — needs `npm run dev`
 npm run secret                   # mint a bearer / mailbox secret
 npm run deploy                   # after `npm run build` — workers.dev
 npm run release                  # bump patch, tag, push (GitHub Release)

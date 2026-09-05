@@ -7,10 +7,12 @@ import { Thread, type ChatBubble } from "./Thread";
 import { mailboxUrl, parseIncoming } from "@/app/lib/socket";
 import { browserGeo } from "@/app/lib/geo";
 import { fileToPhoto } from "@/app/lib/photo";
+import { applyTheme, themeFromQuery } from "@/app/lib/theme";
 import { buildContext } from "@/lib/phone/context";
 import { encodeFrame, type Role } from "@/lib/mailbox/frame";
+import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
 
-type AuthCfg = { mode: "spike" | "oidc" | null; google: boolean };
+type AuthCfg = { mode: "spike" | "oidc" | null; google: boolean; dev?: boolean };
 type Me = { sub: string; email?: string } | null;
 
 export function PhoneShell({ role = "phone" }: { role?: Role }) {
@@ -19,12 +21,26 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [bearer, setBearer] = useState("");
   const [cfg, setCfg] = useState<AuthCfg | null>(null);
   const [me, setMe] = useState<Me>(null);
+  const [sampleId, setSampleId] = useState<SampleId | null>(null);
   const [status, setStatus] = useState<"idle" | "up" | "down">("idle");
   const [gpsHint, setGpsHint] = useState("GPS attaches on send if the OS allows it.");
   const [messages, setMessages] = useState<ChatBubble[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const echoTimer = useRef(0);
+  const echoCount = useRef(0);
   const phone = role === "phone";
+  const painting = Boolean(cfg?.dev && sampleId);
+  const localEcho = Boolean(cfg?.dev && !sampleId && phone);
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    setSampleId(parseSample(q.get("sample")));
+    const theme = themeFromQuery(q.get("theme"));
+    if (theme) {
+      applyTheme(theme);
+    }
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -40,10 +56,31 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   }, []);
 
   useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
+    if (!cfg?.dev || !sampleId) {
+      return;
+    }
+    const scene = sampleScene(sampleId, role);
+    setMessages(scene.messages);
+    setStatus(scene.status);
+    if (scene.gpsHint) {
+      setGpsHint(scene.gpsHint);
+    }
+  }, [cfg?.dev, sampleId, role]);
+
+  useEffect(() => {
+    scroller.current?.scrollTo?.({ top: scroller.current.scrollHeight });
   }, [messages]);
 
-  const needGoogle = cfg?.mode === "oidc" && phone && !me;
+  useEffect(() => {
+    return () => window.clearTimeout(echoTimer.current);
+  }, []);
+
+  const needGoogle = Boolean(
+    phone && (
+      (cfg?.dev && sampleId === "unsigned")
+      || (cfg?.mode === "oidc" && !me && !cfg.dev)
+    ),
+  );
   const canSocket = Boolean(cfg && slug && (cfg.mode === "spike" ? secret : phone ? me : bearer));
 
   const connect = useCallback(() => {
@@ -85,14 +122,21 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   }, [bearer, canSocket, cfg?.mode, phone, role, secret, slug]);
 
   useEffect(() => {
-    if (!canSocket) {
+    if (!canSocket || painting) {
       return;
     }
     connect();
     return () => {
       wsRef.current?.close();
     };
-  }, [canSocket, connect]);
+  }, [canSocket, connect, painting]);
+
+  useEffect(() => {
+    if (painting || canSocket || !localEcho) {
+      return;
+    }
+    setStatus("up");
+  }, [painting, canSocket, localEcho]);
 
   async function sendText(text: string, photo?: string) {
     const geo = phone ? await browserGeo() : { ok: false as const, reason: "unavailable" as const };
@@ -110,7 +154,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           })
         : undefined,
     };
-    wsRef.current?.send(encodeFrame(frame));
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(encodeFrame(frame));
+    }
     setMessages((prev) => [
       ...prev,
       {
@@ -121,6 +167,22 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         photo,
       },
     ]);
+    if (localEcho && !canSocket && !painting) {
+      const n = echoCount.current;
+      echoCount.current += 1;
+      window.clearTimeout(echoTimer.current);
+      echoTimer.current = window.setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `${Date.now()}-echo`,
+            from: "kit",
+            text: nextMockReply(n),
+            at: Date.now(),
+          },
+        ]);
+      }, 400);
+    }
   }
 
   async function sendPhoto(file: File) {
@@ -133,14 +195,18 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   }
 
   const title = useMemo(() => phone ? "Pendant" : "Crane stand-in", [phone]);
+  const hideSecrets = painting;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas">
+    <div className="flex min-h-dvh flex-col bg-canvas" data-shot={phone ? "phone" : "crane"}>
       <header className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-2">
         <p className="text-sm font-medium text-fg">{title}</p>
         <span className={`text-[11px] ${status === "up" ? "text-ok" : "text-dim"}`}>
           {status === "up" ? "live" : status === "down" ? "down" : "idle"}
         </span>
+        {cfg?.dev && !painting
+          ? <span className="text-[11px] text-dim">dev</span>
+          : null}
         <label className="ml-auto flex items-center gap-1 text-xs text-muted">
           slug
           <input
@@ -149,7 +215,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             onChange={(e) => setSlug(e.target.value)}
           />
         </label>
-        {cfg?.mode === "spike"
+        {cfg?.mode === "spike" && !hideSecrets
           ? (
               <label className="flex items-center gap-1 text-xs text-muted">
                 secret
@@ -163,7 +229,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
               </label>
             )
           : null}
-        {!phone && cfg?.mode === "oidc"
+        {!phone && cfg?.mode === "oidc" && !hideSecrets
           ? (
               <label className="flex items-center gap-1 text-xs text-muted">
                 bearer

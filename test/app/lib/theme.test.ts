@@ -1,13 +1,16 @@
 /** @vitest-environment jsdom */
 
 import { describe, expect, it } from "vitest";
-import { applyTheme, DEFAULT_THEME, parseTheme, THEME_BOOT, themeCss, themeOf, THEMES } from "@/app/lib/theme";
+import { applyTheme, DEFAULT_THEME, parseTheme, THEME_BOOT, themeCss, themeFromQuery, themeOf, THEMES } from "@/app/lib/theme";
 
 describe("theme", () => {
   it("falls back to night", () => {
     expect(parseTheme(undefined)).toBe(DEFAULT_THEME);
     expect(parseTheme("nope")).toBe("night");
     expect(parseTheme("fog")).toBe("fog");
+    expect(themeFromQuery("day")).toBe("day");
+    expect(themeFromQuery("nope")).toBeNull();
+    expect(themeFromQuery(null)).toBeNull();
   });
 
   it("ships dark, light, variants, and high contrast", () => {
