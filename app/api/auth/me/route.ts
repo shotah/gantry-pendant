@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
-import { unauthorized } from "@/lib/auth/deny";
-import { allowlistMap } from "@/lib/auth/allowlist";
+import { unauthorized, tooMany } from "@/lib/auth/deny";
+import { cranesFor } from "@/lib/auth/directory";
+import { limitAuthRequest } from "@/lib/auth/limit";
 import { parseCookie, readSession, SESSION_COOKIE } from "@/lib/auth/session";
 import { DEV_USER } from "@/lib/dev/samples";
 import { devEnabled, hostFromRequest } from "@/lib/dev/mode";
@@ -17,9 +18,18 @@ export async function GET(req: Request) {
     return unauthorized();
   }
   const session = await readSession(secret, token);
-  const allowed = allowlistMap(env.ALLOWED_SUBS);
-  if (!session || !allowed.has(session.sub)) {
+  if (!session) {
     return unauthorized();
   }
-  return Response.json({ sub: session.sub, email: session.email ?? allowed.get(session.sub) });
+  if (!limitAuthRequest(req, session.sub)) {
+    return tooMany();
+  }
+  const cranes = env.DIRECTORY
+    ? await cranesFor(env.DIRECTORY, session.sub, session.email)
+    : [];
+  return Response.json({
+    sub: session.sub,
+    email: session.email,
+    cranes,
+  });
 }

@@ -1,5 +1,15 @@
 import { DurableObject } from "cloudflare:workers";
+import { directoryApply } from "../lib/auth/directory";
 import { encodeFaceNotice, packAvatar, AVATAR_STORE_KEY, type StoredAvatar } from "../lib/avatar/store";
+import {
+  ALLOW_STORE_KEY,
+  SLUG_STORE_KEY,
+  cranePublishedAllow,
+  parseAllowUsers,
+  parseStoredSlug,
+  phoneMustNotPublishAllow,
+  type RoomUser,
+} from "../lib/mailbox/allow";
 import { utf8Bytes } from "../lib/mailbox/caps";
 import { cranePublishedCmds, CMDS_STORE_KEY, parseCommands, phoneMustNotPublishCmds } from "../lib/mailbox/cmds";
 import { encodeFrame, parseFrame, type Role, type WireFrame } from "../lib/mailbox/frame";
@@ -15,12 +25,19 @@ import {
   type Queued,
 } from "../lib/mailbox/queue";
 import { persistRole, resolvePhoneKind, routeTag } from "../lib/mailbox/route";
-import { parseExpMs, socketMessageAllowed } from "../lib/mailbox/socketAuth";
+import { parseEmailVerified, parseExpMs, socketMessageAllowed } from "../lib/mailbox/socketAuth";
 import { takeFrame, type DualLimit } from "../lib/mailbox/rate";
 
 const RATE_KEY = "rate";
 
-type AttachMeta = { role: Role; rateId: string; userId?: string; expMs?: number };
+type AttachMeta = {
+  role: Role;
+  rateId: string;
+  userId?: string;
+  email?: string;
+  emailVerified?: boolean;
+  expMs?: number;
+};
 
 export class Mailbox extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -32,18 +49,27 @@ export class Mailbox extends DurableObject<Env> {
     if (request.headers.get("X-Pendant-Op") === "avatar") {
       return this.avatarHttp(request);
     }
+    if (request.headers.get("X-Pendant-Op") === "allow") {
+      return this.allowHttp();
+    }
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected websocket", { status: 426 });
     }
     const role = request.headers.get("X-Pendant-Role");
     const rateId = request.headers.get("X-Pendant-Rate") ?? "anon";
     const userId = request.headers.get("X-Pendant-Sub") ?? undefined;
+    const email = request.headers.get("X-Pendant-Email") ?? undefined;
+    const verified = request.headers.get("X-Pendant-EmailVerified") ?? "";
     const exp = request.headers.get("X-Pendant-Exp") ?? "";
+    const slug = parseStoredSlug(request.headers.get("X-Pendant-Slug") ?? "");
     if (role !== "phone" && role !== "crane") {
       return new Response("bad role", { status: 400 });
     }
+    if (slug) {
+      await this.ctx.storage.put(SLUG_STORE_KEY, slug);
+    }
     const pair = new WebSocketPair();
-    this.ctx.acceptWebSocket(pair[1], [role, rateId, userId ?? "", exp]);
+    this.ctx.acceptWebSocket(pair[1], [role, rateId, userId ?? "", exp, email ?? "", verified]);
     await this.flush(pair[1], role, userId);
     return new Response(null, { status: 101, webSocket: pair[0] } as ResponseInit);
   }
@@ -51,11 +77,16 @@ export class Mailbox extends DurableObject<Env> {
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
     const meta = this.meta(ws);
     const now = Date.now();
+    const roomUsers = this.enforce() ? await this.roomUsers() : undefined;
     if (!socketMessageAllowed({
       role: meta.role,
       userId: meta.userId,
+      email: meta.email,
+      emailVerified: meta.emailVerified,
       expMs: meta.expMs,
       allowedSubs: this.env.ALLOWED_SUBS,
+      roomUsers,
+      enforce: this.enforce(),
       now,
     })) {
       ws.close(4401, "unauthorized");
@@ -82,11 +113,20 @@ export class Mailbox extends DurableObject<Env> {
       if (meta.userId) {
         out.user_id = meta.userId;
       }
+      if (meta.email && meta.emailVerified) {
+        out.email = meta.email;
+      } else {
+        delete out.email;
+      }
     } else if (!out.kind) {
       out.kind = "reply";
     }
-    if (phoneMustNotPublishCmds(meta.role, out.kind)) {
+    if (phoneMustNotPublishCmds(meta.role, out.kind) || phoneMustNotPublishAllow(meta.role, out.kind)) {
       ws.send(encodeFrame({ kind: "error", text: "bad frame" }));
+      return;
+    }
+    if (cranePublishedAllow(meta.role, out.kind)) {
+      await this.storeAllow(parseAllowUsers(out.users), now);
       return;
     }
     if (cranePublishedCmds(meta.role, out.kind)) {
@@ -190,6 +230,44 @@ export class Mailbox extends DurableObject<Env> {
     return new Response("method", { status: 405 });
   }
 
+  private async allowHttp(): Promise<Response> {
+    return Response.json({ users: await this.roomUsers() });
+  }
+
+  private enforce(): boolean {
+    return Boolean(this.env.GOOGLE_CLIENT_ID?.trim());
+  }
+
+  private async roomUsers(): Promise<RoomUser[]> {
+    const stored = await this.ctx.storage.get<RoomUser[]>(ALLOW_STORE_KEY);
+    return Array.isArray(stored) ? stored : [];
+  }
+
+  private async storeAllow(users: RoomUser[], now: number): Promise<void> {
+    const prev = await this.roomUsers();
+    await this.ctx.storage.put(ALLOW_STORE_KEY, users);
+    const slug = parseStoredSlug(await this.ctx.storage.get<string>(SLUG_STORE_KEY));
+    if (slug && this.env.DIRECTORY) {
+      await directoryApply(this.env.DIRECTORY, slug, prev, users);
+    }
+    for (const p of this.ctx.getWebSockets("phone")) {
+      const phone = this.meta(p);
+      if (!socketMessageAllowed({
+        role: "phone",
+        userId: phone.userId,
+        email: phone.email,
+        emailVerified: phone.emailVerified,
+        expMs: phone.expMs,
+        allowedSubs: this.env.ALLOWED_SUBS,
+        roomUsers: users,
+        enforce: this.enforce(),
+        now,
+      })) {
+        p.close(4401, "unauthorized");
+      }
+    }
+  }
+
   private meta(ws: WebSocket): AttachMeta {
     const tags = this.ctx.getTags(ws);
     const role = tags[0] === "crane" ? "crane" : "phone";
@@ -198,6 +276,8 @@ export class Mailbox extends DurableObject<Env> {
       rateId: tags[1] || "anon",
       userId: tags[2] || undefined,
       expMs: parseExpMs(tags[3]),
+      email: tags[4] || undefined,
+      emailVerified: parseEmailVerified(tags[5]),
     };
   }
 

@@ -12,7 +12,7 @@ export default function LoginPage() {
       <img src="/icon.svg" alt="" className="h-16 w-16" />
       <h1 className="text-xl font-medium text-fg">Pendant</h1>
       <p className="max-w-sm text-center text-sm text-muted">
-        Sign in with Google. Only allowlisted accounts reach a crane.
+        Sign in with Google. The crane decides who may talk.
       </p>
       <a
         className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark"

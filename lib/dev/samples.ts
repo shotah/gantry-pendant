@@ -4,6 +4,7 @@ import type { Role } from "@/lib/mailbox/frame";
 export const DEV_USER = {
   sub: "118212345678901234567",
   email: "ada@example.com",
+  cranes: ["ada"],
 };
 
 export const SAMPLE_IDS = ["unsigned", "empty", "cmds", "thread", "ping", "photo", "down", "crane"] as const;

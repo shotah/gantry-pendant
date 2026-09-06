@@ -42,8 +42,8 @@ Code for the mouth is in. These walks are still the second brain.
 - [ ] Deploy to `workers.dev`
 - [ ] GCP Web application client (`openid email profile` only). Redirect
       = this origin — not `oauth-catch`, not `localhost:4100`
-- [ ] Worker secrets: Google + `SESSION_SECRET` + `ALLOWED_SUBS` +
-      `CRANE_BEARERS`. Spike `MAILBOX_SECRET` gone from prod
+- [ ] Worker secrets: Google + `SESSION_SECRET` + `CRANE_BEARERS`.
+      `ALLOWED_SUBS` optional. Spike `MAILBOX_SECRET` gone from prod
 
 ### Pocket (P5)
 
@@ -62,30 +62,28 @@ Do not close those on two laptop tabs.
 
 ## Then — one list, first human
 
-Dual allowlists are still the #1 miss ([edgecases.md](edgecases.md)).
-The crane already publishes `cmds`; it should publish the human list
-the same way.
+The crane publishes `allow`; this Worker stores it and admits from it.
+`ALLOWED_SUBS` is optional extra. Walk is recreate, not a Cloudflare
+paste per human.
 
 ### Crane publishes the allowlist · gantry-pendant + ai-gantry
 
 **Walk:** `ALLOWED_SUBS` is gone from Worker secrets. Crane boots with
 `PENDANT_ALLOWED_USERS`, dials in, publishes. Ada signs in and joins.
 Stranger signs in, sees own `sub` + "send this to the yard admin",
-never joins the room. Admin adds the `sub` to crane `.env`, recreates;
+never joins the room. Admin adds the email to crane `.env`, recreates;
 Ada's friend is in. No `wrangler secret put`.
 
-- [ ] Frame `kind: "allow"` crane→DO with `subs[]` (same shape as
-      `cmds`); phone must not publish
-- [ ] DO stores allowlist per slug; phone handshake asks the DO instead
-      of reading `ALLOWED_SUBS`
-- [ ] On publish: close phone sockets whose `sub` is no longer allowed
-- [ ] Mint session for any **verified** Google account; `/api/auth/me`
-      returns `{ sub, email, allowed }`; DO still denies unless allowed
-- [ ] Phone shows `sub` + "send this to the yard admin" when
-      `allowed: false`; never on the query string
+- [x] Frame `kind: "allow"` crane→DO; phone must not publish
+- [x] DO stores allowlist per slug; phone handshake asks the DO
+- [x] On publish: close phone sockets no longer allowed (`4401`)
+- [x] Mint session for any **verified** Google account; `/api/auth/me`
+      returns `{ sub, email, cranes }`; DO still denies unless allowed
+- [x] Phone picks from `cranes`; empty shows email + `sub` + copy.
+      Never on the query string
 - [ ] ai-gantry: publish allowlist on connect; keep local check as a
-      free redundant filter
-- [ ] Remove `ALLOWED_SUBS` from handshake, wrangler, [setup.md](setup.md)
+      free redundant filter (other repo)
+- [x] `ALLOWED_SUBS` optional in handshake, wrangler, [setup.md](setup.md)
 
 ### Yard copy · gantree
 

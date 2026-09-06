@@ -3,6 +3,7 @@ import { handshakeSlug } from "@/lib/auth/handshake";
 import { configError, unauthorized } from "@/lib/auth/deny";
 import { acceptJpeg } from "@/lib/avatar/jpeg";
 import { readAvatarUpload } from "@/lib/avatar/http";
+import { fetchRoomUsers } from "@/lib/mailbox/allow";
 import { parseSlug } from "@/lib/mailbox/slug";
 import { devEnabled, hostFromRequest } from "@/lib/dev/mode";
 
@@ -24,6 +25,8 @@ async function authorize(req: Request, slug: string): Promise<Response | null> {
     return null;
   }
   const url = new URL(req.url);
+  const stub = stubFor(slug);
+  const roomList = stub ? await fetchRoomUsers(stub) : [];
   const auth = await handshakeSlug({
     env: envOf(env),
     slug,
@@ -31,6 +34,7 @@ async function authorize(req: Request, slug: string): Promise<Response | null> {
     authorization: req.headers.get("Authorization"),
     querySecret: url.searchParams.get("secret"),
     queryBearer: url.searchParams.get("bearer"),
+    roomList,
   });
   if (auth.ok) {
     return null;

@@ -93,10 +93,12 @@ describe("google oidc helpers", () => {
     expect(identityFromIdTokenPayload({ sub: "1182", nonce: "nce" }, "nce")).toEqual({
       sub: "1182",
       email: undefined,
+      emailVerified: false,
     });
-    expect(identityFromIdTokenPayload({ sub: "1182", email: "ada@x.com", nonce: "nce" }, "nce")).toEqual({
+    expect(identityFromIdTokenPayload({ sub: "1182", email: "Ada@X.com", email_verified: true, nonce: "nce" }, "nce")).toEqual({
       sub: "1182",
       email: "ada@x.com",
+      emailVerified: true,
     });
     expect(identityFromIdTokenPayload({ sub: "1182", nonce: "other" }, "nce")).toBeNull();
     expect(identityFromIdTokenPayload({ sub: "1182" }, "nce")).toBeNull();
@@ -107,10 +109,11 @@ describe("google oidc helpers", () => {
   it("uses the same deny for unknown sub and missing identity", () => {
     const allowed = new Map([["1182", "ada@x.com"]]);
     expect(acceptHuman(null, allowed)).toBeNull();
-    expect(acceptHuman({ sub: "nope" }, allowed)).toBeNull();
-    expect(acceptHuman({ sub: "1182", email: "ada@x.com" }, allowed)).toEqual({
+    expect(acceptHuman({ sub: "nope", emailVerified: false }, allowed)).toBeNull();
+    expect(acceptHuman({ sub: "1182", email: "ada@x.com", emailVerified: true }, allowed)).toEqual({
       sub: "1182",
       email: "ada@x.com",
+      emailVerified: true,
     });
   });
 

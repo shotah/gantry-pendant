@@ -42,7 +42,7 @@ is saved on the Durable Object.
 
 | Shot | URL | What it is |
 | --- | --- | --- |
-| `login` | `/login` | Google door. Allowlisted accounts only. |
+| `login` | `/login` | Google door. The crane decides who may talk. |
 | `unsigned` | `/?sample=unsigned` | Same gate inside the shell. |
 | `empty` | `/?sample=empty` | Live, nothing said yet. Paperclip attach: photo, commands, GPS. |
 | `cmds` | `/?sample=cmds` | Command picker. Live list is published by the crane (`cmds` frame); this sample paints a short stand-in. |
@@ -66,7 +66,7 @@ npm run dev                      # http://127.0.0.1:3000 (Chrome Install works o
 
 `PENDANT_DEV=1` on loopback:
 
-- `/api/auth/me` returns mock Ada (`1182…` / `ada@example.com`). No Google.
+- `/api/auth/me` returns mock Ada (`1182…` / `ada@example.com`, `cranes: ["ada"]`). No Google.
 - `/?sample=<id>` paints a scene (no WebSocket).
 - Without a sample, compose is live and Kit answers with canned lines.
 - Type the spike **secret** to join the real Durable Object (two-tab

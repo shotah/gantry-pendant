@@ -7,6 +7,7 @@ export const STATE_COOKIE = "pendant_oauth_state";
 export type SessionClaims = {
   sub: string;
   email?: string;
+  emailVerified?: boolean;
   iat: number;
   exp: number;
 };
@@ -22,12 +23,14 @@ function key(secret: string): Uint8Array {
 
 export async function mintSession(
   secret: string,
-  human: { sub: string; email?: string },
+  human: { sub: string; email?: string; emailVerified?: boolean },
   now = Date.now(),
 ): Promise<string> {
+  const email = human.email?.trim().toLowerCase() ?? "";
   const jwt = new EncryptJWT({
     sub: human.sub,
-    email: human.email ?? "",
+    email,
+    email_verified: human.emailVerified === true,
     nbf_abs: Math.floor(now / 1000),
   })
     .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
@@ -60,8 +63,11 @@ function claimsFrom(payload: JWTPayload, now: number): SessionClaims | null {
   if (!iat || !exp || now > exp || now - iat > ABSOLUTE_MS) {
     return null;
   }
-  const email = typeof payload.email === "string" && payload.email ? payload.email : undefined;
-  return { sub, email, iat, exp };
+  const email = typeof payload.email === "string" && payload.email
+    ? payload.email.trim().toLowerCase()
+    : undefined;
+  const emailVerified = payload.email_verified === true;
+  return { sub, email, emailVerified, iat, exp };
 }
 
 export function parseCookie(header: string | null, name: string): string | undefined {

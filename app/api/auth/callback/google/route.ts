@@ -1,12 +1,15 @@
 import { env } from "cloudflare:workers";
-import { allowlistMap } from "@/lib/auth/allowlist";
-import { unauthorized } from "@/lib/auth/deny";
-import { acceptHuman, decodeOAuthBind, exchangeCode, verifyIdToken } from "@/lib/auth/google";
+import { unauthorized, tooMany } from "@/lib/auth/deny";
+import { decodeOAuthBind, exchangeCode, verifyIdToken } from "@/lib/auth/google";
+import { limitAuthIp, limitAuthSub } from "@/lib/auth/limit";
 import { clearCookie, mintSession, parseCookie, sessionCookie, STATE_COOKIE } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  if (!limitAuthIp(req)) {
+    return tooMany();
+  }
   const url = new URL(req.url);
   const code = url.searchParams.get("code") ?? "";
   const state = url.searchParams.get("state") ?? "";
@@ -31,11 +34,17 @@ export async function GET(req: Request) {
     return unauthorized();
   }
   const identity = await verifyIdToken(exchanged.idToken, clientId, bind.nonce);
-  const human = acceptHuman(identity, allowlistMap(env.ALLOWED_SUBS));
-  if (!human) {
+  if (!identity) {
     return unauthorized();
   }
-  const token = await mintSession(sessionSecret, human);
+  if (!limitAuthSub(identity.sub)) {
+    return tooMany();
+  }
+  const token = await mintSession(sessionSecret, {
+    sub: identity.sub,
+    email: identity.email,
+    emailVerified: identity.emailVerified,
+  });
   const secure = url.origin.startsWith("https:");
   const headers = new Headers({ Location: "/" });
   headers.append("Set-Cookie", sessionCookie(token, secure));

@@ -1,11 +1,18 @@
-import { allowlistMap } from "./allowlist";
 import { bearerForSlug, parseBearers } from "./bearer";
 import { type AuthEnv, type AuthMode, resolveAuthMode } from "./mode";
+import { roomAllows } from "./room";
 import { secretEqual } from "./secret";
 import { parseCookie, readSession, SESSION_COOKIE, type SessionClaims } from "./session";
+import type { RoomUser } from "../mailbox/allow";
 import type { Role } from "../mailbox/frame";
 
-export type PhonePrincipal = { kind: "phone"; sub: string; email?: string; exp?: number };
+export type PhonePrincipal = {
+  kind: "phone";
+  sub: string;
+  email?: string;
+  emailVerified?: boolean;
+  exp?: number;
+};
 export type CranePrincipal = { kind: "crane"; slug: string };
 export type SpikePrincipal = { kind: "spike"; role: Role };
 export type Principal = PhonePrincipal | CranePrincipal | SpikePrincipal;
@@ -23,6 +30,7 @@ export type HandshakeInput = {
   querySecret?: string | null;
   queryBearer?: string | null;
   now?: number;
+  roomList?: RoomUser[];
 };
 
 function bearerFrom(
@@ -100,11 +108,23 @@ function spikeHandshake(env: AuthEnv, role: Role, input: HandshakeInput): Handsh
 async function oidcHandshake(input: HandshakeInput, now: number): Promise<HandshakeResult> {
   if (input.role === "phone") {
     const session = await phoneFromCookie(input.env, input.cookieHeader, now);
-    const allowed = allowlistMap(input.env.ALLOWED_SUBS);
-    if (!session || !allowed.has(session.sub)) {
+    if (!session || !roomAllows(input.roomList, {
+      sub: session.sub,
+      email: session.email,
+      emailVerified: session.emailVerified,
+    }, input.env.ALLOWED_SUBS)) {
       return { ok: false, error: "unauthorized" };
     }
-    return { ok: true, principal: { kind: "phone", sub: session.sub, email: session.email, exp: session.exp } };
+    return {
+      ok: true,
+      principal: {
+        kind: "phone",
+        sub: session.sub,
+        email: session.email,
+        emailVerified: session.emailVerified,
+        exp: session.exp,
+      },
+    };
   }
   const presented = bearerFrom(input.authorization, input.queryBearer, false);
   const bearers = parseBearers(input.env.CRANE_BEARERS);
@@ -137,6 +157,13 @@ export function stampUserId(principal: Principal): string | undefined {
   }
   if (principal.kind === "spike" && principal.role === "phone") {
     return "spike";
+  }
+  return undefined;
+}
+
+export function stampEmail(principal: Principal): string | undefined {
+  if (principal.kind === "phone" && principal.email) {
+    return principal.email;
   }
   return undefined;
 }

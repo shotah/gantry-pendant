@@ -92,6 +92,7 @@ afterEach(() => {
   window.history.replaceState({}, "", "/");
   window.localStorage.removeItem("pendant.geo");
   Reflect.deleteProperty(navigator, "geolocation");
+  Reflect.deleteProperty(navigator, "clipboard");
   FakeSocket.instances = [];
 });
 
@@ -268,4 +269,48 @@ describe("PhoneShell", () => {
     expect(await screen.findByText("yo from kit")).toBeTruthy();
     expect(screen.getAllByText("yo from kit")).toHaveLength(1);
   });
+
+  it("picks from /me cranes and hides the free-text slug", async () => {
+    stubOidc({ sub: DEV_USER.sub, email: DEV_USER.email, cranes: ["kit", "ada"] });
+    stubSocket();
+    render(<PhoneShell />);
+    expect(await screen.findByText("Kit")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    expect(screen.queryByLabelText("Agent name")).toBeNull();
+    const picker = screen.getByLabelText("Agent") as HTMLSelectElement;
+    expect(picker.value).toBe("kit");
+    fireEvent.change(picker, { target: { value: "ada" } });
+    expect(picker.value).toBe("ada");
+    expect(screen.getAllByText("Ada").length).toBeGreaterThanOrEqual(1);
+    expect(window.location.search).not.toContain("sub=");
+  });
+
+  it("shows email and sub when the directory is empty", async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: write },
+    });
+    stubOidc({ sub: DEV_USER.sub, email: "bob@example.com", cranes: [] });
+    render(<PhoneShell />);
+    expect(await screen.findByText(/not on any crane yet/i)).toBeTruthy();
+    expect(screen.getByText("bob@example.com")).toBeTruthy();
+    expect(screen.getByText(DEV_USER.sub)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    expect(write).toHaveBeenCalledWith(`bob@example.com\n${DEV_USER.sub}`);
+    expect(window.location.search).not.toContain("sub=");
+  });
 });
+
+function stubOidc(me: { sub: string; email?: string; cranes: string[] } | null) {
+  vi.stubGlobal("fetch", async (input: RequestInfo) => {
+    const url = String(input);
+    if (url.includes("/api/auth/config")) {
+      return Response.json({ mode: "oidc", google: true, dev: false });
+    }
+    if (url.includes("/api/auth/me")) {
+      return me ? Response.json(me) : new Response(null, { status: 401 });
+    }
+    return new Response(null, { status: 404 });
+  });
+}

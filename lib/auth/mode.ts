@@ -14,14 +14,12 @@ export type AuthEnv = {
 
 /**
  * Google configured → production (spike secret is gone).
+ * `ALLOWED_SUBS` is an optional yard-wide extra, not a requirement.
  * Otherwise a shared mailbox secret is the two-tab spike.
  */
 export function resolveAuthMode(env: AuthEnv): ModeResult {
   const google = env.GOOGLE_CLIENT_ID?.trim() ?? "";
   if (google) {
-    if (!env.ALLOWED_SUBS?.trim()) {
-      return { ok: false, error: "config" };
-    }
     if (!env.SESSION_SECRET?.trim()) {
       return { ok: false, error: "config" };
     }

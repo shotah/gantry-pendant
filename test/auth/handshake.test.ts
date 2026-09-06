@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { handshake, handshakeSlug, rateId, roleFromQuery, stampUserId } from "@/lib/auth/handshake";
+import { handshake, handshakeSlug, rateId, roleFromQuery, stampEmail, stampUserId } from "@/lib/auth/handshake";
 import { mintSession, readSession, SESSION_COOKIE } from "@/lib/auth/session";
 
 describe("handshake", () => {
@@ -40,7 +40,13 @@ describe("handshake", () => {
     });
     expect(phone).toEqual({
       ok: true,
-      principal: { kind: "phone", sub: "1182", email: "ada@x.com", exp: claims?.exp },
+      principal: {
+        kind: "phone",
+        sub: "1182",
+        email: "ada@x.com",
+        emailVerified: false,
+        exp: claims?.exp,
+      },
     });
 
     const stranger = await mintSession(env.SESSION_SECRET, { sub: "999" }, now);
@@ -135,6 +141,8 @@ describe("handshake", () => {
     expect(rateId("oidc", { kind: "crane", slug: "kit" })).toBe("bearer:kit");
     expect(rateId("spike", { kind: "spike", role: "phone" })).toBe("spike:phone");
     expect(stampUserId({ kind: "phone", sub: "1182" })).toBe("1182");
+    expect(stampEmail({ kind: "phone", sub: "1182", email: "ada@x.com" })).toBe("ada@x.com");
+    expect(stampEmail({ kind: "phone", sub: "1182" })).toBeUndefined();
     expect(stampUserId({ kind: "spike", role: "phone" })).toBe("spike");
     expect(stampUserId({ kind: "crane", slug: "kit" })).toBeUndefined();
   });
@@ -180,5 +188,89 @@ describe("handshakeSlug", () => {
       now,
     });
     expect(queryCrane).toEqual({ ok: false, error: "unauthorized" });
+  });
+});
+
+describe("handshake room list", () => {
+  const env = {
+    GOOGLE_CLIENT_ID: "id",
+    SESSION_SECRET: "sess-secret",
+    CRANE_BEARERS: "kit:crane-tok",
+  };
+  const now = Date.UTC(2026, 8, 4);
+  const ada = "118212345678901234567";
+
+  async function cookie(human: { sub: string; email?: string; emailVerified?: boolean }) {
+    const token = await mintSession(env.SESSION_SECRET, human, now);
+    return `${SESSION_COOKIE}=${encodeURIComponent(token)}`;
+  }
+
+  it("admits by room sub without ALLOWED_SUBS", async () => {
+    const ok = await handshake({
+      env,
+      slug: "kit",
+      role: "phone",
+      cookieHeader: await cookie({ sub: ada, email: "ada@example.com", emailVerified: true }),
+      roomList: [{ sub: ada, email: "ada@example.com" }],
+      now,
+    });
+    expect(ok.ok && ok.principal.kind === "phone" && ok.principal.sub).toBe(ada);
+  });
+
+  it("admits by verified email on the room list", async () => {
+    const ok = await handshake({
+      env,
+      slug: "kit",
+      role: "phone",
+      cookieHeader: await cookie({ sub: ada, email: "ada@example.com", emailVerified: true }),
+      roomList: [{ email: "ada@example.com" }],
+      now,
+    });
+    expect(ok.ok && ok.principal.kind === "phone" && ok.principal.sub).toBe(ada);
+  });
+
+  it("refuses an unverified email even when the address is listed", async () => {
+    const refused = await handshake({
+      env,
+      slug: "kit",
+      role: "phone",
+      cookieHeader: await cookie({ sub: ada, email: "ada@example.com", emailVerified: false }),
+      roomList: [{ email: "ada@example.com" }],
+      now,
+    });
+    expect(refused).toEqual({ ok: false, error: "unauthorized" });
+  });
+
+  it("still admits a static ALLOWED_SUBS extra", async () => {
+    const ok = await handshake({
+      env: { ...env, ALLOWED_SUBS: ada },
+      slug: "kit",
+      role: "phone",
+      cookieHeader: await cookie({ sub: ada }),
+      roomList: [],
+      now,
+    });
+    expect(ok.ok && ok.principal.kind === "phone" && ok.principal.sub).toBe(ada);
+  });
+
+  it("fails closed with a valid session and no room list", async () => {
+    const refused = await handshake({
+      env,
+      slug: "kit",
+      role: "phone",
+      cookieHeader: await cookie({ sub: ada, email: "ada@example.com", emailVerified: true }),
+      now,
+    });
+    expect(refused).toEqual({ ok: false, error: "unauthorized" });
+  });
+
+  it("binds the crane bearer without ALLOWED_SUBS", async () => {
+    const kit = await handshake({
+      env,
+      slug: "kit",
+      role: "crane",
+      authorization: "Bearer crane-tok",
+    });
+    expect(kit).toEqual({ ok: true, principal: { kind: "crane", slug: "kit" } });
   });
 });

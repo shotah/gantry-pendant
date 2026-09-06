@@ -1,4 +1,5 @@
-import { allowlistMap } from "../auth/allowlist";
+import { roomAllows, type RoomSession } from "../auth/room";
+import type { RoomUser } from "./allow";
 import type { Role } from "./frame";
 
 /** Decimal millisecond expiry from `X-Pendant-Exp`. Absent / junk → skip the exp check. */
@@ -13,27 +14,47 @@ export function parseExpMs(raw: string | undefined): number | undefined {
   return n;
 }
 
+export function parseEmailVerified(raw: string | undefined): boolean {
+  return raw === "1";
+}
+
 export type SocketAuthInput = {
   role: Role;
   userId?: string;
+  email?: string;
+  emailVerified?: boolean;
   expMs?: number;
   allowedSubs?: string;
+  roomUsers?: RoomUser[];
+  /** Google is on — empty room + no extra admits nobody. Spike skips. */
+  enforce?: boolean;
   now: number;
 };
 
+function phoneSession(input: SocketAuthInput): RoomSession | null {
+  if (!input.userId) {
+    return null;
+  }
+  return {
+    sub: input.userId,
+    email: input.email,
+    emailVerified: input.emailVerified,
+  };
+}
+
 /**
- * Phone sockets re-check allowlist + exp when `ALLOWED_SUBS` is non-empty.
- * Spike (empty list) and crane skip. Does not log sub.
+ * Phone sockets re-check the room list (and optional static extra) on
+ * every frame when Google is on. Spike and crane skip. Does not log sub.
  */
 export function socketMessageAllowed(input: SocketAuthInput): boolean {
   if (input.role !== "phone") {
     return true;
   }
-  const allowed = allowlistMap(input.allowedSubs);
-  if (allowed.size === 0) {
+  if (!input.enforce) {
     return true;
   }
-  if (!input.userId || !allowed.has(input.userId)) {
+  const session = phoneSession(input);
+  if (!session || !roomAllows(input.roomUsers, session, input.allowedSubs)) {
     return false;
   }
   if (input.expMs != null && input.expMs > 0 && input.now > input.expMs) {

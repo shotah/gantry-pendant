@@ -7,23 +7,23 @@ describe("auth mode", () => {
     expect(publicAuthConfig({ MAILBOX_SECRET: "s" })).toEqual({ mode: "spike", google: false });
   });
 
-  it("requires allowlist, session, and crane bearers when Google is on", () => {
+  it("requires session and crane bearers when Google is on", () => {
     expect(resolveAuthMode({ GOOGLE_CLIENT_ID: "id" }).ok).toBe(false);
     expect(resolveAuthMode({
       GOOGLE_CLIENT_ID: "id",
-      ALLOWED_SUBS: "sub1",
-    }).ok).toBe(false);
-    expect(resolveAuthMode({
-      GOOGLE_CLIENT_ID: "id",
-      ALLOWED_SUBS: "sub1",
       SESSION_SECRET: "sess",
     }).ok).toBe(false);
     expect(resolveAuthMode({
       GOOGLE_CLIENT_ID: "id",
-      ALLOWED_SUBS: "sub1",
       SESSION_SECRET: "sess",
       CRANE_BEARERS: "kit:tok",
       MAILBOX_SECRET: "ignored",
+    })).toEqual({ ok: true, mode: "oidc" });
+    expect(resolveAuthMode({
+      GOOGLE_CLIENT_ID: "id",
+      SESSION_SECRET: "sess",
+      CRANE_BEARERS: "kit:tok",
+      ALLOWED_SUBS: "sub1",
     })).toEqual({ ok: true, mode: "oidc" });
   });
 

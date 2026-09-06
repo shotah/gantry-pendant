@@ -16,12 +16,26 @@ describe("session", () => {
     const now = Date.UTC(2026, 8, 4);
     const token = await mintSession(secret, { sub: "1182", email: "ada@x.com" }, now);
     const claims = await readSession(secret, token, now + 1000);
-    expect(claims).toMatchObject({ sub: "1182", email: "ada@x.com" });
+    expect(claims).toMatchObject({ sub: "1182", email: "ada@x.com", emailVerified: false });
     const cookie = sessionCookie(token, true);
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("Secure");
     expect(cookie).toContain(SESSION_COOKIE);
     expect(parseCookie(cookie, SESSION_COOKIE)).toBe(token);
+  });
+
+  it("stores email_verified on the claims", async () => {
+    const now = Date.UTC(2026, 8, 4);
+    const token = await mintSession(secret, {
+      sub: "1182",
+      email: "Ada@X.com",
+      emailVerified: true,
+    }, now);
+    expect(await readSession(secret, token, now + 1000)).toMatchObject({
+      sub: "1182",
+      email: "ada@x.com",
+      emailVerified: true,
+    });
   });
 
   it("rejects junk, wrong secret, and a hard 7d exp (8 days is gone; 6 days still reads)", async () => {

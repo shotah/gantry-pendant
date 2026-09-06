@@ -18,6 +18,14 @@
       }
     ]
   },
+  "kv_namespaces": [
+    {
+      "binding": "DIRECTORY",
+      // wrangler kv namespace create DIRECTORY — paste the id here for deploy
+      "id": "directory-local",
+      "preview_id": "directory-local"
+    }
+  ],
   "migrations": [
     {
       "tag": "v1",

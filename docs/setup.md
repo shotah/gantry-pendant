@@ -1,13 +1,13 @@
 # Setup — who talks to Kit
 
-Admin flow, user flow, and the three pastes that actually connect them.
+Admin flow, user flow, and the paste that actually connects them.
 Gotchas: [edgecases.md](edgecases.md). Auth: [security.md](security.md).
 Shape: [architecture.md](architecture.md). What it looks like:
 [screens.md](screens.md). What's left: [todo.md](todo.md).
 
 This is **not** “add a field on the Gantree person and they can chat.”
-Gantree operates cranes. The mailbox and the mouth each have their own
-allowlist. Saving a yard profile does not open either door.
+Gantree operates cranes. Chat is the crane’s list, enforced by this
+Worker. Saving a yard profile does not open the door.
 
 ---
 
@@ -15,11 +15,11 @@ allowlist. Saving a yard profile does not open either door.
 
 | Question | Today |
 | --- | --- |
-| Where do I add a human who may talk to an agent? | Two lists: Worker `ALLOWED_SUBS` **and** crane `PENDANT_ALLOWED_USERS`. Same Google `sub`. |
-| Is that all in Gantree? | **No.** Gantree writes the crane `.env` only (wizard or Secrets). Worker secrets stay in Cloudflare. |
-| What do I add on the Gantree **user**? | **Nothing that opens chat.** Email / Telegram / Slack / Discord on `/profile` are labels (Inject user → `PERSONA.md`). There is no Google `sub` field and no “copy onto Kit’s pendant” button yet. |
+| Where do I add a human who may talk to an agent? | One list: crane `PENDANT_ALLOWED_USERS`. Recreate. The crane publishes it; this Worker enforces it. |
+| Is that all in Gantree? | The list, yes (wizard or Secrets). Worker secrets stay in Cloudflare: Google + session + **one bearer per crane**. |
+| What do I add on the Gantree **user**? | Email (and, once learned, Google `sub`). Nothing that opens chat by itself. |
 | How does that update ai-gantry? | Recreate the crane. The harness reads `CHANNEL=pendant` + `PENDANT_*` at **boot**. Restart keeps a ghost list. |
-| How does the agent talk to that Google user? | Phone signs in on the pendant. Worker stamps `user_id` = `sub`. Crane ignores any `sub` not on `PENDANT_ALLOWED_USERS`. Replies go back through the same Durable Object room. |
+| How does the agent talk to that Google user? | Phone signs in on the pendant. `/api/auth/me` lists their cranes. Worker stamps `user_id` = `sub` and `email`. Crane ignores anyone not on `PENDANT_ALLOWED_USERS`. |
 
 A yard operator can exist and still never reach Kit. A phone user can
 talk to Kit without ever logging into Gantree.
@@ -28,23 +28,25 @@ talk to Kit without ever logging into Gantree.
 
 ## What you paste (the connect)
 
-Three strings must agree. Email after a colon is a **label only**.
+One human list. Email is a real match (verified Google claim,
+lowercased), not a label.
 
 ```text
 Cloudflare Worker
-  ALLOWED_SUBS=118212345678901234567:ada@example.com
   CRANE_BEARERS=kit:<bearer>
+  # ALLOWED_SUBS is optional break-glass, not required
 
 Crane .env  (Gantree wizard or Secrets — this is what ai-gantry reads)
   CHANNEL=pendant
   PENDANT_MAILBOX_URL=wss://gantry-pendant.<account>.workers.dev/ws/kit
   PENDANT_BEARER=<same bearer>
-  PENDANT_ALLOWED_USERS=118212345678901234567
+  PENDANT_ALLOWED_USERS=ada@example.com
 ```
 
 ```text
 phone Google OIDC  →  session cookie  →  wss …/ws/kit  (role=phone)
 crane bearer       →  outbound wss    →  same room     (role=crane)
+                   →  allow frame     →  room list on the Durable Object
 ```
 
 Gantree never sits on that path. The yard cookie is ignored if it shows
@@ -56,10 +58,10 @@ up on the Worker.
                            |
                            | writes crane .env only
                            v
-phone -- Google --> Worker mailbox (ALLOWED_SUBS) <-- crane (PENDANT_BEARER)
+phone -- Google --> Worker mailbox (room list) <-- crane (PENDANT_BEARER)
                          Durable Object /ws/kit
                            |
-                           | frame.user_id = Google sub
+                           | frame.user_id = Google sub, email
                            v
                     ai-gantry CHANNEL=pendant
                     (PENDANT_ALLOWED_USERS)
@@ -91,20 +93,21 @@ The Worker and the GCP client have to exist. Gantree cannot create them.
    GOOGLE_CLIENT_ID
    GOOGLE_CLIENT_SECRET
    SESSION_SECRET          # npm run secret
-   ALLOWED_SUBS            # start with the admin's Google sub
    CRANE_BEARERS           # kit:<token>  — npm run secret
    ```
+
+   Optional: `ALLOWED_SUBS` as a yard-wide extra (break-glass). The
+   crane list is the door. Bind KV `DIRECTORY` (`wrangler kv namespace
+   create DIRECTORY`, paste the id into `wrangler.jsonc`).
 
    The moment Google is on, `MAILBOX_SECRET` (two-tab spike) is
    rejected. Leave Worker-level Cloudflare Access **off**.
 
-You need at least one Google `sub` to put in `ALLOWED_SUBS` or the
-admin cannot finish sign-in. Unknown accounts never get a session
-cookie, so they cannot open `/api/auth/me` and read their own id. That
-is deliberate (no enumeration) and it makes the **first** human a
-laptop job: decode one Google ID token (`sub` claim, a long digit
-string) and paste it. After that person is allowlisted, they sign in
-on the pendant and `/api/auth/me` returns `{ sub, email }`.
+Anyone with a Google account can finish sign-in. The cookie opens
+**no room**. `/api/auth/me` returns `{ sub, email, cranes }`. Empty
+`cranes` paints “not on any crane yet — give this to your yard admin”
+with that person’s own email and `sub`. No enumeration: you only see
+your own id.
 
 ---
 
@@ -128,7 +131,8 @@ Google field. There isn’t one.
 
 - mailbox URL (`wss://…/ws/<this-slug>`)
 - mailbox bearer (same token as `CRANE_BEARERS` for that slug)
-- Google `sub` allowlist (`PENDANT_ALLOWED_USERS`)
+- Google `sub` allowlist (`PENDANT_ALLOWED_USERS` — email, `sub`, or
+  `sub:email`)
 
 **Existing crane:** open Kit → **Secrets** → set `CHANNEL=pendant` and
 the three `PENDANT_*` keys (or change mouth from telegram). Save.
@@ -141,26 +145,24 @@ gate as Telegram. When `CHANNEL=pendant`, Gantree also POSTs that file
 to this Worker (`/api/avatar?slug=`). The phone can replace it from the
 header. Chat photos never become the face.
 
-Gantree does **not** push `ALLOWED_SUBS` or `CRANE_BEARERS` to
-Cloudflare. After you add a human, you still `wrangler secret put
-ALLOWED_SUBS` (or the dashboard) with the **same** `sub`.
+Gantree does **not** push `CRANE_BEARERS` to Cloudflare. After you add
+a human, recreate Kit. The crane publishes `allow`; the room follows.
 
 ### C. Add another human later
 
-1. Get their Google `sub` (they send it out of band, or you decode an
-   ID token). Email alone is not the key.
-2. Append to Worker `ALLOWED_SUBS`.
-3. Append to crane `PENDANT_ALLOWED_USERS` in Secrets.
-4. Recreate Kit.
+1. Put their email (or `sub`) on `PENDANT_ALLOWED_USERS`.
+2. Recreate Kit.
 
 Until a confirm-scary “add this operator to Kit’s pendant allowlist”
-exists, that is the whole admin path.
+exists, Secrets + recreate is the whole admin path.
 
 ### D. Yank / stolen phone
 
-1. Remove `sub` from **both** lists.
-2. Recreate the crane.
-3. Rotate `CRANE_BEARERS` + `PENDANT_BEARER` if the token leaked.
+1. Remove them from `PENDANT_ALLOWED_USERS`.
+2. Recreate the crane. Their socket closes `4401` when the new `allow`
+   lands (stale list until then).
+3. Rotate `CRANE_BEARERS` + `PENDANT_BEARER` if the token leaked
+   (instant kill while the crane is down).
 4. Lock the phone; Google → sign out other sessions.
 
 ---
@@ -169,27 +171,28 @@ exists, that is the whole admin path.
 
 The human does **not** need a Gantree login.
 
-1. Admin has already pasted their `sub` on both lists and recreated.
+1. Admin has already put them on Kit’s list and recreated.
 2. Open the pendant origin (HTTPS, or `http://127.0.0.1:3000` on a
    laptop). Chrome: **Install** in the address bar (desktop) or the
    menu (Android). iPhone Safari: Share → Add to Home Screen. Vinext
    serves the web app manifest at `/manifest.webmanifest`.
-3. Sign in with Google (the account whose `sub` is on the list).
-4. Grant location if they want `[last pin]` this-send. Denied still
-   sends text.
+3. Sign in with Google.
+4. Pick Kit from the crane list. Empty list: “not on any crane yet”
+   with their email and `sub` to send the yard admin. Grant location
+   if they want `[last pin]` this-send. Denied still sends text.
 5. Type. Kit answers when the crane socket is up.
 6. Tap Kit’s face in the header to set the same `avatar.jpg` the yard
    Photo fold uploads (JPEG, 5MB). The Worker stores it; a chat photo
    is still a turn, not a face change.
 
-If Google works but Kit never answers: they are on the Worker list and
-missing from the crane, or the crane was restarted instead of
-recreated. If the socket 401s: missing from `ALLOWED_SUBS`, or the
-session hit its hard 7-day `exp`. Cron / spark only lands while the
+If Google works but Kit never answers: they are missing from the crane
+list, or the crane was restarted instead of recreated. If the socket
+401s: not on the room list (or the optional `ALLOWED_SUBS` extra), or
+the session hit its hard 7-day `exp`. Cron / spark only lands while the
 app is open — no lock-screen push yet.
 
-A stranger who hits Sign in with Google gets the same unauthorized as
-a bad token. They never join the room and they never see a `sub`.
+A stranger who hits Sign in with Google gets a session and an empty
+crane list. They never join a room.
 
 Local mock (`PENDANT_DEV=1` on loopback) is **not** this flow. It
 paints Ada and canned scenes so you can screenshot the mouth. See
@@ -200,11 +203,11 @@ paints Ada and canned scenes so you can screenshot the mouth. See
 ## How the agent talks back
 
 1. Phone WebSocket is tagged with that `sub`. Each frame carries
-   `user_id`.
+   `user_id` (always `sub`) and `email` when Google verified it.
 2. Durable Object fans the frame to the crane socket (or queues ≤50 /
    1h if Kit is mid-reboot).
-3. `internal/channel/pendant` drops the frame unless `user_id` is on
-   `PENDANT_ALLOWED_USERS`.
+3. `internal/channel/pendant` drops the frame unless `user_id` **or**
+   `email` is on `PENDANT_ALLOWED_USERS`.
 4. Session id is `pendant:<slug>:<sub>`. Completer runs. `Push` /
    replies write back to the same room.
 5. GPS on the frame calls `here.Set`. It is **not** stuffed into
@@ -219,8 +222,9 @@ crane.
 ## Checklist (first working mouth)
 
 - [ ] Worker deployed; GCP redirect = this origin
-- [ ] Worker secrets: Google + session + `ALLOWED_SUBS` + `CRANE_BEARERS`
-- [ ] Gantree: channel pendant, URL `/ws/<slug>`, same bearer, same `sub`
+- [ ] Worker secrets: Google + session + `CRANE_BEARERS` (`ALLOWED_SUBS` optional)
+- [ ] KV `DIRECTORY` bound
+- [ ] Gantree: channel pendant, URL `/ws/<slug>`, same bearer, human list
 - [ ] Recreated
-- [ ] Phone Google sign-in; text comes back
+- [ ] Phone Google sign-in; crane list or “not on any crane yet”
 - [ ] Yard cookie never sent to the Worker

@@ -1,5 +1,6 @@
 interface Env {
   MAILBOX: DurableObjectNamespace;
+  DIRECTORY?: KVNamespace;
   ASSETS?: Fetcher;
   MAILBOX_SECRET?: string;
   GOOGLE_CLIENT_ID?: string;

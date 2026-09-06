@@ -1,4 +1,5 @@
 import { CONTEXT_JSON_MAX, FRAME_BYTES_MAX, IMAGE_BYTES_MAX, IMAGE_MAX, TEXT_MAX, utf8Bytes } from "./caps";
+import { parseAllowUsers, type RoomUser } from "./allow";
 import { parseCommands, type SlashCommand } from "./cmds";
 
 export type Role = "phone" | "crane";
@@ -22,7 +23,7 @@ export type PhoneContext = {
 
 export type FrameImage = { url: string };
 
-export type FrameKind = "inbound" | "reply" | "push" | "ack" | "error" | "pin" | "cmds";
+export type FrameKind = "inbound" | "reply" | "push" | "ack" | "error" | "pin" | "cmds" | "allow";
 
 export type WireFrame = {
   text?: string;
@@ -30,9 +31,11 @@ export type WireFrame = {
   context?: PhoneContext;
   kind?: FrameKind;
   user_id?: string;
+  email?: string;
   id?: string;
   since?: string;
   commands?: SlashCommand[];
+  users?: RoomUser[];
 };
 
 export type ParseOpts = { role?: Role };
@@ -149,7 +152,7 @@ function parseIdField(raw: unknown): string | ParseErr | undefined {
   return raw.length ? raw : undefined;
 }
 
-const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds"]);
+const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds", "allow"]);
 
 /** Parse a mailbox frame. Never logs the body. */
 export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseOpts): ParseResult {
@@ -190,6 +193,15 @@ export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseO
     }
     frame.user_id = o.user_id;
   }
+  if (o.email != null) {
+    if (typeof o.email !== "string" || o.email.length > 254) {
+      return { ok: false, error: "bad frame" };
+    }
+    const email = o.email.trim().toLowerCase();
+    if (email) {
+      frame.email = email;
+    }
+  }
   const id = parseIdField(o.id);
   if (id && typeof id === "object") {
     return id;
@@ -213,6 +225,9 @@ export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseO
   }
   if (o.kind === "cmds") {
     frame.commands = parseCommands(o.commands);
+  }
+  if (o.kind === "allow") {
+    frame.users = parseAllowUsers(o.users);
   }
   if (o.context != null) {
     const blob = JSON.stringify(o.context);

@@ -15,47 +15,48 @@ This is not a product page. It is the second brain the walks still need.
 | Door | Where | Credential | Who it lets in |
 | --- | --- | --- | --- |
 | Yard | gantree `/login` | operator passphrase | people who may **operate** cranes |
-| Mailbox | this Worker | Google OIDC session (human) or crane bearer (machine) | who may **join the room** |
-| Mouth | crane `.env` `PENDANT_ALLOWED_USERS` | Google `sub` again | who the **agent** will answer |
+| Mailbox | this Worker | Google OIDC session (human) or crane bearer (machine) | who may **join the room** (room list from the crane) |
+| Mouth | crane `.env` `PENDANT_ALLOWED_USERS` | Google `sub` or verified email | who the **agent** will answer |
 
 Gantree never sits in a chat turn. Saving a profile does **not** open the
 mailbox. Recreating a crane does **not** write Worker secrets. A yard
 `gantree_session` cookie on the Worker is ignored (and must stay that way).
 
-**Cover:** treat a new human as three pastes, not one toggle. Until a
-Gantree “add this operator to Kit’s pendant” button exists, the admin
-copies the `sub` by hand into **both** allowlists.
+**Cover:** treat a new human as one list + recreate. Until a Gantree
+“add this operator to Kit’s pendant” button exists, the admin copies
+email or `sub` into `PENDANT_ALLOWED_USERS` by hand.
 
 ---
 
-## Dual allowlists (the #1 miss)
+## Stale list until recreate (the #1 miss)
 
-Two lists, same `sub`, different hosts:
+The crane `.env` is the human allowlist. The Worker remembers the last
+`allow` frame on that slug’s Durable Object.
 
 ```text
-Worker  ALLOWED_SUBS=1182…:ada@example.com
-Crane   PENDANT_ALLOWED_USERS=1182…
+Crane   PENDANT_ALLOWED_USERS=ada@example.com
+Room    last allow frame (until the next dial)
 ```
 
 | Symptom | Usual cause |
 | --- | --- |
-| Google works, socket 401s, Kit never hears you | on the crane list, missing from `ALLOWED_SUBS` |
-| Socket is live, Kit ignores the frame | on the Worker list, missing from `PENDANT_ALLOWED_USERS` |
+| Google works, empty crane list, never joins | not on Kit’s `.env`, or Kit has not dialed since the edit |
+| Socket is live, Kit ignores the frame | on the room list, missing from `PENDANT_ALLOWED_USERS` (crane restarted, not recreated) |
 | Crane dies at boot | empty `PENDANT_ALLOWED_USERS` (fail-closed, same as Telegram) |
-| Worker `/ws` is 503 `config` | Google is on but `ALLOWED_SUBS` / `SESSION_SECRET` / `CRANE_BEARERS` is empty |
+| Worker `/ws` is 503 `config` | Google is on but `SESSION_SECRET` / `CRANE_BEARERS` is empty |
+| Yanked human still talks | ghost list: recreate so the crane republishes `allow` |
 
-Email after the colon on the Worker (`sub:email`) is a **label only**.
-The key is `sub`. An email change does not mint a new person. Pasting
-only `ada@example.com` into either list does nothing useful.
+Email is a real match when Google says `email_verified`. The session
+id and `user_id` are always `sub`. Optional Worker `ALLOWED_SUBS` is
+break-glass, not a second copy of the crane list.
 
 Gantree Secrets writes the **crane** `.env`. It cannot see Cloudflare.
-`wrangler secret put ALLOWED_SUBS` (or the dashboard) is a second trip.
+`wrangler secret put CRANE_BEARERS` is the one Cloudflare paste per
+crane.
 
-**Cover:** keep the two strings in one note when you rotate. After the
-crane list: recreate (restart keeps a ghost allowlist). After Worker
-`ALLOWED_SUBS`: the **next phone frame** re-checks (4401 if yanked).
-No Docker step. Collapsing to one list (crane publishes, Worker asks
-the DO) is [todo.md](todo.md).
+**Cover:** after the crane list, recreate (restart keeps a ghost
+allowlist). The room closes yanked sockets `4401` when the new `allow`
+lands. Bearer rotation is the instant kill if the crane is down.
 
 ---
 
@@ -66,22 +67,17 @@ Slack / Discord only. Inject user copies those into `PERSONA.md`, not
 onto a crane allowlist (Telegram has its own confirm-scary copy; pendant
 does not).
 
-The OIDC callback **refuses** an unknown `sub` before minting a session.
-So a stranger who signs in cannot open `/api/auth/me` and read their id.
-That is deliberate (no user enumeration) and it makes first-user setup
-awkward.
+The OIDC callback **mints** a session for any verified Google account.
+The cookie opens no room. `/api/auth/me` returns `{ sub, email, cranes }`.
+A stranger sees `cranes: []` and their own id — never anyone else’s.
 
-**Cover (today):**
+**Cover:**
 
-1. Admin allowlists **themselves** first (decode one ID token, or add
-   `sub` from a laptop Google JWT).
-2. Sign in on the pendant → `/api/auth/me` returns `{ sub, email }`.
-3. For the next human: they send that `sub` out of band, or you decode
-   their ID token the same way. Then paste into both lists.
-
-**Cover (build):** [todo.md](todo.md) — mint a session for any verified
-Google account, still deny the DO unless allowlisted, show “send this
-`sub` to the yard admin.” Do **not** put `sub` on the query string.
+1. Sign in on the pendant. Empty crane list shows email + `sub` with a
+   copy button. Send that to the yard admin. Do **not** put `sub` on
+   the query string.
+2. Admin pastes email (or `sub`) into `PENDANT_ALLOWED_USERS`, recreates.
+3. Next `/me` lists the crane. First frame carries `user_id` + `email`.
 
 ---
 
@@ -106,10 +102,10 @@ https://<this-origin>/api/auth/callback/google
 both in prod and expect the shared secret to still work.
 
 **Cover:** one note in Cloudflare secrets: client id/secret, session
-secret, `ALLOWED_SUBS`, `CRANE_BEARERS`. Confirm the redirect on the
-**deployed** origin (`workers.dev` first, custom host later). Leave
-Access off the mailbox. Hostname Access on the **document** origin only
-is Later.
+secret, `CRANE_BEARERS`. `ALLOWED_SUBS` optional. Confirm the redirect
+on the **deployed** origin (`workers.dev` first, custom host later).
+Leave Access off the mailbox. Hostname Access on the **document**
+origin only is Later.
 
 ---
 
@@ -229,7 +225,7 @@ first. A long turn looks idle until the model finishes.
 ## What Gantree does **not** do
 
 - No chat route, no `/api/gantries/…/messages`.
-- No write to Worker `ALLOWED_SUBS` / `CRANE_BEARERS`.
+- No write to Worker `CRANE_BEARERS` (or optional `ALLOWED_SUBS`).
 - No Google `sub` on the operator row (Telegram-style copy button is
   Later: “add this operator to Kit’s pendant allowlist”).
 - Operator **email** is a profile label and Inject-user fodder, not a
@@ -237,16 +233,16 @@ first. A long turn looks idle until the model finishes.
 - `repos/` is excluded from the yard `tsconfig` on purpose — this
   checkout typechecks itself.
 
-**Cover:** paste mailbox URL + bearer + `sub` in the wizard (or Secrets),
-recreate. Keep the Worker secrets in Cloudflare. Document the two-list
-dance in the install one-liner; do not grow a product page.
+**Cover:** paste mailbox URL + bearer + human list in the wizard (or Secrets),
+recreate. Keep the Worker secrets in Cloudflare. One list, one recreate.
 
 ---
 
 ## Stolen / leaked / wrong-room
 
 1. Lock the phone; Google → sign out other sessions.
-2. Yank `sub` from **both** allowlists (Worker: next frame closes 4401).
+2. Yank them from the **crane** list and recreate (next `allow` closes
+   4401). Optional: yank from Worker `ALLOWED_SUBS` if you used it.
 3. Rotate `CRANE_BEARERS` + `PENDANT_BEARER`; recreate.
 4. If `.env` leaked, assume the bearer is burned.
 
@@ -259,9 +255,9 @@ Telegram pin.
 ## Checklist (after deploy)
 
 - [ ] GCP Web client, redirect = this origin, `openid email profile` only
-- [ ] Worker secrets: Google + session + `ALLOWED_SUBS` + `CRANE_BEARERS`
+- [ ] Worker secrets: Google + session + `CRANE_BEARERS` (`ALLOWED_SUBS` optional)
 - [ ] Spike `MAILBOX_SECRET` gone from prod
-- [ ] Crane `.env`: `CHANNEL=pendant`, URL `/ws/<slug>`, bearer, `sub` list
+- [ ] Crane `.env`: `CHANNEL=pendant`, URL `/ws/<slug>`, bearer, human list
 - [ ] Recreated (not restarted)
 - [ ] Phone Google sign-in; unknown account never joins the DO
 - [ ] Kit’s bearer cannot open Ada’s slug

@@ -1,7 +1,8 @@
 import handler from "vinext/server/app-router-entry";
-import { handshake, rateId, roleFromQuery, stampUserId } from "../lib/auth/handshake";
+import { handshake, rateId, roleFromQuery, stampEmail, stampUserId } from "../lib/auth/handshake";
 import { resolveAuthMode } from "../lib/auth/mode";
 import { stripUpgradeOp, upgradeOriginOk } from "../lib/auth/upgrade";
+import { fetchRoomUsers } from "../lib/mailbox/allow";
 import { slugFromPath } from "../lib/mailbox/slug";
 import { Mailbox } from "./mailbox";
 
@@ -32,6 +33,11 @@ async function mailboxUpgrade(request: Request, env: Env): Promise<Response> {
   if (!mode.ok) {
     return Response.json({ error: "config" }, { status: 503 });
   }
+  const id = env.MAILBOX.idFromName(slug);
+  const stub = env.MAILBOX.get(id);
+  const roomList = mode.mode === "oidc" && role === "phone"
+    ? await fetchRoomUsers(stub)
+    : undefined;
   const auth = await handshake({
     env: envOf(env),
     slug,
@@ -40,18 +46,25 @@ async function mailboxUpgrade(request: Request, env: Env): Promise<Response> {
     authorization: request.headers.get("Authorization"),
     querySecret: url.searchParams.get("secret"),
     queryBearer: url.searchParams.get("bearer"),
+    roomList,
   });
   if (!auth.ok) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const id = env.MAILBOX.idFromName(slug);
-  const stub = env.MAILBOX.get(id);
   const headers = new Headers(request.headers);
   headers.set("X-Pendant-Role", role);
   headers.set("X-Pendant-Rate", rateId(mode.mode, auth.principal));
+  headers.set("X-Pendant-Slug", slug);
   const sub = stampUserId(auth.principal);
   if (sub) {
     headers.set("X-Pendant-Sub", sub);
+  }
+  const email = stampEmail(auth.principal);
+  if (email) {
+    headers.set("X-Pendant-Email", email);
+  }
+  if (auth.principal.kind === "phone" && auth.principal.emailVerified) {
+    headers.set("X-Pendant-EmailVerified", "1");
   }
   if (auth.principal.kind === "phone" && auth.principal.exp !== undefined) {
     headers.set("X-Pendant-Exp", String(auth.principal.exp));

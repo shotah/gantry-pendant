@@ -21,6 +21,7 @@ describe("samples", () => {
   it("ships Ada as the loopback mock human", () => {
     expect(DEV_USER.email).toBe("ada@example.com");
     expect(DEV_USER.sub).toMatch(/^\d+$/);
+    expect(DEV_USER.cranes).toEqual(["ada"]);
   });
 
   it("paints a live thread, a cron ping, and a hatch photo", () => {

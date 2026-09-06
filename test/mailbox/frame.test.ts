@@ -97,6 +97,25 @@ describe("frame", () => {
     expect(got.ok && got.frame.commands).toEqual([{ name: "new", hint: "reset this session", args: true }]);
   });
 
+  it("accepts a crane allow list and lowercases email", () => {
+    const got = parseFrame(JSON.stringify({
+      kind: "allow",
+      users: [{ sub: "118212345678901234567", email: "Ada@Example.com" }, { email: "bob@example.com" }],
+    }));
+    expect(got.ok && got.frame.kind).toBe("allow");
+    expect(got.ok && got.frame.users).toEqual([
+      { sub: "118212345678901234567", email: "ada@example.com" },
+      { email: "bob@example.com" },
+    ]);
+    const stamped = parseFrame(JSON.stringify({
+      kind: "inbound",
+      text: "hi",
+      user_id: "118212345678901234567",
+      email: "Ada@Example.com",
+    }));
+    expect(stamped.ok && stamped.frame.email).toBe("ada@example.com");
+  });
+
   it("parses and encodes a short frame id", () => {
     const got = parseFrame(JSON.stringify({ text: "hi", id: "msg-1" }));
     expect(got.ok && got.frame.id).toBe("msg-1");

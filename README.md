@@ -89,16 +89,17 @@ Google login is a **new Web application** client on the same GCP
 project as google-mcp. Scopes: `openid email profile` only. Redirect:
 `https://<this-origin>/api/auth/callback/google` — not the Pages
 `oauth-catch` URI, not `localhost:4100`. Put `GOOGLE_CLIENT_ID` /
-`GOOGLE_CLIENT_SECRET` / `SESSION_SECRET` / `ALLOWED_SUBS` /
-`CRANE_BEARERS` in Worker secrets. Empty allowlist is a config error.
-The spike secret is rejected once Google is on.
+`GOOGLE_CLIENT_SECRET` / `SESSION_SECRET` / `CRANE_BEARERS` in Worker
+secrets. Bind KV `DIRECTORY`. `ALLOWED_SUBS` is an optional extra.
+Empty crane list fails boot. The spike secret is rejected once Google
+is on.
 
 Crane env (`CHANNEL=pendant`):
 
 ```env
 PENDANT_MAILBOX_URL=wss://gantry-pendant.<account>.workers.dev/ws/kit
 PENDANT_BEARER=<bound to kit>
-PENDANT_ALLOWED_USERS=<google-sub>
+PENDANT_ALLOWED_USERS=<email or google-sub>
 ```
 
 Yard: pick **pendant** in the build wizard, paste those three, recreate.

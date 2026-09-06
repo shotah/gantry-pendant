@@ -7,7 +7,7 @@ export const GOOGLE_JWKS = "https://www.googleapis.com/oauth2/v3/certs";
 
 const SCOPES = "openid email profile";
 
-export type GoogleIdentity = { sub: string; email?: string };
+export type GoogleIdentity = { sub: string; email?: string; emailVerified: boolean };
 
 export type Pkce = { verifier: string; challenge: string };
 
@@ -130,8 +130,10 @@ export function identityFromIdTokenPayload(payload: JWTPayload, nonce: string): 
   if (typeof payload.sub !== "string" || !payload.sub) {
     return null;
   }
-  const email = typeof payload.email === "string" ? payload.email : undefined;
-  return { sub: payload.sub, email };
+  const email = typeof payload.email === "string" && payload.email
+    ? payload.email.trim().toLowerCase()
+    : undefined;
+  return { sub: payload.sub, email, emailVerified: payload.email_verified === true };
 }
 
 export async function verifyIdToken(
@@ -159,5 +161,9 @@ export function acceptHuman(
     return null;
   }
   const label = allowed.get(identity.sub);
-  return { sub: identity.sub, email: identity.email ?? (label || undefined) };
+  return {
+    sub: identity.sub,
+    email: identity.email ?? (label || undefined),
+    emailVerified: identity.emailVerified,
+  };
 }

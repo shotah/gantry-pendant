@@ -43,14 +43,14 @@ crane  — mailbox bearer (machine) —►  Worker → same Durable Object
 
 | Who | Proves | Allowlist |
 | --- | --- | --- |
-| **Human** | Sign in with Google (OIDC). Worker checks the ID token. | Google `sub` (stable). Email is the human-editable label. |
+| **Human** | Sign in with Google (OIDC). Worker checks the ID token. | Room list from the crane (`allow` frame). `sub` or verified email. Optional `ALLOWED_SUBS` extra. |
 | **Crane** | `Authorization: Bearer` from crane `.env` (same job as `TELEGRAM_BOT_TOKEN`). | Token is bound to **that** crane slug. Kit's token cannot join Ada's DO. |
 
-Empty human allowlist is a boot/config error, same as
-`TELEGRAM_ALLOWED_USERS`. The Worker refuses unknown `sub` at
-handshake **and** on every later frame. The crane allowlists too
-(fail closed if the Worker is mis-set). Duplicate of 1–3 emails is
-acceptable until the crane publishes one list ([todo.md](todo.md)).
+Empty crane list is a boot error, same as
+`TELEGRAM_ALLOWED_USERS`. The Worker refuses anyone not on the **room**
+list (last `allow` frame) at handshake **and** on every later frame.
+Optional `ALLOWED_SUBS` is a yard-wide extra, not a requirement.
+The crane allowlists too (fail closed if the Worker is mis-set).
 
 Real crane: header only. `?bearer=` / `?secret=` are **spike mode**
 (two tabs). An oidc-mode upgrade with a query token is 401. `/crane`
@@ -110,7 +110,7 @@ front of a hostname:
 | Where identity lives | Our session cookie after Google | `CF_Authorization` / `ctx.access` |
 | Crane (Go, no browser) | Bearer we mint | Access **service token** (second identity system) |
 | WebSockets | Ours | Worker-level Access **403s WebSocket upgrades**. Hostname Access can proxy them; "Protect this Worker" cannot. |
-| Allowlist of 1–3 people | Our `sub` list | Access policy (email) plus we still need crane bind |
+| Allowlist of 1–3 people | Our room list | Access policy (email) plus we still need crane bind |
 
 **Put Google in the Vinext app.** That is the GCP setup we already
 know: Web client, redirect URI, client id/secret. Access is optional
@@ -160,10 +160,13 @@ same-origin and sends the httpOnly cookie; crane upgrade sends
 `Authorization: Bearer`. Bind DO id to the crane slug in that bearer
 (`kit` cannot write `ada`).
 
-On every `webSocketMessage` the mailbox re-checks `sub` ∈
-`ALLOWED_SUBS` and session `exp`. Failure **closes** the WebSocket
-with **4401**, not a chat `error` reply. Yanking a `sub` takes effect
-on the **next frame**, not the next reconnect.
+On every `webSocketMessage` the mailbox re-checks the **room list**
+(`sub` match, or verified email match) plus optional static
+`ALLOWED_SUBS`, and session `exp`. Failure **closes** the WebSocket
+with **4401**, not a chat `error` reply. A new `allow` frame walks
+phone sockets and closes anyone no longer on it. Yanking a person
+takes effect when the crane republishes (recreate), or on the next
+frame if they were only on `ALLOWED_SUBS`.
 
 Worker session after Google: httpOnly JWE cookie, **hard 7-day `exp`
 at mint**. No sliding refresh. Sign in again after expiry. Not a JWT
@@ -175,14 +178,15 @@ from `ChatID` (Google `sub`).
 
 ### Allowlist
 
-- Humans: Google `sub` list. Email is display and Gantree copy-paste,
-  not the only key (`sub` survives an email change).
-- No in-app pairing. First user is whoever you put in env. Same
-  Telegram lesson.
+- Humans: the crane’s `PENDANT_ALLOWED_USERS`, published as an `allow`
+  frame and stored on the Durable Object. `sub` is the key; verified
+  email is an alias. Optional Worker `ALLOWED_SUBS` is break-glass.
+- No in-app pairing. First user is whoever you put on the crane list.
+  Same Telegram lesson.
 - Crane: one bearer per crane, rotate by rewriting `.env` + Worker
   secret and recreating.
-- Two lists today (Worker `ALLOWED_SUBS` + crane `PENDANT_ALLOWED_USERS`).
-  Collapsing to the crane publishing one list is [todo.md](todo.md).
+- Room list remembered while the crane is down — yank waits for a
+  recreate. Bearer rotation is the instant kill.
 
 ### Bodies
 

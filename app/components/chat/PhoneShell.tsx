@@ -24,7 +24,7 @@ import { encodeFrame, type Role, type WireFrame } from "@/lib/mailbox/frame";
 import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
 
 type AuthCfg = { mode: "spike" | "oidc" | null; google: boolean; dev?: boolean };
-type Me = { sub: string; email?: string } | null;
+type Me = { sub: string; email?: string; cranes?: string[] } | null;
 
 const BACKOFF_MS = 1000;
 const BACKOFF_MAX = 30_000;
@@ -73,6 +73,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [catalog, setCatalog] = useState<SlashCommand[]>([]);
   const [avatarRev, setAvatarRev] = useState(0);
   const [faceHint, setFaceHint] = useState("");
+  const [copied, setCopied] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const echoTimer = useRef(0);
@@ -113,6 +114,14 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       setMe(m);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!phone || cfg?.mode !== "oidc" || !me?.cranes?.length) {
+      return;
+    }
+    const cranes = me.cranes;
+    setSlug((cur) => (cranes.includes(cur) ? cur : cranes[0] ?? cur));
+  }, [cfg?.mode, me, phone]);
 
   useEffect(() => {
     if (!cfg?.dev || !sampleId) {
@@ -179,7 +188,12 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       || (cfg?.mode === "oidc" && !me && !cfg.dev)
     ),
   );
-  const canSocket = Boolean(cfg && slug && (cfg.mode === "spike" ? secret : phone ? me : bearer));
+  const waitingForCrane = Boolean(
+    phone && cfg?.mode === "oidc" && !cfg.dev && me && !(me.cranes && me.cranes.length),
+  );
+  const listed = !phone || cfg?.mode !== "oidc" || Boolean(cfg.dev)
+    || Boolean(me?.cranes?.includes(slug));
+  const canSocket = Boolean(cfg && slug && listed && (cfg.mode === "spike" ? secret : phone ? me : bearer));
 
   const connect = useCallback(() => {
     if (stoppedRef.current || typeof window === "undefined" || !canSocket) {
@@ -478,7 +492,20 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     await sendText("", got.url);
   }
 
-  const title = useMemo(() => displaySlug(slug), [slug]);
+  async function copyIdentity() {
+    const bits = [me?.email, me?.sub].filter((v): v is string => Boolean(v));
+    try {
+      await navigator.clipboard.writeText(bits.join("\n"));
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  const title = useMemo(
+    () => waitingForCrane ? "Pendant" : displaySlug(slug),
+    [waitingForCrane, slug],
+  );
   const hideSecrets = painting;
   const faceAuth = hideSecrets
     ? {}
@@ -486,7 +513,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         secret: cfg?.mode === "spike" ? secret || undefined : undefined,
         bearer: !phone && cfg?.mode === "oidc" ? bearer || undefined : undefined,
       };
-  const canEditFace = Boolean(slug) && !needGoogle;
+  const canEditFace = Boolean(slug) && !needGoogle && !waitingForCrane;
 
   const faceProps = {
     slug: slug || "kit",
@@ -515,18 +542,37 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         </div>
         <SettingsMenu>
           <div className="flex flex-col gap-2">
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Agent name
-              <input
-                className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
-                value={slug}
-                spellCheck={false}
-                autoCapitalize="none"
-                autoCorrect="off"
-                autoComplete="off"
-                onChange={(e) => setSlug(e.target.value.toLowerCase())}
-              />
-            </label>
+            {phone && cfg?.mode === "oidc" && me?.cranes?.length
+              ? (
+                  <label className="flex flex-col gap-1 text-xs text-muted">
+                    Agent
+                    <select
+                      className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value)}
+                    >
+                      {me.cranes.map((c) => (
+                        <option key={c} value={c}>{displaySlug(c)}</option>
+                      ))}
+                    </select>
+                  </label>
+                )
+              : waitingForCrane
+                ? null
+                : (
+                    <label className="flex flex-col gap-1 text-xs text-muted">
+                      Agent name
+                      <input
+                        className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+                        value={slug}
+                        spellCheck={false}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        autoComplete="off"
+                        onChange={(e) => setSlug(e.target.value.toLowerCase())}
+                      />
+                    </label>
+                  )}
             {cfg?.mode === "spike" && !hideSecrets
               ? (
                   <label className="flex flex-col gap-1 text-xs text-muted">
@@ -597,37 +643,57 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
               </a>
             </main>
           )
-        : (
-            <>
-              <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
-                <Thread
-                  messages={messages}
-                  empty={(
-                    <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
-                      <KitAvatar {...faceProps} size="lg" editable={false} />
-                      <p className="text-sm text-dim">
-                        Nothing yet. Type below — or / for harness commands.
-                      </p>
-                    </div>
-                  )}
+        : waitingForCrane
+          ? (
+              <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+                <KitAvatar {...faceProps} size="lg" editable={false} />
+                <p className="text-sm text-body">
+                  Not on any crane yet — give this to your yard admin
+                </p>
+                {me?.email
+                  ? <p className="text-sm text-fg">{me.email}</p>
+                  : null}
+                <p className="break-all font-mono text-xs text-muted">{me?.sub}</p>
+                <button
+                  type="button"
+                  className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark"
+                  onClick={() => void copyIdentity()}
+                >
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </main>
+            )
+          : (
+              <>
+                <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+                  <Thread
+                    messages={messages}
+                    empty={(
+                      <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
+                        <KitAvatar {...faceProps} size="lg" editable={false} />
+                        <p className="text-sm text-dim">
+                          Nothing yet. Type below — or / for harness commands.
+                        </p>
+                      </div>
+                    )}
+                  />
+                </div>
+                <Compose
+                  key={`${sampleId ?? "live"}:${draft}`}
+                  disabled={status !== "up"}
+                  placeholder={phone ? `Message ${title} · / for commands` : "Reply as the crane"}
+                  gpsHint={phone ? gpsHint : undefined}
+                  gpsOn={gpsOn}
+                  onGpsToggle={phone ? toggleGps : undefined}
+                  commands={phone}
+                  catalog={catalog}
+                  initialText={draft}
+                  onSend={(t) => void sendText(t)}
+                  onPhoto={phone ? (f) => void sendPhoto(f) : undefined}
+                  onPin={phone ? () => void sendPin() : undefined}
                 />
-              </div>
-              <Compose
-                key={`${sampleId ?? "live"}:${draft}`}
-                disabled={status !== "up"}
-                placeholder={phone ? `Message ${title} · / for commands` : "Reply as the crane"}
-                gpsHint={phone ? gpsHint : undefined}
-                gpsOn={gpsOn}
-                onGpsToggle={phone ? toggleGps : undefined}
-                commands={phone}
-                catalog={catalog}
-                initialText={draft}
-                onSend={(t) => void sendText(t)}
-                onPhoto={phone ? (f) => void sendPhoto(f) : undefined}
-                onPin={phone ? () => void sendPin() : undefined}
-              />
-            </>
-          )}
+              </>
+            )}
     </div>
   );
 }
