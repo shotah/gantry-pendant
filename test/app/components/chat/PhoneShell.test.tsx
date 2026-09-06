@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PhoneShell } from "@/app/components/chat/PhoneShell";
 import { DEV_USER, MOCK_REPLIES, SAMPLE_LINES } from "@/lib/dev/samples";
@@ -18,6 +18,67 @@ function stubAuth(dev: boolean) {
   });
 }
 
+class FakeSocket {
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSING = 2;
+  static CLOSED = 3;
+  static instances: FakeSocket[] = [];
+
+  readonly url: string;
+  readyState = FakeSocket.CONNECTING;
+  onopen: ((ev: Event) => void) | null = null;
+  onclose: ((ev: Event) => void) | null = null;
+  onerror: ((ev: Event) => void) | null = null;
+  onmessage: ((ev: MessageEvent<string>) => void) | null = null;
+  send = vi.fn<(data: string) => void>();
+
+  constructor(url: string) {
+    this.url = url;
+    FakeSocket.instances.push(this);
+  }
+
+  close() {
+    if (this.readyState === FakeSocket.CLOSED) {
+      return;
+    }
+    this.readyState = FakeSocket.CLOSED;
+    this.onclose?.(new Event("close"));
+  }
+
+  open() {
+    this.readyState = FakeSocket.OPEN;
+    this.onopen?.(new Event("open"));
+  }
+
+  deliver(data: string) {
+    this.onmessage?.(new MessageEvent("message", { data }));
+  }
+}
+
+function stubSocket() {
+  FakeSocket.instances = [];
+  vi.stubGlobal("WebSocket", FakeSocket as unknown as typeof WebSocket);
+}
+
+function liveSocket() {
+  const ws = FakeSocket.instances.at(-1);
+  expect(ws).toBeTruthy();
+  return ws as FakeSocket;
+}
+
+async function connectSpike() {
+  stubAuth(true);
+  stubSocket();
+  render(<PhoneShell />);
+  expect(await screen.findByText("live")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "settings" }));
+  fireEvent.change(screen.getByLabelText("Agent access secret"), { target: { value: "s" } });
+  fireEvent.click(screen.getByRole("button", { name: "settings" }));
+  expect(FakeSocket.instances.length).toBeGreaterThanOrEqual(1);
+  return liveSocket();
+}
+
 beforeEach(() => {
   window.history.replaceState({}, "", "/");
   window.localStorage.removeItem("pendant.geo");
@@ -25,10 +86,13 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   window.history.replaceState({}, "", "/");
   window.localStorage.removeItem("pendant.geo");
   Reflect.deleteProperty(navigator, "geolocation");
+  FakeSocket.instances = [];
 });
 
 describe("PhoneShell", () => {
@@ -67,6 +131,7 @@ describe("PhoneShell", () => {
     fireEvent.change(box, { target: { value: "hello kit" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("hello kit")).toBeTruthy();
+    expect(screen.queryByText("sending")).toBeNull();
     expect(await screen.findByText(MOCK_REPLIES[0], {}, { timeout: 1000 })).toBeTruthy();
     expect(screen.getByText(/dev/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Change Kit's photo" })).toBeTruthy();
@@ -129,5 +194,78 @@ describe("PhoneShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "drop pin" }));
     expect(await screen.findByText("GPS omitted (denied or unavailable)")).toBeTruthy();
     expect(screen.getByText(/Nothing yet/)).toBeTruthy();
+  });
+
+  it("schedules a reconnect after the socket closes", async () => {
+    const first = await connectSpike();
+    vi.useFakeTimers();
+    act(() => {
+      first.close();
+    });
+    expect(FakeSocket.instances).toHaveLength(1);
+    act(() => {
+      vi.advanceTimersByTime(999);
+    });
+    expect(FakeSocket.instances).toHaveLength(1);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(FakeSocket.instances).toHaveLength(2);
+  });
+
+  it("reconnects on visibilitychange when the socket is not open", async () => {
+    const first = await connectSpike();
+    vi.useFakeTimers();
+    act(() => {
+      first.close();
+    });
+    expect(FakeSocket.instances).toHaveLength(1);
+    act(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(FakeSocket.instances).toHaveLength(2);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(FakeSocket.instances).toHaveLength(2);
+  });
+
+  it("keeps a send pending when the socket is not open", async () => {
+    await connectSpike();
+    expect(liveSocket().readyState).not.toBe(FakeSocket.OPEN);
+    fireEvent.change(screen.getByPlaceholderText(/Message Kit/), { target: { value: "hello kit" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("hello kit")).toBeTruthy();
+    expect(screen.getByText("sending")).toBeTruthy();
+    expect(liveSocket().send).not.toHaveBeenCalled();
+  });
+
+  it("clears pending when an ack for that id arrives", async () => {
+    vi.spyOn(crypto, "randomUUID").mockReturnValue("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Message Kit/), { target: { value: "hello kit" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("hello kit")).toBeTruthy();
+    expect(screen.getByText("sending")).toBeTruthy();
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "ack", id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee" }));
+    });
+    expect(screen.getByText("hello kit")).toBeTruthy();
+    expect(screen.queryByText("sending")).toBeNull();
+  });
+
+  it("does not duplicate a row when the same frame id arrives twice", async () => {
+    const ws = await connectSpike();
+    const payload = JSON.stringify({ id: "r1", kind: "reply", text: "yo from kit" });
+    act(() => {
+      ws.deliver(payload);
+      ws.deliver(payload);
+    });
+    expect(await screen.findByText("yo from kit")).toBeTruthy();
+    expect(screen.getAllByText("yo from kit")).toHaveLength(1);
   });
 });

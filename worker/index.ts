@@ -1,6 +1,7 @@
 import handler from "vinext/server/app-router-entry";
 import { handshake, rateId, roleFromQuery, stampUserId } from "../lib/auth/handshake";
 import { resolveAuthMode } from "../lib/auth/mode";
+import { stripUpgradeOp, upgradeOriginOk } from "../lib/auth/upgrade";
 import { slugFromPath } from "../lib/mailbox/slug";
 import { Mailbox } from "./mailbox";
 
@@ -23,6 +24,9 @@ async function mailboxUpgrade(request: Request, env: Env): Promise<Response> {
   const role = roleFromQuery(url.searchParams.get("role"));
   if (!slug || !role) {
     return new Response("not found", { status: 404 });
+  }
+  if (!upgradeOriginOk(request.headers.get("Origin"), url.origin)) {
+    return new Response("forbidden", { status: 403 });
   }
   const mode = resolveAuthMode(envOf(env));
   if (!mode.ok) {
@@ -49,7 +53,11 @@ async function mailboxUpgrade(request: Request, env: Env): Promise<Response> {
   if (sub) {
     headers.set("X-Pendant-Sub", sub);
   }
+  if (auth.principal.kind === "phone" && auth.principal.exp !== undefined) {
+    headers.set("X-Pendant-Exp", String(auth.principal.exp));
+  }
   headers.delete("Authorization");
+  stripUpgradeOp(headers);
   return stub.fetch(new Request(request, { headers }));
 }
 

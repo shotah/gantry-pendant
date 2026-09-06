@@ -9,6 +9,7 @@ export type ChatBubble = {
   kind?: string;
   at: number;
   photo?: string;
+  pending?: boolean;
 };
 
 export function Thread({ messages, empty }: { messages: ChatBubble[]; empty?: ReactNode }) {
@@ -39,6 +40,9 @@ export function Thread({ messages, empty }: { messages: ChatBubble[]; empty?: Re
                 ? <img src={m.photo} alt="" className="mb-2 max-h-48 rounded-lg" />
                 : null}
               {m.text ? <p className="whitespace-pre-wrap">{m.text}</p> : null}
+              {mine && m.pending
+                ? <p className="mt-1 text-[10px] text-dim">sending</p>
+                : null}
             </div>
           </li>
         );

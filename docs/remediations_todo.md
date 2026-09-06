@@ -6,6 +6,10 @@ when the boxes are ticked. Tests live under `test/`, mirroring source.
 
 Status: **now** · **next** · **later**
 
+Code for R1–R3.4 and R4 (except `setup.md`) is in. Groups stay **now**
+until the cellular walks. R2 queues images (8 MiB per destination).
+R3.1 session is hard 7d.
+
 Two groups get a callout because they are the ones a real phone finds
 first: **multi-user / multi-phone** and **auth**.
 
@@ -23,19 +27,19 @@ texts Kit; only Ada's phone(s) get the reply. Bob's phone in the
 background for 5 minutes; Kit replies; Bob foregrounds and the reply
 appears without reload. Cron `Push` with no target lands on both.
 
-- [ ] `id` on every frame (`lib/mailbox/frame.ts`); `ack` carries `id`
-- [ ] Phone frames forced to `inbound | pin | ack` server-side
-- [ ] Route `reply` by `user_id` → `getWebSockets(sub)`; `push` with no
+- [x] `id` on every frame (`lib/mailbox/frame.ts`); `ack` carries `id`
+- [x] Phone frames forced to `inbound | pin | ack` server-side
+- [x] Route `reply` by `user_id` → `getWebSockets(sub)`; `push` with no
       `user_id` = broadcast
-- [ ] Queue keyed by `(to, userId)`; `flush()` drains only that `sub`
-- [ ] DO holds phone-bound frames per `sub` until `ack` or TTL
-- [ ] Phone sends `since: <last id>` on connect; DO redelivers
-- [ ] Client reconnect with backoff on `onclose` and `visibilitychange`
-- [ ] Bubble shows "sent" only on DO ack; pending state before that
-- [ ] `setWebSocketAutoResponse(ping → pong)` so Go keepalive does not
+- [x] Queue keyed by `(to, userId)`; `flush()` drains only that `sub`
+- [x] DO holds phone-bound frames per `sub` until `ack` or TTL
+- [x] Phone sends `since: <last id>` on connect; DO redelivers
+- [x] Client reconnect with backoff on `onclose` and `visibilitychange`
+- [x] Bubble shows "sent" only on DO ack; pending state before that
+- [x] `setWebSocketAutoResponse(ping → pong)` so Go keepalive does not
       wake the DO
-- [ ] ai-gantry: `reply` / `push` frames stamp `user_id` from `ChatID`
-- [ ] Tests: `test/mailbox/frame.test.ts` (id, ack), routing and queue
+- [x] ai-gantry: `reply` / `push` frames stamp `user_id` from `ChatID`
+- [x] Tests: `test/mailbox/frame.test.ts` (id, ack), routing and queue
       per `sub`, PhoneShell reconnect + pending bubble
 
 ---
@@ -45,13 +49,13 @@ appears without reload. Cron `Push` with no target lands on both.
 **Walk:** crane offline. Phone sends a 1.4 MB photo and three texts.
 Crane comes back; all four arrive in order. No DO exception.
 
-- [ ] One storage row per queued frame (`q:<id>` + `list({prefix})`, or
+- [x] One storage row per queued frame (`q:<id>` + `list({prefix})`, or
       `ctx.storage.sql`) — 2 MiB per-value cap
-- [ ] Do not queue `pin`
-- [ ] Cap total queued bytes per `sub`; decide: queue images or drop
+- [x] Do not queue `pin`
+- [x] Cap total queued bytes per `sub`; decide: queue images or drop
       with an `error` frame back to sender
-- [ ] Drop policy: evict oldest **non-reply** first
-- [ ] Tests: `test/mailbox/queue.test.ts` for byte cap, pin skip, order
+- [x] Drop policy: evict oldest **non-reply** first
+- [x] Tests: `test/mailbox/queue.test.ts` for byte cap, pin skip, order
 
 ---
 
@@ -68,12 +72,12 @@ Crane comes back; all four arrive in order. No DO exception.
 gets a 4401 close, not a reply. Session expiry behaves the way the doc
 says it does.
 
-- [ ] Session `exp` in a socket tag
-- [ ] `webSocketMessage`: re-check `sub` ∈ allowlist and `exp`; close
+- [x] Session `exp` in a socket tag
+- [x] `webSocketMessage`: re-check `sub` ∈ allowlist and `exp`; close
       4401 on failure
-- [ ] Decide sliding idle (re-mint cookie on activity) **or** hard 7d;
+- [x] Decide sliding idle (re-mint cookie on activity) **or** hard 7d;
       make `security.md` / `edgecases.md` match the code
-- [ ] Tests: `test/auth/session.test.ts`, mailbox close-on-yank
+- [x] Tests: `test/auth/session.test.ts`, mailbox close-on-yank
 
 ### R3.2 — One allowlist, published by the crane · **next**
 
@@ -103,36 +107,36 @@ Ada's friend is in. No `wrangler secret put`.
 **Walk:** real crane connects with `Authorization: Bearer` only.
 `?bearer=` on an oidc-mode upgrade is 401. Logpush shows no tokens.
 
-- [ ] `handshake`: accept `queryBearer` / `querySecret` in **spike**
+- [x] `handshake`: accept `queryBearer` / `querySecret` in **spike**
       mode only
-- [ ] `avatarRequestPath`: same
-- [ ] Docs: crane must use the header; `/crane` stand-in is spike-only
-- [ ] Tests: `test/auth/handshake.test.ts` rejects query bearer in oidc
+- [x] `avatarRequestPath`: same
+- [x] Docs: crane must use the header; `/crane` stand-in is spike-only
+- [x] Tests: `test/auth/handshake.test.ts` rejects query bearer in oidc
 
 ### R3.4 — Surface hardening · **now**
 
-- [ ] `/crane` page gated behind `PENDANT_DEV` (or excluded from prod
+- [x] `/crane` page gated behind `PENDANT_DEV` (or excluded from prod
       build)
-- [ ] `parseImages`: phone→crane `data:image/` only; `https://` legal
+- [x] `parseImages`: phone→crane `data:image/` only; `https://` legal
       crane→phone
-- [ ] `mailboxUpgrade`: `headers.delete("X-Pendant-Op")`
-- [ ] `mailboxUpgrade`: `Origin` must match request origin when present
-- [ ] OAuth: PKCE (`code_challenge` S256) + `nonce` verified on the ID
+- [x] `mailboxUpgrade`: `headers.delete("X-Pendant-Op")`
+- [x] `mailboxUpgrade`: `Origin` must match request origin when present
+- [x] OAuth: PKCE (`code_challenge` S256) + `nonce` verified on the ID
       token
-- [ ] Tests: frame images by role, upgrade origin/op stripping, PKCE
+- [x] Tests: frame images by role, upgrade origin/op stripping, PKCE
       round trip in `test/auth/google.test.ts`
 
 ---
 
 ## R4 — Docs · **next** · gantry-pendant
 
-- [ ] `security.md`: "Authn on every frame" → describe what R3.1 does
-- [ ] `security.md` / `edgecases.md`: session idle vs hard, per R3.1
-- [ ] `architecture.md` / `design.md`: DO benefit is "sockets meet
+- [x] `security.md`: "Authn on every frame" → describe what R3.1 does
+- [x] `security.md` / `edgecases.md`: session idle vs hard, per R3.1
+- [x] `architecture.md` / `design.md`: DO benefit is "sockets meet
       here", not streaming
-- [ ] `todo.md`: Web Push (VAPID from the Worker, iOS 16.4+ installed
+- [x] `todo.md`: Web Push (VAPID from the Worker, iOS 16.4+ installed
       PWA) moves from "not this version" to **later**
-- [ ] `edgecases.md`: add "sent" with socket down, two devices one
+- [x] `edgecases.md`: add "sent" with socket down, two devices one
       human, iOS background drop, `context.at` untrusted, long turn
       with no streaming, `cmds` ghost until republish
 - [ ] `setup.md`: collapse the two-paste dance after R3.2

@@ -11,7 +11,9 @@ export type SessionClaims = {
   exp: number;
 };
 
+/** Hard 7d JWT `exp` at mint. There is no sliding idle (that is R5). */
 const IDLE_MS = 7 * 24 * 60 * 60 * 1000;
+/** Unreachable defense while live policy is hard 7d; keep for a future sliding refresh. */
 const ABSOLUTE_MS = 30 * 24 * 60 * 60 * 1000;
 
 function key(secret: string): Uint8Array {
@@ -54,6 +56,7 @@ function claimsFrom(payload: JWTPayload, now: number): SessionClaims | null {
   }
   const iat = typeof payload.iat === "number" ? payload.iat * 1000 : 0;
   const exp = typeof payload.exp === "number" ? payload.exp * 1000 : 0;
+  // Live policy is hard 7d (`exp`). ABSOLUTE_MS is unreachable defense.
   if (!iat || !exp || now > exp || now - iat > ABSOLUTE_MS) {
     return null;
   }

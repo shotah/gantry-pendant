@@ -51,9 +51,10 @@ only `ada@example.com` into either list does nothing useful.
 Gantree Secrets writes the **crane** `.env`. It cannot see Cloudflare.
 `wrangler secret put ALLOWED_SUBS` (or the dashboard) is a second trip.
 
-**Cover:** keep the two strings in one note when you rotate. After either
-save: recreate the crane (restart keeps a ghost allowlist). After a
-Worker secret change: the next handshake picks it up; no Docker step.
+**Cover:** keep the two strings in one note when you rotate. After the
+crane list: recreate (restart keeps a ghost allowlist). After Worker
+`ALLOWED_SUBS`: the **next phone frame** re-checks (4401 if yanked).
+No Docker step.
 
 ---
 
@@ -126,6 +127,12 @@ Kit’s bearer cannot join Ada’s Durable Object. A typo in the path
 (`/ws/Kit` vs `/ws/kit`) is a different room or a 404. Gantree slugs
 are letter-first, max 32; the Worker parser matches that.
 
+The Go crane sends `Authorization: Bearer`. `?bearer=` and `?secret=`
+are **spike mode only** (two browser tabs). Browsers cannot set
+headers on `new WebSocket`, so the spike puts the secret on the query
+string; an oidc-mode upgrade with a query token is 401. `/crane` is
+the loopback stand-in under `PENDANT_DEV`, not production.
+
 Two cranes with the **same** bearer is the Telegram “two bots one
 token” problem: they fight over one room. Rotate by rewriting Worker
 `CRANE_BEARERS` **and** the crane `.env`, then recreate.
@@ -166,14 +173,27 @@ You cannot run telegram + pendant in the same process.
 | iOS `watchPosition` | killed in the background | we only `getCurrentPosition` on send |
 | HEIC / iPhone photo | canvas JPEG when `createImageBitmap` can decode | otherwise “bad photo” |
 | Photo > ~1.5 MB | compress in-app to the chat cap | still 413 if encode cannot shrink enough |
-| Lock screen ping while app is dead | no APNs / FCM | cron only lands if the socket is up |
+| Lock screen ping while app is dead | no Web Push yet | cron only lands if the socket is up; Web Push (VAPID, installed PWA) is later; native APNs/FCM later still |
 | Queue while Mini reboots | ≤50 frames, 1 hour TTL, then drop | short note, not `gantry.db` |
 | Rate limit (30 frames / 256 KB per min) | socket stays up, frames return `rate` | looks like “she ignored me” |
-| Session idle 7d / absolute 30d | next send 401s | sign in again; yank `sub` if stolen |
+| Session hard 7d (JWT `exp` at mint) | next send closes 4401 | sign in again; yank `sub` takes effect on the next frame |
 | Service worker | no chat cache (good) | also no offline compose |
 
 SSID / BSSID / Bluetooth / clipboard must never go on the wire. Battery
 and `net` attach on send when the OS exposes them; the prompt stays stingy.
+
+---
+
+## Delivery, two phones, clock
+
+| Gotcha | What happens | Cover |
+| --- | --- | --- |
+| “Sent” with the socket down | local echo is not delivered | bubble stays **pending** until the DO acks; reconnect + `since` redelivers |
+| Two devices, one human | replies route by `user_id` / `sub` | both of Ada’s phones see Ada’s replies; Bob does not |
+| iOS PWA background drop | socket dies | reconnect on visible (`visibilitychange` / `onclose`); redeliver |
+| `context.at` untrusted | phone clock can lie | order by DO time; `at` is a hint |
+| Long turn, no streaming | whole replies; looks idle | no typing indicator yet (thinking-ack is later) |
+| `cmds` after a removal | last catalog stays on the DO | ghost until the crane publishes again (next dial) |
 
 ---
 
@@ -227,7 +247,7 @@ dance in the install one-liner; do not grow a product page.
 ## Stolen / leaked / wrong-room
 
 1. Lock the phone; Google → sign out other sessions.
-2. Yank `sub` from **both** allowlists.
+2. Yank `sub` from **both** allowlists (Worker: next frame closes 4401).
 3. Rotate `CRANE_BEARERS` + `PENDANT_BEARER`; recreate.
 4. If `.env` leaked, assume the bearer is burned.
 

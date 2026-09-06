@@ -1,0 +1,30 @@
+{
+  // markdownlint-cli2: `npm run lint` writes fixes (`fix` here + `--fix`).
+  // vscode-markdownlint reads this file too.
+  "fix": true,
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    "node_modules/**",
+    "coverage/**",
+    "dist/**",
+    ".next/**",
+    ".vinext/**",
+    ".wrangler/**"
+  ],
+  "config": {
+    "default": true,
+    // Not auto-fixable; wrap in the editor, don't fail CI over a long URL.
+    "MD013": false,
+    // README + docs/screens.md use HTML for badges and shot grids.
+    "MD033": {
+      "allowed_elements": [
+        "a",
+        "br",
+        "img",
+        "p"
+      ]
+    }
+  }
+}

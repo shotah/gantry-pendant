@@ -20,11 +20,42 @@ import { browserWakeLock, releaseScreenWake, type WakeLockSentinel } from "@/app
 import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
 import { buildContext } from "@/lib/phone/context";
 import { geoHint } from "@/lib/phone/geo";
-import { encodeFrame, type Role } from "@/lib/mailbox/frame";
+import { encodeFrame, type Role, type WireFrame } from "@/lib/mailbox/frame";
 import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
 
 type AuthCfg = { mode: "spike" | "oidc" | null; google: boolean; dev?: boolean };
 type Me = { sub: string; email?: string } | null;
+
+const BACKOFF_MS = 1000;
+const BACKOFF_MAX = 30_000;
+
+type ClientFrame = {
+  id?: string;
+  since?: string;
+  kind?: string;
+  text?: string;
+  images?: { url: string }[];
+  context?: unknown;
+};
+
+function clientFrameId(frame: object): string | undefined {
+  if (!("id" in frame)) {
+    return undefined;
+  }
+  const id = frame.id;
+  return typeof id === "string" && id.length > 0 ? id : undefined;
+}
+
+function mintFrameId(n: number): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${n}`;
+}
+
+function sendClientFrame(ws: WebSocket, frame: ClientFrame): void {
+  ws.send(encodeFrame(frame as WireFrame));
+}
 
 export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [slug, setSlug] = useState("kit");
@@ -50,6 +81,13 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const badgeRef = useRef(0);
   const pinConsumed = useRef(false);
   const sendPinRef = useRef<() => Promise<void>>(async () => {});
+  const stoppedRef = useRef(true);
+  const connectGen = useRef(0);
+  const backoffRef = useRef(BACKOFF_MS);
+  const reconnectTimer = useRef(0);
+  const lastSeenId = useRef<string | undefined>(undefined);
+  const seenIds = useRef(new Set<string>());
+  const idSeq = useRef(0);
   const phone = role === "phone";
   const painting = Boolean(cfg?.dev && sampleId);
   const localEcho = Boolean(cfg?.dev && !sampleId && phone);
@@ -144,9 +182,21 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const canSocket = Boolean(cfg && slug && (cfg.mode === "spike" ? secret : phone ? me : bearer));
 
   const connect = useCallback(() => {
-    wsRef.current?.close();
-    if (typeof window === "undefined" || !canSocket) {
+    if (stoppedRef.current || typeof window === "undefined" || !canSocket) {
       return;
+    }
+    window.clearTimeout(reconnectTimer.current);
+    reconnectTimer.current = 0;
+    connectGen.current += 1;
+    const gen = connectGen.current;
+    const prev = wsRef.current;
+    wsRef.current = null;
+    if (prev) {
+      prev.onopen = null;
+      prev.onclose = null;
+      prev.onerror = null;
+      prev.onmessage = null;
+      prev.close();
     }
     const url = mailboxUrl({
       host: window.location.host,
@@ -158,14 +208,44 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     });
     const ws = new WebSocket(url);
     wsRef.current = ws;
-    ws.onopen = () => setStatus("up");
+    ws.onopen = () => {
+      if (gen !== connectGen.current || stoppedRef.current) {
+        return;
+      }
+      backoffRef.current = BACKOFF_MS;
+      setStatus("up");
+      const since = lastSeenId.current;
+      if (since) {
+        sendClientFrame(ws, { kind: "ack", since });
+      }
+    };
     ws.onclose = () => {
+      if (gen !== connectGen.current || stoppedRef.current) {
+        return;
+      }
       setStatus("down");
       void releaseScreenWake(wakeRef.current);
       wakeRef.current = null;
+      window.clearTimeout(reconnectTimer.current);
+      const delay = backoffRef.current;
+      backoffRef.current = Math.min(delay * 2, BACKOFF_MAX);
+      reconnectTimer.current = window.setTimeout(() => {
+        if (stoppedRef.current) {
+          return;
+        }
+        connect();
+      }, delay);
     };
-    ws.onerror = () => setStatus("down");
+    ws.onerror = () => {
+      if (gen !== connectGen.current || stoppedRef.current) {
+        return;
+      }
+      setStatus("down");
+    };
     ws.onmessage = (ev) => {
+      if (gen !== connectGen.current || stoppedRef.current) {
+        return;
+      }
       const frame = parseIncoming(String(ev.data));
       if (!frame) {
         return;
@@ -179,11 +259,27 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         setCatalog(frame.commands ?? []);
         return;
       }
+      const id = clientFrameId(frame);
+      if (frame.kind === "ack") {
+        if (id) {
+          setMessages((prev) => prev.map((m) => (
+            m.id === id ? { ...m, pending: false } : m
+          )));
+        }
+        return;
+      }
+      if (id) {
+        lastSeenId.current = id;
+        if (seenIds.current.has(id)) {
+          return;
+        }
+        seenIds.current.add(id);
+      }
       const from = phone ? "kit" : "you";
       setMessages((prev) => [
         ...prev,
         {
-          id: `${Date.now()}-${prev.length}`,
+          id: id ?? `${Date.now()}-${prev.length}`,
           from,
           text: frame.text ?? "",
           kind: frame.kind,
@@ -204,9 +300,35 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     if (!canSocket || painting) {
       return;
     }
+    stoppedRef.current = false;
+    backoffRef.current = BACKOFF_MS;
     connect();
+    function onVis() {
+      if (document.visibilityState !== "visible" || stoppedRef.current) {
+        return;
+      }
+      const sock = wsRef.current;
+      if (sock && sock.readyState === WebSocket.OPEN) {
+        return;
+      }
+      connect();
+    }
+    document.addEventListener("visibilitychange", onVis);
     return () => {
-      wsRef.current?.close();
+      stoppedRef.current = true;
+      document.removeEventListener("visibilitychange", onVis);
+      window.clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = 0;
+      connectGen.current += 1;
+      const sock = wsRef.current;
+      wsRef.current = null;
+      if (sock) {
+        sock.onopen = null;
+        sock.onclose = null;
+        sock.onerror = null;
+        sock.onmessage = null;
+        sock.close();
+      }
     };
   }, [canSocket, connect, painting]);
 
@@ -268,24 +390,35 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       void takeWake();
     }
     const trimmed = text.trim();
-    const frame = {
+    const waitAck = canSocket && !painting;
+    const outbound = Boolean(trimmed || photo);
+    if (outbound) {
+      idSeq.current += 1;
+    }
+    const id = outbound ? mintFrameId(idSeq.current) : undefined;
+    if (id) {
+      seenIds.current.add(id);
+    }
+    const frame: ClientFrame = {
+      id,
       text: trimmed || undefined,
-      kind: phone ? "inbound" as const : "reply" as const,
+      kind: phone ? "inbound" : "reply",
       images: photo ? [{ url: photo }] : undefined,
       context,
     };
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(encodeFrame(frame));
+      sendClientFrame(wsRef.current, frame);
     }
-    if (trimmed || photo) {
+    if (outbound && id) {
       setMessages((prev) => [
         ...prev,
         {
-          id: `${Date.now()}-out`,
+          id,
           from: phone ? "you" : "kit",
           text: trimmed,
           at: Date.now(),
           photo,
+          pending: waitAck ? true : undefined,
         },
       ]);
     }

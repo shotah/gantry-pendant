@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { handshake, handshakeSlug, rateId, roleFromQuery, stampUserId } from "@/lib/auth/handshake";
-import { mintSession, SESSION_COOKIE } from "@/lib/auth/session";
+import { mintSession, readSession, SESSION_COOKIE } from "@/lib/auth/session";
 
 describe("handshake", () => {
   it("accepts the spike secret for either role", async () => {
@@ -30,6 +30,7 @@ describe("handshake", () => {
     };
     const now = Date.UTC(2026, 8, 4);
     const session = await mintSession(env.SESSION_SECRET, { sub: "1182", email: "ada@x.com" }, now);
+    const claims = await readSession(env.SESSION_SECRET, session, now);
     const phone = await handshake({
       env,
       slug: "kit",
@@ -37,7 +38,10 @@ describe("handshake", () => {
       cookieHeader: `${SESSION_COOKIE}=${encodeURIComponent(session)}`,
       now,
     });
-    expect(phone.ok && phone.principal.kind === "phone" && phone.principal.sub).toBe("1182");
+    expect(phone).toEqual({
+      ok: true,
+      principal: { kind: "phone", sub: "1182", email: "ada@x.com", exp: claims?.exp },
+    });
 
     const stranger = await mintSession(env.SESSION_SECRET, { sub: "999" }, now);
     const unknown = await handshake({
@@ -81,6 +85,30 @@ describe("handshake", () => {
     expect(cross).toEqual({ ok: false, error: "unauthorized" });
   });
 
+  it("in oidc, query bearer is ignored so the crane must send Authorization", async () => {
+    const env = {
+      GOOGLE_CLIENT_ID: "id",
+      ALLOWED_SUBS: "1182",
+      SESSION_SECRET: "sess-secret",
+      CRANE_BEARERS: "kit:crane-tok",
+    };
+    const queryOnly = await handshake({
+      env,
+      slug: "kit",
+      role: "crane",
+      queryBearer: "crane-tok",
+    });
+    expect(queryOnly).toEqual({ ok: false, error: "unauthorized" });
+    const header = await handshake({
+      env,
+      slug: "kit",
+      role: "crane",
+      authorization: "Bearer crane-tok",
+      queryBearer: "ignored",
+    });
+    expect(header).toEqual({ ok: true, principal: { kind: "crane", slug: "kit" } });
+  });
+
   it("rejects the spike secret once Google is configured", async () => {
     const env = {
       GOOGLE_CLIENT_ID: "id",
@@ -103,7 +131,7 @@ describe("handshake", () => {
     expect(r).toEqual({ ok: false, error: "config" });
     expect(roleFromQuery("phone")).toBe("phone");
     expect(roleFromQuery("nope")).toBeNull();
-    expect(rateId("oidc", { kind: "phone", sub: "1182" })).toBe("sub:1182");
+    expect(rateId("oidc", { kind: "phone", sub: "1182", exp: 1 })).toBe("sub:1182");
     expect(rateId("oidc", { kind: "crane", slug: "kit" })).toBe("bearer:kit");
     expect(rateId("spike", { kind: "spike", role: "phone" })).toBe("spike:phone");
     expect(stampUserId({ kind: "phone", sub: "1182" })).toBe("1182");
@@ -137,6 +165,7 @@ describe("handshakeSlug", () => {
       now,
     });
     expect(phone.ok && phone.principal.kind === "phone" && phone.principal.sub).toBe("1182");
+    expect(phone.ok && phone.principal.kind === "phone" && phone.principal.exp).toBeDefined();
     const crane = await handshakeSlug({
       env,
       slug: "kit",
@@ -144,5 +173,12 @@ describe("handshakeSlug", () => {
       now,
     });
     expect(crane).toEqual({ ok: true, principal: { kind: "crane", slug: "kit" } });
+    const queryCrane = await handshakeSlug({
+      env,
+      slug: "kit",
+      queryBearer: "crane-tok",
+      now,
+    });
+    expect(queryCrane).toEqual({ ok: false, error: "unauthorized" });
   });
 });

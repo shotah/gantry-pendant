@@ -30,8 +30,14 @@ export type WireFrame = {
   context?: PhoneContext;
   kind?: FrameKind;
   user_id?: string;
+  id?: string;
+  since?: string;
   commands?: SlashCommand[];
 };
+
+export type ParseOpts = { role?: Role };
+
+const ID_MAX = 128;
 
 export type ParseOk = { ok: true; frame: WireFrame; bytes: number };
 export type ParseErr = { ok: false; error: string };
@@ -96,7 +102,14 @@ function parseContext(raw: unknown): PhoneContext | undefined {
   return ctx;
 }
 
-function parseImages(raw: unknown): FrameImage[] | ParseErr {
+function imageUrlAllowed(url: string, role?: Role): boolean {
+  if (url.startsWith("data:image/")) {
+    return true;
+  }
+  return role !== "phone" && url.startsWith("https://");
+}
+
+function parseImages(raw: unknown, role?: Role): FrameImage[] | ParseErr {
   if (raw == null) {
     return [];
   }
@@ -115,7 +128,7 @@ function parseImages(raw: unknown): FrameImage[] | ParseErr {
     if (typeof url !== "string" || url.length === 0) {
       return { ok: false, error: "bad frame" };
     }
-    if (!url.startsWith("data:image/") && !url.startsWith("https://")) {
+    if (!imageUrlAllowed(url, role)) {
       return { ok: false, error: "bad frame" };
     }
     if (utf8Bytes(url) > IMAGE_BYTES_MAX) {
@@ -126,10 +139,20 @@ function parseImages(raw: unknown): FrameImage[] | ParseErr {
   return out;
 }
 
+function parseIdField(raw: unknown): string | ParseErr | undefined {
+  if (raw == null) {
+    return undefined;
+  }
+  if (typeof raw !== "string" || raw.length > ID_MAX) {
+    return { ok: false, error: "bad frame" };
+  }
+  return raw.length ? raw : undefined;
+}
+
 const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds"]);
 
 /** Parse a mailbox frame. Never logs the body. */
-export function parseFrame(raw: string | ArrayBuffer | Uint8Array): ParseResult {
+export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseOpts): ParseResult {
   const text = typeof raw === "string" ? raw : new TextDecoder().decode(raw);
   const bytes = utf8Bytes(text);
   if (bytes > FRAME_BYTES_MAX) {
@@ -167,7 +190,21 @@ export function parseFrame(raw: string | ArrayBuffer | Uint8Array): ParseResult 
     }
     frame.user_id = o.user_id;
   }
-  const images = parseImages(o.images);
+  const id = parseIdField(o.id);
+  if (id && typeof id === "object") {
+    return id;
+  }
+  if (id) {
+    frame.id = id;
+  }
+  const since = parseIdField(o.since);
+  if (since && typeof since === "object") {
+    return since;
+  }
+  if (since) {
+    frame.since = since;
+  }
+  const images = parseImages(o.images, opts?.role);
   if (!Array.isArray(images)) {
     return images;
   }

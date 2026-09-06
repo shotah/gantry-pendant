@@ -69,7 +69,9 @@ same Worker as the pages.
 
 A stateless Worker cannot do this by itself: two requests do not share
 memory. D1-plus-short-poll is a possible mailbox (Telegram `getUpdates`
-clone) but streaming replies and live “typing” want the DO socket.
+clone). It does not give you a room. The Durable Object is the
+rendezvous: phone and crane dial in, the sockets meet here — same job
+as Slack Socket Mode’s hub.
 
 ```text
 gantry-pendant/            this checkout — Vinext app + DO mailbox
@@ -193,10 +195,10 @@ Expo Android APK   ─┼─►  same Durable Object
 Expo iOS TestFlight─┘
 ```
 
-Push notifications (APNs / FCM) are a **second** path: Worker → platform
-push → lock screen. They do not replace the socket while the app is
-open. They do not belong in the spike. Cloudflare will not send APNs
-for us.
+Push notifications are a **second** path. They do not replace the
+socket while the app is open. They do not belong in the spike. **Web
+Push** (VAPID from this Worker, installed PWA, iOS 16.4+) is later.
+Native APNs / FCM is later still; Cloudflare will not send APNs for us.
 
 ## Why not these shapes
 
@@ -208,7 +210,7 @@ for us.
 | Phone is the server | Phones sleep, change IP, leave the house. |
 | Mailbox process on the Mini | Works on a desk. Phone needs Tailscale; mailbox dies with the Mini. |
 | Stateless Worker only (no DO) | No room: phone and crane never share state. |
-| D1 as the only mailbox | Fine as a `getUpdates` clone; weak for streaming. Use if we refuse DOs. |
+| D1 as the only mailbox | Fine as a `getUpdates` clone. Not a room: the sockets never meet. Use if we refuse DOs. |
 | Tunnel to the Mini “relay” | Exposes the house. Phone still depends on home internet. |
 | Gantree `app/` on Workers as the mouth | Yard needs Docker. This is a second Vinext app. |
 | Cloudflare Access as the only lock | Worker-level Access 403s WebSockets. Crane is not a browser. |

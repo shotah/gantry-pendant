@@ -66,6 +66,7 @@ remote, same pattern as `repos/ai-gantry`.
 cp .dev.vars.example .dev.vars   # MAILBOX_SECRET + PENDANT_DEV
 npm install
 npm test
+npm run lint                     # ESLint + markdownlint, writes fixes
 npm run dev                      # http://127.0.0.1:3000 — Chrome can Install from here
 ```
 

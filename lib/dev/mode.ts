@@ -16,6 +16,19 @@ export function hostFromRequest(req: Request): string {
   return new URL(req.url).hostname;
 }
 
+/** `Host` may include a port (`127.0.0.1:5173`). Strip before `devEnabled`. */
+export function hostnameFromHostHeader(host: string | null | undefined): string {
+  const raw = (host ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+  try {
+    return new URL(`http://${raw}`).hostname;
+  } catch {
+    return "";
+  }
+}
+
 export function devEnabled(env: DevEnv, host: string): boolean {
   return envFlag(env.PENDANT_DEV) && loopbackHost(host);
 }

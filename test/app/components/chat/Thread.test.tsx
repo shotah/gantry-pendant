@@ -24,4 +24,24 @@ describe("Thread", () => {
     expect(screen.getByText("yo")).toBeTruthy();
     expect(screen.getByText("ping")).toBeTruthy();
   });
+
+  it("marks your pending bubble as sending", () => {
+    render(
+      <Thread
+        messages={[{ id: "1", from: "you", text: "hi", at: 1, pending: true }]}
+      />,
+    );
+    expect(screen.getByText("hi")).toBeTruthy();
+    expect(screen.getByText("sending")).toBeTruthy();
+  });
+
+  it("does not mark kit bubbles as sending", () => {
+    render(
+      <Thread
+        messages={[{ id: "2", from: "kit", text: "yo", at: 2, pending: true }]}
+      />,
+    );
+    expect(screen.getByText("yo")).toBeTruthy();
+    expect(screen.queryByText("sending")).toBeNull();
+  });
 });

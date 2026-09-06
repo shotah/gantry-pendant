@@ -24,12 +24,17 @@ describe("session", () => {
     expect(parseCookie(cookie, SESSION_COOKIE)).toBe(token);
   });
 
-  it("rejects junk, wrong secret, and expired idle", async () => {
+  it("rejects junk, wrong secret, and a hard 7d exp (8 days is gone; 6 days still reads)", async () => {
     expect(await readSession(secret, "nope")).toBeNull();
     const token = await mintSession(secret, { sub: "1182" }, 0);
     expect(await readSession("other", token, 1000)).toBeNull();
-    const fresh = await mintSession(secret, { sub: "1182" }, 1_000);
-    const eightDays = 1_000 + 8 * 24 * 60 * 60 * 1000;
+    const mintedAt = Math.floor(Date.now() / 1000) * 1000;
+    const fresh = await mintSession(secret, { sub: "1182" }, mintedAt);
+    const claims = await readSession(secret, fresh, mintedAt);
+    expect(claims?.exp).toBe(mintedAt + 7 * 24 * 60 * 60 * 1000);
+    const sixDays = mintedAt + 6 * 24 * 60 * 60 * 1000;
+    expect(await readSession(secret, fresh, sixDays)).not.toBeNull();
+    const eightDays = mintedAt + 8 * 24 * 60 * 60 * 1000;
     expect(await readSession(secret, fresh, eightDays)).toBeNull();
   });
 

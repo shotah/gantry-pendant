@@ -38,12 +38,22 @@ interface DurableObjectState {
   acceptWebSocket(ws: WebSocket, tags?: string[]): void;
   getWebSockets(tag?: string): WebSocket[];
   getTags(ws: WebSocket): string[];
+  setWebSocketAutoResponse(pair?: WebSocketRequestResponsePair | null): void;
   storage: DurableObjectStorage;
 }
 
 interface DurableObjectStorage {
   get<T>(key: string): Promise<T | undefined>;
   put<T>(key: string, value: T): Promise<void>;
+  delete(key: string): Promise<boolean>;
+  delete(keys: string[]): Promise<number>;
+  list<T>(options?: { prefix?: string; limit?: number }): Promise<Map<string, T>>;
+}
+
+declare class WebSocketRequestResponsePair {
+  constructor(request: string, response: string);
+  readonly request: string;
+  readonly response: string;
 }
 
 interface WebSocketPair {

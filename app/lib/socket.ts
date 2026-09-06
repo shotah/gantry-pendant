@@ -11,6 +11,7 @@ export function mailboxUrl(opts: {
   const ws = opts.protocol === "https:" ? "wss:" : "ws:";
   const u = new URL(`${ws}//${opts.host}/ws/${opts.slug}`);
   u.searchParams.set("role", opts.role);
+  // Spike /crane may put creds on the query; oidc handshake ignores them.
   if (opts.secret) {
     u.searchParams.set("secret", opts.secret);
   }

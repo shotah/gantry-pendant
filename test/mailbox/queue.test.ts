@@ -1,9 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { QUEUE_MAX, QUEUE_TTL_MS } from "@/lib/mailbox/caps";
-import { drainFor, enqueue, newQueueId, pruneQueue, type Queued } from "@/lib/mailbox/queue";
+import { QUEUE_BYTES_MAX, QUEUE_MAX, QUEUE_TTL_MS, utf8Bytes } from "@/lib/mailbox/caps";
+import {
+  destKey,
+  drainFor,
+  enqueue,
+  matchesFlush,
+  newQueueId,
+  peekFor,
+  pruneQueue,
+  queuedFromList,
+  queueStoreKey,
+  shouldQueue,
+  type Queued,
+} from "@/lib/mailbox/queue";
 
 function msg(over: Partial<Queued> = {}): Queued {
-  return { id: "1", to: "phone", body: "{}", at: 1_000, ...over };
+  const base = { id: "1", to: "phone" as const, body: "{}", at: 1_000 };
+  const merged = { ...base, ...over };
+  return { ...merged, bytes: over.bytes ?? utf8Bytes(merged.body) };
 }
 
 describe("queue", () => {
@@ -33,5 +47,95 @@ describe("queue", () => {
 
   it("mints ids", () => {
     expect(newQueueId(1, () => 0.5)).toMatch(/^1-/);
+  });
+
+  it("does not queue pin or ack", () => {
+    expect(shouldQueue("pin")).toBe(false);
+    expect(shouldQueue("ack")).toBe(false);
+    expect(shouldQueue("inbound")).toBe(true);
+    expect(shouldQueue("reply")).toBe(true);
+    expect(shouldQueue("push")).toBe(true);
+  });
+
+  it("drops oldest non-reply first under the byte cap", () => {
+    const items = [
+      msg({ id: "r1", kind: "reply", at: 1, bytes: 8, body: "rrrrrrrr" }),
+      msg({ id: "i1", kind: "inbound", at: 2, bytes: 8, body: "iiiiiiii" }),
+    ];
+    const next = enqueue(items, msg({ id: "r2", kind: "reply", at: 3, bytes: 8, body: "rrrrrrrr" }), {
+      now: 3,
+      bytesMax: 20,
+    });
+    expect(next.map((m) => m.id)).toEqual(["r1", "r2"]);
+  });
+
+  it("drops oldest reply only when nothing else remains", () => {
+    const items = [
+      msg({ id: "r1", kind: "reply", at: 1, bytes: 8 }),
+      msg({ id: "r2", kind: "reply", at: 2, bytes: 8 }),
+    ];
+    const next = enqueue(items, msg({ id: "r3", kind: "reply", at: 3, bytes: 8 }), {
+      now: 3,
+      bytesMax: 20,
+    });
+    expect(next.map((m) => m.id)).toEqual(["r2", "r3"]);
+  });
+
+  it("caps bytes per destination key, not globally", () => {
+    const ada = msg({ id: "a1", userId: "ada", at: 1, bytes: 8 });
+    const bob = msg({ id: "b1", userId: "bob", at: 1, bytes: 8 });
+    let next = enqueue([ada], bob, { now: 1, bytesMax: 10 });
+    next = enqueue(next, msg({ id: "a2", userId: "ada", at: 2, bytes: 8 }), { now: 2, bytesMax: 10 });
+    expect(next.map((m) => m.id).sort()).toEqual(["a2", "b1"]);
+  });
+
+  it("peeks phone items for one sub plus broadcasts and preserves order", () => {
+    const items = [
+      msg({ id: "ada-1", userId: "ada", at: 1 }),
+      msg({ id: "all", userId: "", at: 2 }),
+      msg({ id: "bob-1", userId: "bob", at: 3 }),
+      msg({ id: "ada-2", userId: "ada", at: 4 }),
+      msg({ id: "crane-1", to: "crane", at: 5 }),
+    ];
+    expect(peekFor(items, "phone", 10, { userId: "ada" }).map((m) => m.id)).toEqual(["ada-1", "all", "ada-2"]);
+    expect(peekFor(items, "phone", 10, { userId: "bob" }).map((m) => m.id)).toEqual(["all", "bob-1"]);
+    expect(peekFor(items, "crane", 10).map((m) => m.id)).toEqual(["crane-1"]);
+    const drained = drainFor(items, "phone", 10, QUEUE_TTL_MS, "ada");
+    expect(drained.take.map((m) => m.id)).toEqual(["ada-1", "all", "ada-2"]);
+    expect(drained.kept.map((m) => m.id)).toEqual(["bob-1", "crane-1"]);
+  });
+
+  it("skips ids at or before since", () => {
+    const items = [
+      msg({ id: "a", userId: "ada", at: 1 }),
+      msg({ id: "b", userId: "ada", at: 2 }),
+      msg({ id: "c", userId: "ada", at: 3 }),
+    ];
+    expect(peekFor(items, "phone", 10, { userId: "ada", since: "b" }).map((m) => m.id)).toEqual(["c"]);
+  });
+
+  it("holds a walk-sized photo plus three texts under the 8 MiB cap", () => {
+    const photo = "x".repeat(1_400_000);
+    let q: Queued[] = [];
+    q = enqueue(q, msg({ id: "photo", to: "crane", body: photo, at: 1, kind: "inbound" }), { now: 1 });
+    q = enqueue(q, msg({ id: "t1", to: "crane", body: "one", at: 2, kind: "inbound" }), { now: 2 });
+    q = enqueue(q, msg({ id: "t2", to: "crane", body: "two", at: 3, kind: "inbound" }), { now: 3 });
+    q = enqueue(q, msg({ id: "t3", to: "crane", body: "three", at: 4, kind: "inbound" }), { now: 4 });
+    expect(q.map((m) => m.id)).toEqual(["photo", "t1", "t2", "t3"]);
+    expect(q.reduce((n, m) => n + m.bytes, 0)).toBeLessThan(QUEUE_BYTES_MAX);
+    expect(peekFor(q, "crane", 4).map((m) => m.id)).toEqual(["photo", "t1", "t2", "t3"]);
+  });
+
+  it("sorts storage rows by time and names keys q:<id>", () => {
+    expect(queueStoreKey("abc")).toBe("q:abc");
+    expect(destKey("phone", "ada")).toBe("phone:ada");
+    expect(destKey("crane")).toBe("crane:");
+    const rows = new Map<string, Queued>([
+      ["q:b", msg({ id: "b", at: 2 })],
+      ["q:a", msg({ id: "a", at: 1 })],
+    ]);
+    expect(queuedFromList(rows).map((m) => m.id)).toEqual(["a", "b"]);
+    expect(matchesFlush(msg({ to: "phone", userId: "ada" }), "phone", "ada")).toBe(true);
+    expect(matchesFlush(msg({ to: "phone", userId: "bob" }), "phone", "ada")).toBe(false);
   });
 });

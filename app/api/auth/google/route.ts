@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { configError } from "@/lib/auth/deny";
-import { authorizeUrl, newState } from "@/lib/auth/google";
+import { authorizeUrl, encodeOAuthBind, newNonce, newPkce, newState } from "@/lib/auth/google";
 import { resolveAuthMode } from "@/lib/auth/mode";
 import { stateCookie } from "@/lib/auth/session";
 
@@ -13,17 +13,21 @@ export function GET(req: Request) {
   }
   const origin = new URL(req.url).origin;
   const state = newState();
+  const pkce = newPkce();
+  const nonce = newNonce();
   const location = authorizeUrl({
     clientId: env.GOOGLE_CLIENT_ID,
     origin,
     state,
+    codeChallenge: pkce.challenge,
+    nonce,
   });
   const secure = origin.startsWith("https:");
   return new Response(null, {
     status: 302,
     headers: {
       Location: location,
-      "Set-Cookie": stateCookie(state, secure),
+      "Set-Cookie": stateCookie(encodeOAuthBind({ state, verifier: pkce.verifier, nonce }), secure),
     },
   });
 }

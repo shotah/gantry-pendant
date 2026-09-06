@@ -44,12 +44,17 @@ crane  — mailbox bearer (machine) —►  Worker → same Durable Object
 | Who | Proves | Allowlist |
 | --- | --- | --- |
 | **Human** | Sign in with Google (OIDC). Worker checks the ID token. | Google `sub` (stable). Email is the human-editable label. |
-| **Crane** | Bearer in crane `.env` (same job as `TELEGRAM_BOT_TOKEN`). | Token is bound to **that** crane slug. Kit’s token cannot join Ada’s DO. |
+| **Crane** | `Authorization: Bearer` from crane `.env` (same job as `TELEGRAM_BOT_TOKEN`). | Token is bound to **that** crane slug. Kit’s token cannot join Ada’s DO. |
 
 Empty human allowlist is a boot/config error, same as
-`TELEGRAM_ALLOWED_USERS`. The Worker refuses unknown `sub` **before**
-the frame hits the DO. The crane allowlists too (fail closed if the
-Worker is mis-set). Duplicate of 1–3 emails is acceptable.
+`TELEGRAM_ALLOWED_USERS`. The Worker refuses unknown `sub` at
+handshake **and** on every later frame. The crane allowlists too
+(fail closed if the Worker is mis-set). Duplicate of 1–3 emails is
+acceptable.
+
+Real crane: header only. `?bearer=` / `?secret=` are **spike mode**
+(two tabs). An oidc-mode upgrade with a query token is 401. `/crane`
+is the loopback stand-in under `PENDANT_DEV`, not production.
 
 Gantree operator **email** is already a profile label (not a reset
 link). Later, “add this operator to Kit’s phone mouth” can copy that
@@ -144,16 +149,20 @@ They do not see chat or GPS unless **we** log it.
 
 ### Authn on every frame
 
-Handshake is not enough. Phone frames carry a Google ID token (or a
-short Worker session minted from one). Crane frames carry the bearer.
-Reject missing/expired. Bind DO id to the crane slug in the token
+Handshake still mints the session and tags the socket (`sub`, `exp`).
+Google ID tokens do **not** ride later frames. The PWA WebSocket is
+same-origin and sends the httpOnly cookie; crane upgrade sends
+`Authorization: Bearer`. Bind DO id to the crane slug in that bearer
 (`kit` cannot write `ada`).
 
-Worker session after Google: httpOnly cookie or a DO-side session id
-with idle/absolute caps (copy Gantree’s idea: idle days, absolute
-days, hash at rest). Not a JWT in `localStorage` if we can avoid it.
-PWA WebSocket from the same origin can use a cookie; document if we
-cannot.
+On every `webSocketMessage` the mailbox re-checks `sub` ∈
+`ALLOWED_SUBS` and session `exp`. Failure **closes** the WebSocket
+with **4401**, not a chat `error` reply. Yanking a `sub` takes effect
+on the **next frame**, not the next reconnect.
+
+Worker session after Google: httpOnly JWE cookie, **hard 7-day `exp`
+at mint**. No sliding refresh. Sign in again after expiry. Not a JWT
+in `localStorage`.
 
 ### Allowlist
 
@@ -191,7 +200,7 @@ cannot.
 
 1. OS lock / find my device
 2. Google: sign out other sessions
-3. Yank `sub` from allowlist, rotate crane bearer
+3. Yank `sub` from allowlist (next frame is 4401), rotate crane bearer
 4. Recreate crane if `.env` leaked
 
 ---
@@ -200,10 +209,10 @@ cannot.
 
 | When | Auth |
 | --- | --- |
-| Spike (two tabs) | One shared secret on the Worker. Not production. |
-| Phone on LTE | Google OIDC for the human + crane bearer |
+| Spike (two tabs) | One shared secret on the Worker. `?secret=` / `?bearer=` allowed here only. Not production. |
+| Phone on LTE | Google OIDC for the human + crane `Authorization: Bearer` |
 | Gantree wizard | Writes crane bearer + allowlist into `.env`; Worker secrets stay with this app |
-| `npm run dev` | `PENDANT_DEV=1` on **loopback only**: mock Ada, canned `?sample=` scenes. Not a session. Ignored on `workers.dev`. |
+| `npm run dev` | `PENDANT_DEV=1` on **loopback only**: mock Ada, canned `?sample=` scenes, `/crane` stand-in. Not a session. Ignored on `workers.dev`. |
 
 ---
 

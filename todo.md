@@ -164,7 +164,7 @@ this-send.
 - [ ] Confirm Android Chrome PWA and iPhone Add to Home Screen
 - [x] No SSID / Bluetooth / clipboard on the wire
 
-**Out of this phase:** `watchPosition`, APNs, Expo, stores.
+**Out of this phase:** `watchPosition`, Web Push / APNs, Expo, stores.
 
 ---
 
@@ -201,7 +201,7 @@ until the walk is real.
 | No profile Google field | gantree | Telegram-style chat id + copy button. Email is not the key. |
 | Confirm PWA on a real phone | pendant | Android Chrome + iPhone Add to Home Screen (P5). |
 | Examples auto-bind is telegram-only | ai-gantry | Spark already binds for pendant. `EXAMPLES_QTY` does not. |
-| No streaming / lock-screen push | both | Whole replies; cron only while the socket is up. |
+| No streaming / lock-screen push | both | Whole replies; cron lands while the socket is up. Web Push later. |
 
 ---
 
@@ -210,7 +210,10 @@ until the walk is real.
 How-to and checkboxes: [docs/todo_next_features.md](docs/todo_next_features.md).
 
 - Expo wrap (sideload / TestFlight) when PWA feels like a bookmark
-- APNs / FCM (lock screen while the app is dead)
+- Web Push via service worker + VAPID from the Worker (installed PWA,
+  iOS 16.4+ / Android Chrome); lock-screen cron ping while the app is
+  dead
+- Native APNs / FCM (Expo / stores) if Web Push is not enough
 - Streaming placeholder + edit (`ReplyWriter`)
 - `context.battery` / `net` (wire now, prompt only if cron cares)
 - `here.Pin` accuracy `±12m` in the clock footer (ai-gantry)

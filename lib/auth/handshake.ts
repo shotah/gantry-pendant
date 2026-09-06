@@ -2,10 +2,10 @@ import { allowlistMap } from "./allowlist";
 import { bearerForSlug, parseBearers } from "./bearer";
 import { type AuthEnv, type AuthMode, resolveAuthMode } from "./mode";
 import { secretEqual } from "./secret";
-import { parseCookie, readSession, SESSION_COOKIE } from "./session";
+import { parseCookie, readSession, SESSION_COOKIE, type SessionClaims } from "./session";
 import type { Role } from "../mailbox/frame";
 
-export type PhonePrincipal = { kind: "phone"; sub: string; email?: string };
+export type PhonePrincipal = { kind: "phone"; sub: string; email?: string; exp?: number };
 export type CranePrincipal = { kind: "crane"; slug: string };
 export type SpikePrincipal = { kind: "spike"; role: Role };
 export type Principal = PhonePrincipal | CranePrincipal | SpikePrincipal;
@@ -25,10 +25,17 @@ export type HandshakeInput = {
   now?: number;
 };
 
-function bearerFrom(authorization: string | null | undefined, query: string | null | undefined): string {
+function bearerFrom(
+  authorization: string | null | undefined,
+  query: string | null | undefined,
+  allowQuery: boolean,
+): string {
   const header = authorization?.trim() ?? "";
   if (header.toLowerCase().startsWith("bearer ")) {
     return header.slice(7).trim();
+  }
+  if (!allowQuery) {
+    return "";
   }
   return query?.trim() ?? "";
 }
@@ -37,7 +44,7 @@ async function phoneFromCookie(
   env: HandshakeInput["env"],
   cookieHeader: string | null | undefined,
   now: number,
-): Promise<{ sub: string; email?: string } | null> {
+): Promise<SessionClaims | null> {
   const secret = env.SESSION_SECRET?.trim() ?? "";
   const token = parseCookie(cookieHeader ?? null, SESSION_COOKIE);
   if (!secret || !token) {
@@ -83,7 +90,7 @@ export async function handshakeSlug(input: HandshakeSlugInput): Promise<Handshak
 
 function spikeHandshake(env: AuthEnv, role: Role, input: HandshakeInput): HandshakeResult {
   const want = env.MAILBOX_SECRET?.trim() ?? "";
-  const presented = bearerFrom(input.authorization, input.querySecret);
+  const presented = bearerFrom(input.authorization, input.querySecret, true);
   if (!want || !presented || !secretEqual(want, presented)) {
     return { ok: false, error: "unauthorized" };
   }
@@ -97,9 +104,9 @@ async function oidcHandshake(input: HandshakeInput, now: number): Promise<Handsh
     if (!session || !allowed.has(session.sub)) {
       return { ok: false, error: "unauthorized" };
     }
-    return { ok: true, principal: { kind: "phone", sub: session.sub, email: session.email } };
+    return { ok: true, principal: { kind: "phone", sub: session.sub, email: session.email, exp: session.exp } };
   }
-  const presented = bearerFrom(input.authorization, input.queryBearer);
+  const presented = bearerFrom(input.authorization, input.queryBearer, false);
   const bearers = parseBearers(input.env.CRANE_BEARERS);
   if (!presented || !bearerForSlug(bearers, input.slug, presented)) {
     return { ok: false, error: "unauthorized" };

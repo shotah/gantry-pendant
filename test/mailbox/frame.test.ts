@@ -96,4 +96,36 @@ describe("frame", () => {
     expect(got.ok && got.frame.kind).toBe("cmds");
     expect(got.ok && got.frame.commands).toEqual([{ name: "new", hint: "reset this session", args: true }]);
   });
+
+  it("parses and encodes a short frame id", () => {
+    const got = parseFrame(JSON.stringify({ text: "hi", id: "msg-1" }));
+    expect(got.ok && got.frame.id).toBe("msg-1");
+    if (got.ok) {
+      expect(JSON.parse(encodeFrame(got.frame))).toEqual({ text: "hi", id: "msg-1" });
+    }
+    expect(parseFrame(JSON.stringify({ id: "x".repeat(129) })).ok).toBe(false);
+    expect(parseFrame(JSON.stringify({ id: 1 })).ok).toBe(false);
+    expect(parseFrame(JSON.stringify({ since: 1 })).ok).toBe(false);
+    expect(parseFrame(JSON.stringify({ text: "hi", user_id: "ada", id: "" })).ok).toBe(true);
+  });
+
+  it("keeps ack id and optional since", () => {
+    const got = parseFrame(JSON.stringify({ kind: "ack", id: "msg-1", since: "msg-0" }));
+    expect(got.ok && got.frame).toEqual({ kind: "ack", id: "msg-1", since: "msg-0" });
+    if (got.ok) {
+      expect(JSON.parse(encodeFrame(got.frame))).toEqual({ kind: "ack", id: "msg-1", since: "msg-0" });
+    }
+  });
+
+  it("rejects https images from the phone and still allows data urls", () => {
+    const https = parseFrame(JSON.stringify({ images: [{ url: "https://example.test/a.jpg" }] }), { role: "phone" });
+    expect(https.ok).toBe(false);
+    const data = parseFrame(JSON.stringify({ images: [{ url: "data:image/jpeg;base64,aa" }] }), { role: "phone" });
+    expect(data.ok).toBe(true);
+  });
+
+  it("allows https images from the crane", () => {
+    const crane = parseFrame(JSON.stringify({ images: [{ url: "https://example.test/a.jpg" }] }), { role: "crane" });
+    expect(crane.ok).toBe(true);
+  });
 });

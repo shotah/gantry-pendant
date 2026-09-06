@@ -76,7 +76,7 @@ What we do **not** need for a first talk:
 
 - Opening crane ports
 - Tailscale on the phone (Worker path)
-- Apple / Google push (APNs / FCM) — only when the app is dead and you
+- Web Push / native APNs / FCM — only when the app is dead and you
   still want a lock-screen ping. Open-app socket is enough to prove it.
 - App Store / Play Store
 - A second VPS
@@ -85,9 +85,10 @@ What we do **not** need for a first talk:
 
 **Lean Durable Object.** A plain Worker is the wrong primitive: it is
 stateless. Two sockets (phone + crane) only meet if they hit the **same
-isolate with memory**. That is a Durable Object. One DO per crane slug.
-Hibernated WebSockets are the product feature this is for. SQLite on
-the DO can hold a small queue when the other side is offline.
+isolate with memory**. That is a Durable Object — the sockets meet
+here, same job as Slack Socket Mode’s hub. One DO per crane slug.
+Hibernated WebSockets keep that room without billing idle CPU. SQLite
+on the DO can hold a small queue when the other side is offline.
 
 | | Mini process | Worker + Durable Object |
 | --- | --- | --- |
@@ -143,7 +144,7 @@ pings stay stuck on Telegram.
 
 | Already | New | Later, optional |
 | --- | --- | --- |
-| Mini, Docker, cranes, LLM | Vinext app on Workers + Durable Object | APNs / FCM if lock-screen matters |
+| Mini, Docker, cranes, LLM | Vinext app on Workers + Durable Object | Web Push (VAPID); native APNs / FCM if lock-screen matters |
 | GCP project (google-mcp) | New Web OAuth client, openid only | TestFlight / Play sideload |
 | CF account (Tunnel for the yard) | Crane env: mailbox URL + bearer | Mini hub only as a local fallback |
 | Tailscale (console, SSH) | — not required on the phone for chat | |

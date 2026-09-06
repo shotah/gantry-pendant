@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { allowlistMap } from "@/lib/auth/allowlist";
 import { unauthorized } from "@/lib/auth/deny";
-import { acceptHuman, exchangeCode, verifyIdToken } from "@/lib/auth/google";
+import { acceptHuman, decodeOAuthBind, exchangeCode, verifyIdToken } from "@/lib/auth/google";
 import { clearCookie, mintSession, parseCookie, sessionCookie, STATE_COOKIE } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -10,8 +10,8 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code") ?? "";
   const state = url.searchParams.get("state") ?? "";
-  const want = parseCookie(req.headers.get("Cookie"), STATE_COOKIE) ?? "";
-  if (!code || !state || !want || state !== want) {
+  const bind = decodeOAuthBind(parseCookie(req.headers.get("Cookie"), STATE_COOKIE));
+  if (!code || !state || !bind || state !== bind.state) {
     return unauthorized();
   }
   const clientId = env.GOOGLE_CLIENT_ID?.trim() ?? "";
@@ -25,11 +25,12 @@ export async function GET(req: Request) {
     clientId,
     clientSecret,
     origin: url.origin,
+    codeVerifier: bind.verifier,
   });
   if ("error" in exchanged) {
     return unauthorized();
   }
-  const identity = await verifyIdToken(exchanged.idToken, clientId);
+  const identity = await verifyIdToken(exchanged.idToken, clientId, bind.nonce);
   const human = acceptHuman(identity, allowlistMap(env.ALLOWED_SUBS));
   if (!human) {
     return unauthorized();

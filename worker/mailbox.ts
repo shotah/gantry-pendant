@@ -1,16 +1,33 @@
 import { DurableObject } from "cloudflare:workers";
 import { encodeFaceNotice, packAvatar, AVATAR_STORE_KEY, type StoredAvatar } from "../lib/avatar/store";
-import { encodeFrame, parseFrame, peerOf, type Role, type WireFrame } from "../lib/mailbox/frame";
+import { utf8Bytes } from "../lib/mailbox/caps";
 import { cranePublishedCmds, CMDS_STORE_KEY, parseCommands, phoneMustNotPublishCmds } from "../lib/mailbox/cmds";
-import { drainFor, enqueue, newQueueId, type Queued } from "../lib/mailbox/queue";
+import { encodeFrame, parseFrame, type Role, type WireFrame } from "../lib/mailbox/frame";
+import {
+  drainFor,
+  enqueue,
+  newQueueId,
+  peekFor,
+  pruneQueue,
+  queuedFromList,
+  queueStoreKey,
+  QUEUE_STORE_PREFIX,
+  type Queued,
+} from "../lib/mailbox/queue";
+import { persistRole, resolvePhoneKind, routeTag } from "../lib/mailbox/route";
+import { parseExpMs, socketMessageAllowed } from "../lib/mailbox/socketAuth";
 import { takeFrame, type DualLimit } from "../lib/mailbox/rate";
 
-const QUEUE_KEY = "queue";
 const RATE_KEY = "rate";
 
-type AttachMeta = { role: Role; rateId: string; userId?: string };
+type AttachMeta = { role: Role; rateId: string; userId?: string; expMs?: number };
 
 export class Mailbox extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+  }
+
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("X-Pendant-Op") === "avatar") {
       return this.avatarHttp(request);
@@ -21,18 +38,30 @@ export class Mailbox extends DurableObject<Env> {
     const role = request.headers.get("X-Pendant-Role");
     const rateId = request.headers.get("X-Pendant-Rate") ?? "anon";
     const userId = request.headers.get("X-Pendant-Sub") ?? undefined;
+    const exp = request.headers.get("X-Pendant-Exp") ?? "";
     if (role !== "phone" && role !== "crane") {
       return new Response("bad role", { status: 400 });
     }
     const pair = new WebSocketPair();
-    this.ctx.acceptWebSocket(pair[1], [role, rateId, userId ?? ""]);
-    await this.flush(pair[1], role);
+    this.ctx.acceptWebSocket(pair[1], [role, rateId, userId ?? "", exp]);
+    await this.flush(pair[1], role, userId);
     return new Response(null, { status: 101, webSocket: pair[0] } as ResponseInit);
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
     const meta = this.meta(ws);
-    const parsed = parseFrame(message);
+    const now = Date.now();
+    if (!socketMessageAllowed({
+      role: meta.role,
+      userId: meta.userId,
+      expMs: meta.expMs,
+      allowedSubs: this.env.ALLOWED_SUBS,
+      now,
+    })) {
+      ws.close(4401, "unauthorized");
+      return;
+    }
+    const parsed = parseFrame(message, { role: meta.role });
     if (!parsed.ok) {
       ws.send(encodeFrame({ kind: "error", text: parsed.error }));
       return;
@@ -43,17 +72,22 @@ export class Mailbox extends DurableObject<Env> {
       return;
     }
     const out: WireFrame = { ...parsed.frame };
-    if (phoneMustNotPublishCmds(meta.role, out.kind)) {
-      ws.send(encodeFrame({ kind: "error", text: "bad frame" }));
-      return;
-    }
     if (meta.role === "phone") {
-      out.kind = out.kind ?? (out.text || out.images?.length ? "inbound" : "pin");
+      const kind = resolvePhoneKind(out);
+      if (!kind) {
+        ws.send(encodeFrame({ kind: "error", text: "bad frame" }));
+        return;
+      }
+      out.kind = kind;
       if (meta.userId) {
         out.user_id = meta.userId;
       }
     } else if (!out.kind) {
       out.kind = "reply";
+    }
+    if (phoneMustNotPublishCmds(meta.role, out.kind)) {
+      ws.send(encodeFrame({ kind: "error", text: "bad frame" }));
+      return;
     }
     if (cranePublishedCmds(meta.role, out.kind)) {
       const body = encodeFrame({ kind: "cmds", commands: parseCommands(out.commands) });
@@ -63,23 +97,63 @@ export class Mailbox extends DurableObject<Env> {
       }
       return;
     }
+    if (!out.id) {
+      out.id = newQueueId();
+    }
+    if (meta.role === "phone" && out.kind === "ack") {
+      if (out.since) {
+        await this.dropAckedThrough(out.since, meta.userId);
+      }
+      await this.ctx.storage.delete(queueStoreKey(out.id));
+      const cranes = this.ctx.getWebSockets("crane");
+      for (const c of cranes) {
+        c.send(encodeFrame(out));
+      }
+      return;
+    }
     const body = encodeFrame(out);
-    const peer = peerOf(meta.role);
-    const peers = this.ctx.getWebSockets(peer);
-    if (peers.length) {
+    const tag = routeTag(meta.role, out);
+    const peers = tag ? this.ctx.getWebSockets(tag) : [];
+    const dest = persistRole(meta.role, out.kind, out.user_id);
+    if (dest === "phone") {
+      await this.putQueued({
+        id: out.id,
+        to: "phone",
+        body,
+        at: now,
+        userId: out.user_id ?? "",
+        kind: out.kind,
+        bytes: utf8Bytes(body),
+      });
       for (const p of peers) {
         p.send(body);
       }
       return;
     }
-    const items = await this.loadQueue();
-    const next = enqueue(items, {
-      id: newQueueId(),
-      to: peer,
-      body,
-      at: Date.now(),
-    }, { now: Date.now() });
-    await this.ctx.storage.put(QUEUE_KEY, next);
+    if (dest === "crane") {
+      if (peers.length) {
+        for (const p of peers) {
+          p.send(body);
+        }
+      } else {
+        await this.putQueued({
+          id: out.id,
+          to: "crane",
+          body,
+          at: now,
+          userId: out.user_id,
+          kind: out.kind,
+          bytes: utf8Bytes(body),
+        });
+      }
+      if (meta.role === "phone" && out.kind === "inbound") {
+        ws.send(encodeFrame({ kind: "ack", id: out.id }));
+      }
+      return;
+    }
+    for (const p of peers) {
+      p.send(body);
+    }
   }
 
   async webSocketClose() {
@@ -119,10 +193,15 @@ export class Mailbox extends DurableObject<Env> {
   private meta(ws: WebSocket): AttachMeta {
     const tags = this.ctx.getTags(ws);
     const role = tags[0] === "crane" ? "crane" : "phone";
-    return { role, rateId: tags[1] || "anon", userId: tags[2] || undefined };
+    return {
+      role,
+      rateId: tags[1] || "anon",
+      userId: tags[2] || undefined,
+      expMs: parseExpMs(tags[3]),
+    };
   }
 
-  private async flush(ws: WebSocket, role: Role) {
+  private async flush(ws: WebSocket, role: Role, userId?: string) {
     if (role === "phone") {
       const cmds = await this.ctx.storage.get<string>(CMDS_STORE_KEY);
       if (cmds) {
@@ -130,15 +209,59 @@ export class Mailbox extends DurableObject<Env> {
       }
     }
     const items = await this.loadQueue();
-    const { kept, take } = drainFor(items, role, Date.now());
+    if (role === "phone") {
+      const take = peekFor(items, "phone", Date.now(), { userId });
+      for (const m of take) {
+        ws.send(m.body);
+      }
+      return;
+    }
+    const { take } = drainFor(items, "crane", Date.now());
     for (const m of take) {
       ws.send(m.body);
+      await this.ctx.storage.delete(queueStoreKey(m.id));
     }
-    await this.ctx.storage.put(QUEUE_KEY, kept);
   }
 
   private async loadQueue(): Promise<Queued[]> {
-    return (await this.ctx.storage.get<Queued[]>(QUEUE_KEY)) ?? [];
+    const rows = await this.ctx.storage.list<Queued>({ prefix: QUEUE_STORE_PREFIX });
+    const all = queuedFromList(rows);
+    const now = Date.now();
+    const live = pruneQueue(all, now);
+    if (live.length !== all.length) {
+      const keep = new Set(live.map((m) => m.id));
+      for (const m of all) {
+        if (!keep.has(m.id)) {
+          await this.ctx.storage.delete(queueStoreKey(m.id));
+        }
+      }
+    }
+    return live;
+  }
+
+  private async putQueued(msg: Queued): Promise<void> {
+    const items = await this.loadQueue();
+    const next = enqueue(items, msg, { now: Date.now() });
+    const nextIds = new Set(next.map((m) => m.id));
+    for (const m of items) {
+      if (!nextIds.has(m.id)) {
+        await this.ctx.storage.delete(queueStoreKey(m.id));
+      }
+    }
+    if (nextIds.has(msg.id)) {
+      const stored = next.find((m) => m.id === msg.id) ?? msg;
+      await this.ctx.storage.put(queueStoreKey(msg.id), stored);
+    }
+  }
+
+  private async dropAckedThrough(since: string, userId?: string): Promise<void> {
+    const items = await this.loadQueue();
+    const uid = userId ?? "";
+    for (const m of items) {
+      if (m.to === "phone" && (m.userId ?? "") === uid && m.id <= since) {
+        await this.ctx.storage.delete(queueStoreKey(m.id));
+      }
+    }
   }
 
   private async take(rateId: string, bytes: number): Promise<boolean> {

@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import { avatarRequestPath, mailboxToAvatarUrl, readAvatarUpload } from "@/lib/avatar/http";
 
 describe("avatarRequestPath", () => {
-  it("puts slug and optional creds on the query", () => {
+  it("keeps a clean query when secret and bearer are omitted", () => {
     expect(avatarRequestPath({ slug: "kit" })).toBe("/api/avatar?slug=kit");
+    expect(avatarRequestPath({ slug: "kit", rev: 0 })).toBe("/api/avatar?slug=kit");
+  });
+
+  it("appends secret and bearer only when those args are provided", () => {
     expect(avatarRequestPath({ slug: "kit", rev: 9, secret: "s", bearer: "b" })).toBe(
       "/api/avatar?slug=kit&v=9&secret=s&bearer=b",
     );
-    expect(avatarRequestPath({ slug: "kit", rev: 0 })).toBe("/api/avatar?slug=kit");
   });
 });
 

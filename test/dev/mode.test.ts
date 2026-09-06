@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { devEnabled, envFlag, hostFromRequest, loopbackHost } from "@/lib/dev/mode";
+import { devEnabled, envFlag, hostFromRequest, hostnameFromHostHeader, loopbackHost } from "@/lib/dev/mode";
 
 describe("dev mode", () => {
   it("treats 1/true/yes/on as on", () => {
@@ -31,5 +31,14 @@ describe("dev mode", () => {
   it("reads hostname from the request URL", () => {
     expect(hostFromRequest(new Request("http://127.0.0.1:5173/api/auth/me"))).toBe("127.0.0.1");
     expect(hostFromRequest(new Request("http://localhost:5173/"))).toBe("localhost");
+  });
+
+  it("strips a port from a Host header before the loopback gate", () => {
+    expect(hostnameFromHostHeader("127.0.0.1:5173")).toBe("127.0.0.1");
+    expect(hostnameFromHostHeader("localhost:3000")).toBe("localhost");
+    expect(hostnameFromHostHeader("[::1]:3000")).toBe("[::1]");
+    expect(hostnameFromHostHeader(null)).toBe("");
+    expect(devEnabled({ PENDANT_DEV: "1" }, hostnameFromHostHeader("127.0.0.1:5173"))).toBe(true);
+    expect(devEnabled({ PENDANT_DEV: "1" }, hostnameFromHostHeader("gantry-pendant.example.workers.dev"))).toBe(false);
   });
 });
