@@ -11,7 +11,7 @@ canned Ada/Kit turns — not a live crane.
 
 ## Phone
 
-The product viewport is a pocket (390×844). Theme defaults to Night.
+The product viewport is a pocket (390×844). Theme defaults to Boom.
 Kit’s face sits in the header (tap to replace it). Empty and unsigned
 screens use the same mark. Fallback is the pendant glyph until a JPEG
 is saved on the Durable Object.
@@ -35,7 +35,7 @@ is saved on the Durable Object.
 <p align="center">
   <img src="../assets/docs/down.png" alt="Socket down, compose disabled" width="220">
   &nbsp;
-  <img src="../assets/docs/thread-day.png" alt="Same thread in Day theme" width="220">
+  <img src="../assets/docs/thread-day.png" alt="Same thread in Lamp theme" width="220">
   &nbsp;
   <img src="../assets/docs/crane.png" alt="Crane stand-in tab" width="220">
 </p>
@@ -50,7 +50,7 @@ is saved on the Durable Object.
 | `ping` | `/?sample=ping` | Cron `Push` — labeled **ping**. |
 | `photo` | `/?sample=photo` | Inbound image + text. |
 | `down` | `/?sample=down` | Other side gone. Compose locked. |
-| `thread-day` | `/?sample=thread&theme=day` | Day theme. Night / ember / fog / contrast live in the picker. |
+| `thread-day` | `/?sample=thread&theme=lamp` | Lamp theme. Boom / Inlay / Lamp live in the picker. |
 | `crane` | `/crane?sample=crane` | Laptop stand-in for the harness while the channel is missing. |
 
 ---

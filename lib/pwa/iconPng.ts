@@ -8,10 +8,10 @@ export type PendantIconKind = "any" | "maskable" | "apple";
 
 const PNG_SIG = Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10);
 
-const CANVAS = { r: 12, g: 10, b: 9, a: 255 };
-const GOLD = { r: 232, g: 184, b: 109, a: 255 };
-const DARK = { r: 28, g: 25, b: 23, a: 255 };
-const DOT = { r: 110, g: 231, b: 183, a: 255 };
+const CANVAS = { r: 14, g: 19, b: 22, a: 255 };
+const ACCENT = { r: 240, g: 120, b: 72, a: 255 };
+const DARK = { r: 23, g: 29, b: 34, a: 255 };
+const DOT = { r: 61, g: 184, b: 160, a: 255 };
 const CLEAR = { r: 0, g: 0, b: 0, a: 0 };
 
 type Rgba = { r: number; g: number; b: number; a: number };
@@ -85,7 +85,7 @@ function sample(px: number, py: number, size: number, kind: PendantIconKind): Rg
     out = CANVAS;
   }
   if (inRoundRect(u, v, 22, 8, 20, 8, 3) || inPendantBody(u, v)) {
-    out = GOLD;
+    out = ACCENT;
   }
   if (inCircle(u, v, 32, 34, 7)) {
     out = DARK;

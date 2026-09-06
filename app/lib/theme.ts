@@ -1,9 +1,9 @@
-/** Pendant themes — a mouth, not the yard board. */
+/** Color themes — Boom, Inlay, Lamp. Same ids and shared surface/accent hex as gantree. */
 
 export const THEME_KEY = "pendant.theme";
 
-type ThemeTokens = {
-  scheme: "dark" | "light";
+type NightCore = {
+  scheme: "dark";
   canvas: string;
   panel: string;
   track: string;
@@ -24,161 +24,119 @@ type ThemeTokens = {
   dangerSoft: string;
   ok: string;
   info: string;
+};
+
+type ThemeTokens = NightCore & {
   you: string;
   kit: string;
 };
 
+/** Shared with gantree — do not drift these hex values. */
+const BOOM = {
+  scheme: "dark",
+  canvas: "#0e1316",
+  panel: "#171d22",
+  track: "#232b32",
+  line: "#3a4550",
+  edge: "#5c6772",
+  fg: "#f4f0ea",
+  body: "#dcd6ce",
+  muted: "#9aa3ab",
+  dim: "#84909a",
+  faint: "#5a6570",
+  accent: "#f07848",
+  accentHover: "#f89068",
+  mark: "#f3b199",
+  accentLine: "#c24a28",
+  accentSoft: "#2a1612",
+  danger: "#e070a0",
+  dangerLine: "#a03860",
+  dangerSoft: "#2a121c",
+  ok: "#3db8a0",
+  info: "#6ba8c9",
+} as const satisfies NightCore;
+
+const INLAY = {
+  scheme: "dark",
+  canvas: "#0c110f",
+  panel: "#151c19",
+  track: "#1e2823",
+  line: "#33423b",
+  edge: "#5a6e64",
+  fg: "#f2ebe0",
+  body: "#d9d0c4",
+  muted: "#a3ada6",
+  dim: "#8a948c",
+  faint: "#5a6560",
+  accent: "#e6d3b0",
+  accentHover: "#f0e0c4",
+  mark: "#f7ebd4",
+  accentLine: "#a89068",
+  accentSoft: "#243028",
+  danger: "#d4787a",
+  dangerLine: "#8a4042",
+  dangerSoft: "#2a1818",
+  ok: "#6baf9a",
+  info: "#7aa8b8",
+} as const satisfies NightCore;
+
+const LAMP = {
+  scheme: "dark",
+  canvas: "#0c0c16",
+  panel: "#151522",
+  track: "#1e1e2e",
+  line: "#32324a",
+  edge: "#5a5a78",
+  fg: "#eef0e6",
+  body: "#d5d8c8",
+  muted: "#9aa090",
+  dim: "#8a9088",
+  faint: "#5a6058",
+  accent: "#c5d24a",
+  accentHover: "#d4e05a",
+  mark: "#e4eec8",
+  accentLine: "#8a9430",
+  accentSoft: "#222418",
+  danger: "#e07090",
+  dangerLine: "#a03850",
+  dangerSoft: "#2a1218",
+  ok: "#5ec8b0",
+  info: "#8aa0e0",
+} as const satisfies NightCore;
+
 export const THEMES = [
   {
-    id: "night",
-    label: "Night",
+    id: "boom",
+    label: "Boom",
     tokens: {
-      scheme: "dark",
-      canvas: "#0c0a09",
-      panel: "#1c1917",
-      track: "#292524",
-      line: "#3f3a36",
-      edge: "#57534e",
-      fg: "#fafaf9",
-      body: "#e7e5e4",
-      muted: "#a8a29e",
-      dim: "#78716c",
-      faint: "#57534e",
-      accent: "#e8b86d",
-      accentHover: "#f2d19a",
-      mark: "#fde68a",
-      accentLine: "#a16207",
-      accentSoft: "#2a2114",
-      danger: "#fda4af",
-      dangerLine: "#9f1239",
-      dangerSoft: "#2a1218",
-      ok: "#6ee7b7",
-      info: "#7dd3fc",
-      you: "#3f2e14",
-      kit: "#292524",
+      ...BOOM,
+      you: "#3a1e16",
+      kit: BOOM.track,
     } satisfies ThemeTokens,
   },
   {
-    id: "ember",
-    label: "Night · ember",
+    id: "inlay",
+    label: "Inlay",
     tokens: {
-      scheme: "dark",
-      canvas: "#140c0a",
-      panel: "#241614",
-      track: "#3a1f18",
-      line: "#5c2e22",
-      edge: "#7c3a28",
-      fg: "#fff7ed",
-      body: "#fed7aa",
-      muted: "#fdba74",
-      dim: "#c2410c",
-      faint: "#7c2d12",
-      accent: "#fb7185",
-      accentHover: "#fda4af",
-      mark: "#fecdd3",
-      accentLine: "#be123c",
-      accentSoft: "#3a1218",
-      danger: "#fb7185",
-      dangerLine: "#e11d48",
-      dangerSoft: "#3a0814",
-      ok: "#fbbf24",
-      info: "#fdba74",
-      you: "#4a1d18",
-      kit: "#3a1f18",
+      ...INLAY,
+      you: "#2a2820",
+      kit: INLAY.track,
     } satisfies ThemeTokens,
   },
   {
-    id: "day",
-    label: "Day",
+    id: "lamp",
+    label: "Lamp",
     tokens: {
-      scheme: "light",
-      canvas: "#f6f1ea",
-      panel: "#fffdf8",
-      track: "#ece4d8",
-      line: "#d4c4b0",
-      edge: "#b08968",
-      fg: "#1c140c",
-      body: "#3d2f22",
-      muted: "#6b5344",
-      dim: "#8a7364",
-      faint: "#b8a090",
-      accent: "#8b4513",
-      accentHover: "#6b3410",
-      mark: "#5c2e12",
-      accentLine: "#b08968",
-      accentSoft: "#f0e4d4",
-      danger: "#9f1239",
-      dangerLine: "#9f1239",
-      dangerSoft: "#f8d0d8",
-      ok: "#047857",
-      info: "#0f4c81",
-      you: "#f0e4d4",
-      kit: "#efe6d8",
-    } satisfies ThemeTokens,
-  },
-  {
-    id: "fog",
-    label: "Day · fog",
-    tokens: {
-      scheme: "light",
-      canvas: "#e8eef3",
-      panel: "#f7fafc",
-      track: "#d5e0ea",
-      line: "#9aaebb",
-      edge: "#5c7384",
-      fg: "#0f1720",
-      body: "#1e2936",
-      muted: "#3d5160",
-      dim: "#5c7384",
-      faint: "#8a9eac",
-      accent: "#0f4c5c",
-      accentHover: "#0a3640",
-      mark: "#134e4a",
-      accentLine: "#2a6f7a",
-      accentSoft: "#d4e8ec",
-      danger: "#9f1239",
-      dangerLine: "#9f1239",
-      dangerSoft: "#f0c8d4",
-      ok: "#0f766e",
-      info: "#0369a1",
-      you: "#d4e8ec",
-      kit: "#dce6ee",
-    } satisfies ThemeTokens,
-  },
-  {
-    id: "contrast",
-    label: "High contrast",
-    tokens: {
-      scheme: "dark",
-      canvas: "#000000",
-      panel: "#0a0a0a",
-      track: "#1a1a1a",
-      line: "#ffff00",
-      edge: "#ffff00",
-      fg: "#ffffff",
-      body: "#ffffff",
-      muted: "#e0e0e0",
-      dim: "#c0c0c0",
-      faint: "#a0a0a0",
-      accent: "#ffff00",
-      accentHover: "#ffff99",
-      mark: "#ffff00",
-      accentLine: "#ffff00",
-      accentSoft: "#1a1a00",
-      danger: "#ff0040",
-      dangerLine: "#ff0040",
-      dangerSoft: "#33000d",
-      ok: "#00ff80",
-      info: "#00ffff",
-      you: "#1a1a00",
-      kit: "#0a0a0a",
+      ...LAMP,
+      you: "#2a2a18",
+      kit: LAMP.track,
     } satisfies ThemeTokens,
   },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];
 
-export const DEFAULT_THEME: ThemeId = "night";
+export const DEFAULT_THEME: ThemeId = "boom";
 
 export function themeOf(id: ThemeId = DEFAULT_THEME) {
   return THEMES.find((t) => t.id === id) ?? THEMES[0];

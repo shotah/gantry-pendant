@@ -42,7 +42,7 @@ ports. The Mini does not have to be the mailbox.
   <img src="assets/docs/photo.png" alt="Photo on an inbound turn" width="180">
 </p>
 
-Every screen, Day theme, crane stand-in: [docs/screens.md](docs/screens.md).
+Every screen, Lamp theme, crane stand-in: [docs/screens.md](docs/screens.md).
 
 **Docs (the plan lives here, not in chat):**
 

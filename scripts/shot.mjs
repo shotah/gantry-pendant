@@ -44,11 +44,11 @@ const SHOTS = {
     phone: true,
   },
   "thread-day": {
-    path: "/?sample=thread&theme=day",
+    path: "/?sample=thread&theme=lamp",
     sel: "[data-shot=phone]",
     text: "Leave-by 20:50",
     phone: true,
-    theme: "day",
+    theme: "lamp",
   },
   ping: {
     path: "/?sample=ping",
@@ -228,7 +228,7 @@ try {
   for (const name of wanted) {
     const spec = SHOTS[name];
     await metrics(Boolean(spec.phone));
-    const theme = spec.theme || "night";
+    const theme = spec.theme || "boom";
     await evalJson(
       cdp,
       `localStorage.setItem("pendant.theme", ${JSON.stringify(theme)}); document.documentElement.setAttribute("data-theme", ${JSON.stringify(theme)});`,
