@@ -12,7 +12,7 @@ describe("Compose", () => {
   it("sends trimmed text and ignores blanks", () => {
     const onSend = vi.fn();
     render(<Compose onSend={onSend} gpsHint="GPS on send" />);
-    expect(screen.getByText("GPS on send")).toBeTruthy();
+    expect(screen.getByPlaceholderText("Message")).toBeTruthy();
     fireEvent.change(screen.getByPlaceholderText("Message"), { target: { value: "  hi  " } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(onSend).toHaveBeenCalledWith("hi");
@@ -21,7 +21,8 @@ describe("Compose", () => {
   it("opens the photo picker when asked", () => {
     const onPhoto = vi.fn();
     render(<Compose onSend={vi.fn()} onPhoto={onPhoto} />);
-    fireEvent.click(screen.getByRole("button", { name: "photo" }));
+    fireEvent.click(screen.getByRole("button", { name: "attach" }));
+    fireEvent.click(screen.getByRole("button", { name: "Photo" }));
     const input = document.querySelector("input[type=file]") as HTMLInputElement;
     const file = new File([new Uint8Array([1])], "a.jpg", { type: "image/jpeg" });
     fireEvent.change(input, { target: { files: [file] } });
@@ -38,6 +39,7 @@ describe("Compose", () => {
     ];
     render(<Compose onSend={onSend} commands catalog={catalog} placeholder="Message Kit" />);
     expect(screen.queryByRole("listbox", { name: "Harness commands" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "attach" }));
     fireEvent.click(screen.getByRole("button", { name: "harness commands" }));
     expect(screen.getByText("These go to the crane, not the chat model.")).toBeTruthy();
     expect(screen.getByRole("option", { name: /^\/new / })).toBeTruthy();
@@ -70,12 +72,14 @@ describe("Compose", () => {
     expect((box as HTMLTextAreaElement).value).toBe("/brief ");
   });
 
-  it("toggles GPS and pins when asked", () => {
+  it("toggles GPS and pins from the attach menu", () => {
     const onPin = vi.fn();
     const onGpsToggle = vi.fn();
     const { rerender } = render(
       <Compose onSend={vi.fn()} onPin={onPin} gpsOn onGpsToggle={onGpsToggle} gpsHint="GPS on send" />,
     );
+    fireEvent.click(screen.getByRole("button", { name: "attach" }));
+    expect(screen.getByRole("dialog", { name: "Attach" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "GPS on" }));
     expect(onGpsToggle).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "drop pin" }));

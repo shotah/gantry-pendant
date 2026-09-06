@@ -72,12 +72,33 @@ describe("PhoneShell", () => {
     expect(screen.getByRole("button", { name: "Change Kit's photo" })).toBeTruthy();
   });
 
+  it("keeps agent name, theme, and the crane stand-in behind the settings cog", async () => {
+    stubAuth(true);
+    render(<PhoneShell />);
+    expect(await screen.findByText("live")).toBeTruthy();
+    expect(screen.getByText("Kit")).toBeTruthy();
+    expect(screen.queryByLabelText("Agent name")).toBeNull();
+    expect(screen.queryByRole("button", { name: "color theme" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open crane stand-in" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    expect(screen.getByRole("dialog", { name: "Settings" })).toBeTruthy();
+    expect(screen.getByLabelText("Agent name")).toBeTruthy();
+    expect((screen.getByLabelText("Agent name") as HTMLInputElement).value).toBe("kit");
+    expect(screen.getByLabelText("Agent access secret")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "color theme" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open crane stand-in" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Agent name"), { target: { value: "Ada" } });
+    expect((screen.getByLabelText("Agent name") as HTMLInputElement).value).toBe("ada");
+    expect(screen.getByText("Ada")).toBeTruthy();
+  });
+
   it("paints the harness command picker for the cmds sample", async () => {
     window.history.replaceState({}, "", "/?sample=cmds");
     stubAuth(true);
     render(<PhoneShell />);
     expect(await screen.findByText("These go to the crane, not the chat model.")).toBeTruthy();
     expect(screen.getByRole("option", { name: /^\/new / })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "attach" }));
     expect(screen.getByRole("button", { name: "harness commands" })).toBeTruthy();
   });
 
@@ -90,6 +111,7 @@ describe("PhoneShell", () => {
     stubAuth(true);
     render(<PhoneShell />);
     expect(await screen.findByText("live")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "attach" }));
     fireEvent.click(screen.getByRole("button", { name: "GPS on" }));
     expect(screen.getByRole("button", { name: "GPS off" })).toBeTruthy();
     expect(screen.getByText("GPS off")).toBeTruthy();
@@ -103,6 +125,7 @@ describe("PhoneShell", () => {
     stubAuth(true);
     render(<PhoneShell />);
     expect(await screen.findByText("live")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "attach" }));
     fireEvent.click(screen.getByRole("button", { name: "drop pin" }));
     expect(await screen.findByText("GPS omitted (denied or unavailable)")).toBeTruthy();
     expect(screen.getByText(/Nothing yet/)).toBeTruthy();

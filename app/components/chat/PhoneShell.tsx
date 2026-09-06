@@ -5,6 +5,7 @@ import { ThemeSelect } from "../shared/ThemeSelect";
 import type { SlashCommand } from "@/app/lib/slash";
 import { Compose } from "./Compose";
 import { KitAvatar } from "./KitAvatar";
+import { SettingsMenu } from "./SettingsMenu";
 import { Thread, type ChatBubble } from "./Thread";
 import { mailboxUrl, parseIncoming } from "@/app/lib/socket";
 import { browserBattery } from "@/app/lib/battery";
@@ -365,7 +366,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas" data-shot={phone ? "phone" : "crane"}>
-      <header className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-2">
+      <header className="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <KitAvatar {...faceProps} size="md" />
           <div className="min-w-0">
@@ -379,57 +380,76 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             </p>
           </div>
         </div>
-        <label className="ml-auto flex items-center gap-1 text-xs text-muted">
-          slug
-          <input
-            className="w-24 rounded border border-edge bg-canvas px-1 py-0.5 text-fg"
-            value={slug}
-            onChange={(e) => setSlug(e.target.value)}
-          />
-        </label>
-        {cfg?.mode === "spike" && !hideSecrets
-          ? (
-              <label className="flex items-center gap-1 text-xs text-muted">
-                secret
-                <input
-                  type="password"
-                  autoComplete="off"
-                  className="w-28 rounded border border-edge bg-canvas px-1 py-0.5 text-fg"
-                  value={secret}
-                  onChange={(e) => setSecret(e.target.value)}
-                />
-              </label>
-            )
-          : null}
-        {!phone && cfg?.mode === "oidc" && !hideSecrets
-          ? (
-              <label className="flex items-center gap-1 text-xs text-muted">
-                bearer
-                <input
-                  type="password"
-                  autoComplete="off"
-                  className="w-28 rounded border border-edge bg-canvas px-1 py-0.5 text-fg"
-                  value={bearer}
-                  onChange={(e) => setBearer(e.target.value)}
-                />
-              </label>
-            )
-          : null}
-        {phone
-          ? <a className="text-xs text-dim underline" href="/crane">crane tab</a>
-          : <a className="text-xs text-dim underline" href="/">phone</a>}
-        {cfg?.google && phone
-          ? (
-              me
-                ? (
-                    <form action="/api/auth/logout" method="post">
-                      <button type="submit" className="text-xs text-dim underline">sign out</button>
-                    </form>
-                  )
-                : <a className="text-xs text-mark underline" href="/login">sign in</a>
-            )
-          : null}
-        <ThemeSelect />
+        <SettingsMenu>
+          <div className="flex flex-col gap-2">
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Agent name
+              <input
+                className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+                value={slug}
+                spellCheck={false}
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="off"
+                onChange={(e) => setSlug(e.target.value.toLowerCase())}
+              />
+            </label>
+            {cfg?.mode === "spike" && !hideSecrets
+              ? (
+                  <label className="flex flex-col gap-1 text-xs text-muted">
+                    Agent access secret
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+                      value={secret}
+                      onChange={(e) => setSecret(e.target.value)}
+                    />
+                  </label>
+                )
+              : null}
+            {!phone && cfg?.mode === "oidc" && !hideSecrets
+              ? (
+                  <label className="flex flex-col gap-1 text-xs text-muted">
+                    Agent access token
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+                      value={bearer}
+                      onChange={(e) => setBearer(e.target.value)}
+                    />
+                  </label>
+                )
+              : null}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted">Theme</span>
+              <ThemeSelect />
+            </div>
+            {(cfg?.dev || (cfg?.google && phone))
+              ? (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2">
+                    {cfg?.dev
+                      ? phone
+                        ? <a className="text-xs text-dim underline" href="/crane">Open crane stand-in</a>
+                        : <a className="text-xs text-dim underline" href="/">Open phone</a>
+                      : null}
+                    {cfg?.google && phone
+                      ? (
+                          me
+                            ? (
+                                <form action="/api/auth/logout" method="post">
+                                  <button type="submit" className="text-xs text-dim underline">sign out</button>
+                                </form>
+                              )
+                            : <a className="text-xs text-mark underline" href="/login">sign in</a>
+                        )
+                      : null}
+                  </div>
+                )
+              : null}
+          </div>
+        </SettingsMenu>
       </header>
       {faceHint
         ? <p className="border-b border-line px-3 py-1 text-[11px] text-danger">{faceHint}</p>

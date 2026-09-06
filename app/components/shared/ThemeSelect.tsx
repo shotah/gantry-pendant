@@ -77,7 +77,7 @@ export function ThemeSelect() {
   }
 
   return (
-    <span ref={root} className="relative inline-block">
+    <span ref={root} className="relative block">
       <button
         ref={trigger}
         type="button"
@@ -86,7 +86,7 @@ export function ThemeSelect() {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
-        className="inline-flex max-w-[11.5rem] items-center gap-1.5 rounded border border-line bg-canvas px-1.5 py-0.5 text-xs text-body"
+        className="inline-flex w-full items-center gap-1.5 rounded border border-line bg-canvas px-1.5 py-0.5 text-xs text-body"
         onClick={() => setOpen((v) => !v)}
       >
         <ThemeDot canvas={current.tokens.canvas} accent={current.tokens.accent} line={current.tokens.line} />
@@ -97,7 +97,7 @@ export function ThemeSelect() {
             <span
               id={listId}
               role="listbox"
-              className="absolute right-0 z-50 mt-1 min-w-[11.5rem] rounded border border-line bg-panel py-1 shadow-lg"
+              className="absolute inset-x-0 z-50 mt-1 rounded border border-line bg-panel py-1 shadow-lg"
             >
               {THEMES.map((t) => (
                 <button

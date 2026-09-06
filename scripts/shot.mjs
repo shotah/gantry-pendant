@@ -57,7 +57,7 @@ const SHOTS = {
     phone: true,
   },
   photo: { path: "/?sample=photo", sel: "[data-shot=phone]", text: "right hatch", phone: true },
-  down: { path: "/?sample=down", sel: "[data-shot=phone]", text: "GPS omitted", phone: true },
+  down: { path: "/?sample=down", sel: "[data-shot=phone]", text: "is the gate still open", phone: true },
   crane: {
     path: "/crane?sample=crane",
     sel: "[data-shot=crane]",
