@@ -57,21 +57,21 @@ The Vinext app is the front door (chat UI + Google login). The Durable
 Object is the room. Phone and crane both **connect in**. Hibernation
 keeps the sockets without billing idle CPU. A short SQLite queue on
 the DO holds messages while the other side is gone (Mini reboot, app
-backgrounded). Kit’s face is a JPEG blob on that same DO (`GET/POST
-/api/avatar`) — not a chat `images[]` turn. Gantree’s Photo fold writes
+backgrounded). Kit's face is a JPEG blob on that same DO (`GET/POST
+/api/avatar`) — not a chat `images[]` turn. Gantree's Photo fold writes
 `persona/avatar.jpg` and, for `CHANNEL=pendant`, POSTs it here the way
 it calls `setMyProfilePhoto` for Telegram.
 
-This is not Gantree’s `app/` deployed to Workers. Gantree stays Node on
-the Mini. Vinext’s Workers target is what this second app uses because
-it does not need Docker. CF’s Vinext examples already bind DOs in the
+This is not Gantree's `app/` deployed to Workers. Gantree stays Node on
+the Mini. Vinext's Workers target is what this second app uses because
+it does not need Docker. CF's Vinext examples already bind DOs in the
 same Worker as the pages.
 
 A stateless Worker cannot do this by itself: two requests do not share
 memory. D1-plus-short-poll is a possible mailbox (Telegram `getUpdates`
 clone). It does not give you a room. The Durable Object is the
 rendezvous: phone and crane dial in, the sockets meet here — same job
-as Slack Socket Mode’s hub.
+as Slack Socket Mode's hub.
 
 ```text
 gantry-pendant/            this checkout — Vinext app + DO mailbox
@@ -82,25 +82,45 @@ gantry-pendant/            this checkout — Vinext app + DO mailbox
   lib/dev/                 loopback mock + canned scenes
   assets/docs/             phone shots (`npm run shot`)
 
-ai-gantry/                 harness — new internal/channel/ sibling
+ai-gantry/                 harness — internal/channel/ sibling
   internal/channel/        Channel, Pusher, Message, Outbound
     telegram/
     discord/
     slack/
     stdio/
-    pendant/               not written yet
+    pendant/               CHANNEL=pendant, outbound WSS
 
-gantree/                   yard — CHANNEL in the build wizard, last
+gantree/                   yard — CHANNEL in the build wizard
                            still Vinext-on-Node. Not this Worker.
 ```
 
-Gantree does not grow a chat route. When the channel exists, the wizard
-gains another mouth the way it already has Discord and Slack: env +
-allowlist, then recreate.
+Gantree does not grow a chat route. The wizard has another mouth the
+way it already has Discord and Slack: env + allowlist, then recreate.
+
+## Mailbox room
+
+The room is **per crane slug**. Sessions are **per human** (`sub`).
+
+- Phone frames go to the crane socket. Crane `reply` requires
+  `user_id` and fans to `getWebSockets(sub)`. Crane `push` with no
+  `user_id` broadcasts to every phone in the room.
+- Every frame gets an `id`. Phone-bound frames persist per `sub` until
+  `ack` or TTL. On reconnect the phone sends `since: <last id>` and
+  the DO redelivers. The bubble is **pending** until the DO acks —
+  local echo is not "sent".
+- Queue is one storage row per frame (`q:<id>`), keyed by
+  `(to, userId)`. Do not queue `pin`. Cap count and bytes; evict oldest
+  **non-reply** first. Hibernated ping/pong
+  (`setWebSocketAutoResponse`) so Go keepalive does not wake the DO.
+- Phone reconnects with backoff on `onclose` and `visibilitychange`
+  (iOS PWAs drop the socket when backgrounded).
+
+Wire, prompt, and GPS mapping: [design.md](design.md#phone-context-gps-first).
+Who may join: [security.md](security.md).
 
 ## Channel contract (harness)
 
-The client never calls the model. The crane’s existing loop does:
+The client never calls the model. The crane's existing loop does:
 
 ```text
 channel.Run  →  Handler(Message) → reply string
@@ -108,22 +128,21 @@ channel.Push →  Outbound           → cron / spark / watch
 ```
 
 `Message` already has `SessionID`, `UserID`, `Text`, `Images`, `ChatID`,
-`ThreadID`. Streaming is optional (`ReplyWriter` on the context). A first
-relay channel can send whole replies; placeholder + edit can wait. A DO
+`ThreadID`. Streaming is optional (`ReplyWriter` on the context). The
+relay sends whole replies; placeholder + edit can wait. A DO
 WebSocket makes that edit cheap later.
 
 Slash commands are the same list Telegram registers (`setMyCommands`).
-The catalog lives in ai-gantry `internal/slash`. `/help`, stdio’s ready
-line, Telegram’s `/` menu, and pendant’s picker all read it. The crane
+The catalog lives in ai-gantry `internal/slash`. `/help`, stdio's ready
+line, Telegram's `/` menu, and pendant's picker all read it. The crane
 publishes a `cmds` frame when it dials the mailbox; the DO remembers it
-for the next phone connect. Pendant does not keep a second copy.
+for the next phone connect. A removed command is a ghost until the
+next publish. Pendant does not keep a second copy.
 
 Phone **context** is extra on the mailbox frame, not a second chat
 API. GPS, battery, and net ride next to `text`. The relay
 channel maps `context.geo` → `here.Set` (same pin the clock footer
-already prints). It does **not** prepend `[location]` to `Text` —
-Telegram does that for an explicit pin, and putting it on every turn
-would freeze coords into session history.
+already prints). It does **not** prepend `[location]` to `Text`.
 
 ```text
 phone  { text, images?, context.geo }
@@ -135,17 +154,13 @@ phone  { text, images?, context.geo }
 
 Telegram pins still work on a Telegram crane. This channel just keeps
 the cursor fresh without asking. Bare-geo-only frames (no text, no
-photo) can stay silent like a Telegram bare pin: update `here`, no
+photo) stay silent like a Telegram bare pin: update `here`, no
 Completer.
 
-PWA spike: optional fake `geo` in the browser tab; real
-`navigator.geolocation` on the phone. Denied permission = omit
-`context.geo`.
-
-Allowlist is crane env, same as Telegram (Google `sub` on this mouth).
-The mailbox authenticates the crane (bearer) and the human (Google ID
-token). Untrusted bodies; fail closed. Details:
-[security.md](security.md).
+Denied permission = omit `context.geo`. Allowlist is crane env, same
+as Telegram (Google `sub` on this mouth). The mailbox authenticates
+the crane (bearer) and the human (Google ID token). Untrusted bodies;
+fail closed. Details: [security.md](security.md).
 
 ## What has to be reachable
 
@@ -162,20 +177,6 @@ WAN hope. `workers.dev` is fine for the spike; a custom hostname later.
 
 **Not the path:** Cloudflare Tunnel to `gantree:3000`. That is how a
 browser reaches the board. Chat does not use it.
-
-## First spike (prove talk)
-
-Skip the phone OS. Skip the harness. Skip the Mini.
-
-1. Vinext on Workers + one Durable Object.
-2. Open two browser tabs against that origin.
-3. Type in A, see it in B, reply.
-
-Then replace tab B with `CHANNEL=pendant`. Then replace tab A with a PWA
-on a real phone **on cellular**.
-
-A Mini WebSocket hub is a fallback if we cannot deploy Vinext to
-Workers yet. Do not treat it as the architecture.
 
 ## Android / iPhone in this picture
 
@@ -196,9 +197,10 @@ Expo iOS TestFlight─┘
 ```
 
 Push notifications are a **second** path. They do not replace the
-socket while the app is open. They do not belong in the spike. **Web
-Push** (VAPID from this Worker, installed PWA, iOS 16.4+) is later.
-Native APNs / FCM is later still; Cloudflare will not send APNs for us.
+socket while the app is open. **Web Push** (VAPID from this Worker,
+installed PWA, iOS 16.4+) is later. Native APNs / FCM is later still;
+Cloudflare will not send native APNs for us. Apple's Web Push endpoint
+is a different thing.
 
 ## Why not these shapes
 
@@ -206,12 +208,12 @@ Native APNs / FCM is later still; Cloudflare will not send APNs for us.
 | --- | --- |
 | Phone talks to `gantree:3000` chat API | Console in the turn. Contract forbids it. |
 | Crane `:443` + TLS | Inbound on the agent. NAT, sleep, and the port rule. |
-| Telegram userbot / Mini App | Still Telegram’s mailbox; ToS and not “our client.” |
+| Telegram userbot / Mini App | Still Telegram's mailbox; ToS and not "our client." |
 | Phone is the server | Phones sleep, change IP, leave the house. |
 | Mailbox process on the Mini | Works on a desk. Phone needs Tailscale; mailbox dies with the Mini. |
 | Stateless Worker only (no DO) | No room: phone and crane never share state. |
 | D1 as the only mailbox | Fine as a `getUpdates` clone. Not a room: the sockets never meet. Use if we refuse DOs. |
-| Tunnel to the Mini “relay” | Exposes the house. Phone still depends on home internet. |
+| Tunnel to the Mini "relay" | Exposes the house. Phone still depends on home internet. |
 | Gantree `app/` on Workers as the mouth | Yard needs Docker. This is a second Vinext app. |
 | Cloudflare Access as the only lock | Worker-level Access 403s WebSockets. Crane is not a browser. |
 
@@ -219,10 +221,10 @@ Native APNs / FCM is later still; Cloudflare will not send APNs for us.
 
 - This repo: [security.md](security.md)
 - Harness architecture: `repos/ai-gantry/docs/architecture.md`
-- Harness design (non-goals: “Web dashboard, gateway, REST/WS API”):
+- Harness design (non-goals: "Web dashboard, gateway, REST/WS API"):
   `repos/ai-gantry/docs/design.md`
 - Discord / Slack as outbound templates:
   `repos/ai-gantry/docs/discord.md`, `docs/slack.md`
 - Yard Tunnel vs portal: gantree `docs/install.md`, `docs/architecture.md`
-- “Tiny relay, gantry long-polls” (webhook inbound, same idea):
+- "Tiny relay, gantry long-polls" (webhook inbound, same idea):
   `repos/ai-gantry/todo.md` (Webhook inbound)

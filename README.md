@@ -48,14 +48,13 @@ Every screen, Lamp theme, crane stand-in: [docs/screens.md](docs/screens.md).
 
 | File | What it is |
 | --- | --- |
-| [todo.md](todo.md) | Phases, walks, which repo |
-| [docs/todo_next_features.md](docs/todo_next_features.md) | After the mouth talks — GPS polish, push, maps, Expo |
+| [docs/todo.md](docs/todo.md) | What's left — walks, one allowlist, later |
 | [docs/screens.md](docs/screens.md) | What the mouth looks like (phone shots) |
 | [docs/setup.md](docs/setup.md) | Admin / user / connect — what you paste where |
 | [docs/edgecases.md](docs/edgecases.md) | Gotchas across pendant + gantree + ai-gantry |
-| [docs/design.md](docs/design.md) | Why this shape, Worker vs Mini, phone context (GPS), walk |
+| [docs/design.md](docs/design.md) | Why this shape, Worker vs Mini, phone context |
 | [docs/architecture.md](docs/architecture.md) | How the three pieces talk |
-| [docs/security.md](docs/security.md) | Two principals, Google OIDC in the Vinext app vs Access vs MCP |
+| [docs/security.md](docs/security.md) | Two principals, Google OIDC vs Access vs MCP |
 
 Nested checkout under gantree (`repos/gantry-pendant`), own git
 remote, same pattern as `repos/ai-gantry`.

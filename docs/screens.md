@@ -51,7 +51,7 @@ is saved on the Durable Object.
 | `photo` | `/?sample=photo` | Inbound image + text. |
 | `down` | `/?sample=down` | Other side gone. Compose locked. |
 | `thread-day` | `/?sample=thread&theme=lamp` | Lamp theme. Boom / Inlay / Lamp live in the picker. |
-| `crane` | `/crane?sample=crane` | Laptop stand-in for the harness while the channel is missing. |
+| `crane` | `/crane?sample=crane` | Loopback stand-in for the harness (`PENDANT_DEV`). |
 
 ---
 

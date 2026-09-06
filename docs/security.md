@@ -3,9 +3,9 @@
 How the phone proves it may talk to Kit, how the crane proves it is
 Kit, and why that is **not** google-mcp OAuth. Shape:
 [architecture.md](architecture.md). Why a Worker mailbox:
-[design.md](design.md).
+[design.md](design.md). Who pastes what: [setup.md](setup.md).
 
-Gantree’s door (operator passphrase) stays on the **yard**. Harness
+Gantree's door (operator passphrase) stays on the **yard**. Harness
 allowlists stay on the **crane**. This Worker is a third door: the
 mailbox. Do not merge them.
 
@@ -16,7 +16,7 @@ mailbox. Do not merge them.
 | Actor | Goal we care about |
 | --- | --- |
 | Random internet | Connect to `workers.dev`, inject text/GPS, burn LLM |
-| Someone with a Google account not on the list | Same, after “Sign in with Google” |
+| Someone with a Google account not on the list | Same, after "Sign in with Google" |
 | Stolen phone / stolen Google session | Talk to Kit, see replies, leak live GPS |
 | Stolen crane mailbox token | Impersonate the crane, read the queue, send fake replies to the phone |
 | Compromised allowlisted human | Same as Telegram today: tools (mail, calendar, maps) as the operator |
@@ -24,9 +24,9 @@ mailbox. Do not merge them.
 | Prompt injection in a message | Steer tools; GPS labels are untrusted text too |
 
 Out of scope: multi-tenant SaaS, Sign in with Apple (until an App Store
-build), turning the Worker into Gantree’s IdP.
+build), turning the Worker into Gantree's IdP.
 
-The bar is Telegram’s: **strangers do not get a turn**. An allowlisted
+The bar is Telegram's: **strangers do not get a turn**. An allowlisted
 person who is compromised can still burn quota. GPS on every send makes
 a stolen session worse than a Telegram pin — treat it that way.
 
@@ -44,20 +44,20 @@ crane  — mailbox bearer (machine) —►  Worker → same Durable Object
 | Who | Proves | Allowlist |
 | --- | --- | --- |
 | **Human** | Sign in with Google (OIDC). Worker checks the ID token. | Google `sub` (stable). Email is the human-editable label. |
-| **Crane** | `Authorization: Bearer` from crane `.env` (same job as `TELEGRAM_BOT_TOKEN`). | Token is bound to **that** crane slug. Kit’s token cannot join Ada’s DO. |
+| **Crane** | `Authorization: Bearer` from crane `.env` (same job as `TELEGRAM_BOT_TOKEN`). | Token is bound to **that** crane slug. Kit's token cannot join Ada's DO. |
 
 Empty human allowlist is a boot/config error, same as
 `TELEGRAM_ALLOWED_USERS`. The Worker refuses unknown `sub` at
 handshake **and** on every later frame. The crane allowlists too
 (fail closed if the Worker is mis-set). Duplicate of 1–3 emails is
-acceptable.
+acceptable until the crane publishes one list ([todo.md](todo.md)).
 
 Real crane: header only. `?bearer=` / `?secret=` are **spike mode**
 (two tabs). An oidc-mode upgrade with a query token is 401. `/crane`
 is the loopback stand-in under `PENDANT_DEV`, not production.
 
 Gantree operator **email** is already a profile label (not a reset
-link). Later, “add this operator to Kit’s phone mouth” can copy that
+link). Later, "add this operator to Kit's phone mouth" can copy that
 address onto the crane list. The yard still logs in with a passphrase.
 The Worker never accepts a `gantree_session` cookie.
 
@@ -67,7 +67,7 @@ The Worker never accepts a `gantree_session` cookie.
 
 google-mcp, strava-mcp, and go-garmin OAuth are **tool grants**: the
 agent acting as you against Gmail / Strava / Garmin. Chat `/auth` is a
-PKCE paste (or Garmin MFA). Tokens live in that crane’s `data/`. The
+PKCE paste (or Garmin MFA). Tokens live in that crane's `data/`. The
 console does not become the IdP
 ([gantree security](https://github.com/shotah/gantree/blob/main/docs/security.md)).
 
@@ -89,10 +89,10 @@ muscle, not token reuse.
 
 - Type: **Web application**
 - Scopes: `openid email profile` only — never Gmail/Drive/Calendar
-- Redirect: this app’s origin (`https://…workers.dev/api/auth/callback/google`
-  or whatever VinextAuth/Auth.js uses) — not the Pages `oauth-catch`
-  URI, not `localhost:4100`
-- App verifies `iss`, `aud`, `exp`, signature (Google JWKS)
+- Redirect: this app's origin (`https://…workers.dev/api/auth/callback/google`)
+  — not the Pages `oauth-catch` URI, not `localhost:4100`
+- App verifies `iss`, `aud`, `exp`, `nonce`, signature (Google JWKS)
+- Authorization request uses PKCE (`code_challenge` S256) + `state`
 - Secret lives in Worker secrets, not `data/google-oauth.json`
 
 Same Google *account*. Different client id.
@@ -106,10 +106,10 @@ front of a hostname:
 
 | | Vinext app (Google provider) | Cloudflare Access (Zero Trust) |
 | --- | --- | --- |
-| What it is | OAuth in our code, same idea as NextAuth | CF’s auth **platform**: login gate before the Worker runs |
+| What it is | OAuth in our code, same idea as NextAuth | CF's auth **platform**: login gate before the Worker runs |
 | Where identity lives | Our session cookie after Google | `CF_Authorization` / `ctx.access` |
 | Crane (Go, no browser) | Bearer we mint | Access **service token** (second identity system) |
-| WebSockets | Ours | Worker-level Access **403s WebSocket upgrades**. Hostname Access can proxy them; “Protect this Worker” cannot. |
+| WebSockets | Ours | Worker-level Access **403s WebSocket upgrades**. Hostname Access can proxy them; "Protect this Worker" cannot. |
 | Allowlist of 1–3 people | Our `sub` list | Access policy (email) plus we still need crane bind |
 
 **Put Google in the Vinext app.** That is the GCP setup we already
@@ -117,8 +117,9 @@ know: Web client, redirect URI, client id/secret. Access is optional
 later on the **document** hostname only, never as the only lock on the
 crane socket, and not the one-click Worker Access button.
 
-**Not for the spike.** Two browser tabs can share a mailbox secret.
-Google OIDC lands when a real phone talks.
+Two browser tabs can share a mailbox secret on loopback. Google OIDC
+is the phone path; the spike secret is rejected once `GOOGLE_CLIENT_ID`
+is set.
 
 ---
 
@@ -143,14 +144,18 @@ They do not see chat or GPS unless **we** log it.
 ### Network
 
 - Crane still **outbound only**. Worker is the only new listener, on
-  Cloudflare’s edge, TLS by default.
+  Cloudflare's edge, TLS by default.
 - Public Worker + tokens. Not `0.0.0.0` on the Mini.
 - Custom hostname later; `workers.dev` is fine if tokens hold.
+- WebSocket upgrade: `Origin` must match the request origin when
+  present (browsers). Missing `Origin` is allowed (Go crane).
+- Authenticated `/ws/` strips `X-Pendant-Op` so a spoofed header cannot
+  reach avatar HTTP.
 
 ### Authn on every frame
 
-Handshake still mints the session and tags the socket (`sub`, `exp`).
-Google ID tokens do **not** ride later frames. The PWA WebSocket is
+Handshake mints the session and tags the socket (`sub`, `exp`). Google
+ID tokens do **not** ride later frames. The PWA WebSocket is
 same-origin and sends the httpOnly cookie; crane upgrade sends
 `Authorization: Bearer`. Bind DO id to the crane slug in that bearer
 (`kit` cannot write `ada`).
@@ -164,6 +169,10 @@ Worker session after Google: httpOnly JWE cookie, **hard 7-day `exp`
 at mint**. No sliding refresh. Sign in again after expiry. Not a JWT
 in `localStorage`.
 
+Phone frames are forced to `inbound | pin | ack` server-side. The
+phone cannot forge `reply` / `push` / `cmds`. Crane stamps `user_id`
+from `ChatID` (Google `sub`).
+
 ### Allowlist
 
 - Humans: Google `sub` list. Email is display and Gantree copy-paste,
@@ -172,16 +181,22 @@ in `localStorage`.
   Telegram lesson.
 - Crane: one bearer per crane, rotate by rewriting `.env` + Worker
   secret and recreating.
+- Two lists today (Worker `ALLOWED_SUBS` + crane `PENDANT_ALLOWED_USERS`).
+  Collapsing to the crane publishing one list is [todo.md](todo.md).
 
 ### Bodies
 
 - Untrusted. Size cap on text, `context`, images (photos are the
   quota bomb).
+- Phone → crane images are `data:image/` only. `https://` is legal
+  crane → phone (Telegram-style hosted URLs). Phone-supplied `https://`
+  would be SSRF from the crane.
 - GPS is **sensitive**. Do not `console.log` lat/lon. Do not put geo
   in CF logpush. Queue on the DO is short-lived; `here.Pin` stays
   in-memory on the crane (process restart clears, as today).
-- Do not persist chat bodies in Worker KV “for later” unless we have a
-  retention story. The crane’s `gantry.db` is the mailbox dump.
+- `context.at` / `tz` are phone-supplied hints. Order by DO time.
+- Do not persist chat bodies in Worker KV "for later" unless we have a
+  retention story. The crane's `gantry.db` is the mailbox dump.
 
 ### Abuse
 
@@ -193,6 +208,8 @@ in `localStorage`.
 ### Isolation
 
 - One DO per crane slug. No shared room.
+- Replies route by `user_id` / `sub`. Cron `push` with no `user_id`
+  broadcasts. Ada's phones see Ada's replies; Bob does not.
 - Mailbox Worker ≠ Gantree portal Worker. No `docker.sock`, no yard
   session, no `.env` reads.
 

@@ -2,18 +2,18 @@
 
 A phone we own, talking to a crane, without opening a port on the
 harness. Pitch: [root readme](../README.md). What it looks like:
-[screens.md](screens.md). Diagrams:
+[screens.md](screens.md). Wire:
 [architecture.md](architecture.md). Authn: [security.md](security.md).
-Phases: [todo.md](../todo.md).
+What's left: [todo.md](todo.md).
 
 ## Problem
 
 ai-gantry is outbound-only. Telegram, Discord Gateway, and Slack
 Socket Mode all work because **their** hosts are the mailbox. The crane
 polls or keeps an outbound WebSocket. The phone talks to Telegram, not to
-Kit’s container.
+Kit's container.
 
-We want a client that is ours. That means replacing Telegram’s relay
+We want a client that is ours. That means replacing Telegram's relay
 function, not wrapping the Bot API in a prettier skin, and not putting
 turns through Gantree.
 
@@ -21,7 +21,7 @@ Two phone ideas people mix up:
 
 | Idea | What it is | This repo? |
 | --- | --- | --- |
-| Yard on a phone | Operator board in a browser (`/login`, cards, Kit’s graphs) | No — gantree mobile track |
+| Yard on a phone | Operator board in a browser (`/login`, cards, Kit's graphs) | No — gantree mobile track |
 | Gantry pendant | Chat mouth. Message Kit. Cron can ping you. | Yes |
 
 ## Principles
@@ -33,20 +33,21 @@ Two phone ideas people mix up:
    each other through NAT. Something always-on holds the mailbox. That
    something is **ours** (code we deploy), not Telegram. It does not have
    to live on the Mini. A Cloudflare Durable Object on our account is
-   the same job as Slack’s Socket Mode hub: both sides dial out to it.
+   the same job as Slack's Socket Mode hub: both sides dial out to it.
+   The DO's job is **the sockets meet here**, not streaming.
 3. **Console never sits in a chat turn.** Gantree writes files and pulls
    Docker. Pairing the agent through the yard API is out of contract
    ([gantree-contract](https://github.com/shotah/ai-gantry/blob/main/docs/gantree-contract.md)).
 4. **Allowlist on the crane.** `TELEGRAM_ALLOWED_USERS` stays the model.
    No pairing flow in the app. Empty allowlist is a config error. On
    this mouth the human id is a Google `sub`, not a Telegram number —
-   [security.md](security.md). Not google-mcp’s Gmail token.
+   [security.md](security.md). Not google-mcp's Gmail token.
 5. **One channel loop.** The harness already has `Channel` + optional
    `Pusher`. We add a sibling next to `telegram/`, `discord/`, `slack/`,
    `stdio/`. We do not invent a second agent loop.
 6. **Client is TypeScript / Vinext.** Same `app/` muscle as Gantree.
    Gantree is Vinext **on Node** because it needs `docker.sock`. This
-   app has no Docker — Vinext’s actual happy path is Cloudflare
+   app has no Docker — Vinext's actual happy path is Cloudflare
    Workers. PWA first. Expo if a Home Screen bookmark is not enough.
 7. **The phone may send more than text.** Telegram only gets a location
    when you drop a pin. Owning the client means a small **context**
@@ -68,7 +69,7 @@ default for a **phone**: the handset needs the VPN, the mailbox dies
 when the Mini reboots, and the phone cannot send while home internet is
 out even to leave a note.
 
-A Worker we deploy is still “a server,” the way Telegram is. The
+A Worker we deploy is still "a server," the way Telegram is. The
 difference: we write it, we can leave Cloudflare, the crane still only
 dials **out**. That is not Gantree SaaS.
 
@@ -86,9 +87,9 @@ What we do **not** need for a first talk:
 **Lean Durable Object.** A plain Worker is the wrong primitive: it is
 stateless. Two sockets (phone + crane) only meet if they hit the **same
 isolate with memory**. That is a Durable Object — the sockets meet
-here, same job as Slack Socket Mode’s hub. One DO per crane slug.
-Hibernated WebSockets keep that room without billing idle CPU. SQLite
-on the DO can hold a small queue when the other side is offline.
+here. One DO per crane slug. Hibernated WebSockets keep that room
+without billing idle CPU. SQLite on the DO holds a short queue when the
+other side is offline.
 
 | | Mini process | Worker + Durable Object |
 | --- | --- | --- |
@@ -113,7 +114,7 @@ Gantree already picked Vinext. Do not invent a second UI framework.
 Do not copy Gantree onto Workers — that process must see Docker.
 
 This repo is a **second** Vinext app: chat shell + Google sign-in +
-a Durable Object mailbox. Cloudflare’s own Vinext examples bind DOs
+a Durable Object mailbox. Cloudflare's own Vinext examples bind DOs
 and WebSockets in the same Worker as `app/`. That is the mouth.
 
 | | Gantree | gantry-pendant |
@@ -126,15 +127,15 @@ and WebSockets in the same Worker as `app/`. That is the mouth.
 
 Google Cloud: **same project you already use** for google-mcp. New
 **Web application** client (`openid email profile`), redirect = this
-app’s origin. Not the Pages `oauth-catch` URI, not the Desktop client,
+app's origin. Not the Pages `oauth-catch` URI, not the Desktop client,
 not Workspace scopes. Console muscle, new client id.
 
-Cloudflare **Access** (Zero Trust) is CF’s auth platform: a login gate
+Cloudflare **Access** (Zero Trust) is CF's auth platform: a login gate
 in front of a hostname. It is not a substitute for this app. Worker-
 level Access currently **403s WebSocket upgrades**. The crane is a
 machine, not a browser. Put Google in the Vinext app. Leave Access off
 the mailbox unless we later wrap only the document origin with a
-**hostname** Access app (not “Protect this Worker”).
+**hostname** Access app (not "Protect this Worker").
 
 Cron, spark, and watches already push through the channel. The new
 channel must implement `Pusher`, not only reply-to-message, or scheduled
@@ -151,14 +152,14 @@ pings stay stuck on Telegram.
 
 ## Phone context (GPS first)
 
-Telegram’s location is a **special message**. The harness already knows
+Telegram's location is a **special message**. The harness already knows
 that: inbound `[location] lat=… lon=…`, `here.Pin` per session, clock
 footer `[last pin]`. A bare pin updates the cursor and does **not**
-start a turn. Recipes then say “ask for a pin if it’s stale.”
+start a turn. Recipes then say "ask for a pin if it's stale."
 
-A client we own can attach coords to **every text** (and photo), so
-the pin is seconds old instead of hours. That is the point. “What’s
-near me” / leave-by / directions should not require a ritual pin.
+A client we own attaches coords to **every text** (and photo), so the
+pin is seconds old instead of hours. That is the point. "What's near
+me" / leave-by / directions should not require a ritual pin.
 
 **Wire is generous. Prompt is stingy.**
 
@@ -174,8 +175,6 @@ is how Telegram location messages work, and it would re-bill coords
 on every later Completer call. Update `here` from structured context;
 leave `Text` as what they typed.
 
-Envelope (sketch, not a schema lock):
-
 ```text
 text, images?,
 context?: {
@@ -186,14 +185,24 @@ context?: {
 }
 ```
 
-GPS is denied or unavailable → message still sends. OS prompt once;
-in-app toggle can sit on top. PWA: `getCurrentPosition` on send (HTTPS,
-which `workers.dev` is). Not `watchPosition` in the background for the
-spike — iOS will kill it, and we do not need live-period yet.
+GPS denied, unavailable, or toggled off in-app → message still sends.
+OS prompt once; `pendant.geo=off` sits on top without revoking Chrome's
+grant. PWA: `getCurrentPosition` on send (HTTPS). Not `watchPosition`
+in the background — iOS will kill it, and we do not need live-period
+yet.
 
-**Later (Expo, or a second pass):** motion (walk / drive), a label if
-the phone already knows “home,” voice. Reverse-geocode is a maps
-**tool**, not a client field.
+A silent **pin** control sends `{ context.geo }` with empty text
+(`kind: pin`). The harness treats that like a Telegram bare pin: cursor
+updates, no Completer.
+
+**Shipped on the phone:** GPS on send, in-app toggle, silent pin, clock
+(`at`/`tz`), battery + net when the OS exposes them, photo compress
+(HEIC/PNG → JPEG under the chat cap), screen wake while waiting,
+vibrate + badge on inbound ping, manifest shortcuts (Message / Pin).
+
+**Later:** reverse-geocode is a maps **tool** on the crane, not a client
+field. Motion / "home" labels / voice / share-target / lock-screen
+push / Expo — [todo.md](todo.md).
 
 **Never on the wire:** SSID / BSSID, Bluetooth neighbors, clipboard,
 contacts dump. Fingerprinting, not chat.
@@ -213,38 +222,25 @@ One web codebase.
 
 Store listing is not the experiment. Sideload and a Home Screen icon are.
 
-## Walk (no product code until this order)
-
-1. This repo: README + these docs. Own git remote when we push.
-2. **Relay spike on Cloudflare.** Vinext + Workers plugin + one Durable
-   Object. Two browser tabs against that origin. Type, see it, type
-   back. Shared secret is enough. No harness yet.
-3. **`ai-gantry` channel.** `CHANNEL=pendant` outbound WSS/HTTPS
-   to that Worker. Allowlist. `Push` for cron. Telegram stays on other
-   cranes. Stdio stays for hacking the binary.
-4. **Same shell on a phone as a PWA, over LTE.** No Tailscale. Text with
-   GPS attached (permission granted), then a photo. Confirm a cron
-   ping lands with the app open. Confirm `[last pin]` is this-send, not
-   a stale Telegram pin.
-5. **Gantree last.** Fourth channel in the build wizard, URL/token in
-   secrets. No chat UI on the board.
-
-Mini Tailscale hub is an optional detour if we need a mailbox with the
-plane in the air. Do not start there.
+Chrome Install does **not** unlock extra sensors. HTTPS + an OS
+permission does. Install is a home-screen icon, standalone chrome, and
+a better shot at Web Push.
 
 ## Non-goals
 
-- Hosted cellphone SaaS (other people’s cranes on our Worker)
+- Hosted cellphone SaaS (other people's cranes on our Worker)
 - Chat in the Gantree console
-- Inbound webhook port on the crane (see ai-gantry’s “tiny relay”
+- Inbound webhook port on the crane (see ai-gantry's "tiny relay"
   note: something POSTs at the relay, gantry long-polls — same idea,
   now the relay is a DO)
 - Feature-matching Telegram (groups, channels, stickers, Mini Apps)
-- Making the yard’s phone layout “done”
+- Making the yard's phone layout "done"
 - Putting the mailbox on the portal Worker
+- Caching chat in `sw.js` (socket is the source of truth)
+- Reverse-geocode in the client (stale label on the wire)
 
 ## Done enough to experiment
 
 You open the phone on cellular, talk to Kit, she answers, a scheduled
-ping can reach you, the crane still has **no inbound port**, and
-Telegram can stay on another crane.
+ping can reach you with the app open, the crane still has **no inbound
+port**, and Telegram can stay on another crane.

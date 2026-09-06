@@ -3,7 +3,7 @@
 Admin flow, user flow, and the three pastes that actually connect them.
 Gotchas: [edgecases.md](edgecases.md). Auth: [security.md](security.md).
 Shape: [architecture.md](architecture.md). What it looks like:
-[screens.md](screens.md).
+[screens.md](screens.md). What's left: [todo.md](todo.md).
 
 This is **not** “add a field on the Gantree person and they can chat.”
 Gantree operates cranes. The mailbox and the mouth each have their own
@@ -185,8 +185,8 @@ The human does **not** need a Gantree login.
 If Google works but Kit never answers: they are on the Worker list and
 missing from the crane, or the crane was restarted instead of
 recreated. If the socket 401s: missing from `ALLOWED_SUBS`, or the
-session is idle/expired (7d idle / 30d absolute). Cron / spark only
-lands while the app is open — no lock-screen push yet.
+session hit its hard 7-day `exp`. Cron / spark only lands while the
+app is open — no lock-screen push yet.
 
 A stranger who hits Sign in with Google gets the same unauthorized as
 a bad token. They never join the room and they never see a `sub`.

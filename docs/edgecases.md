@@ -4,7 +4,7 @@ Things that bite after deploy, across **gantry-pendant**, **gantree**, and
 **ai-gantry**. How they fail, and how to cover them. Who talks:
 [setup.md](setup.md). Shape:
 [architecture.md](architecture.md). Auth:
-[security.md](security.md). Phases: [todo.md](../todo.md).
+[security.md](security.md). What's left: [todo.md](todo.md).
 
 This is not a product page. It is the second brain the walks still need.
 
@@ -54,7 +54,8 @@ Gantree Secrets writes the **crane** `.env`. It cannot see Cloudflare.
 **Cover:** keep the two strings in one note when you rotate. After the
 crane list: recreate (restart keeps a ghost allowlist). After Worker
 `ALLOWED_SUBS`: the **next phone frame** re-checks (4401 if yanked).
-No Docker step.
+No Docker step. Collapsing to one list (crane publishes, Worker asks
+the DO) is [todo.md](todo.md).
 
 ---
 
@@ -78,11 +79,9 @@ awkward.
 3. For the next human: they send that `sub` out of band, or you decode
    their ID token the same way. Then paste into both lists.
 
-**Cover (build):** mint a session for any verified Google account, still
-deny the Durable Object unless allowlisted, and show “send this `sub` to
-the yard admin” on the phone. `/api/auth/me` can return
-`{ sub, email, allowed: false }` without opening the room. Do **not**
-put `sub` on the query string.
+**Cover (build):** [todo.md](todo.md) — mint a session for any verified
+Google account, still deny the DO unless allowlisted, show “send this
+`sub` to the yard admin.” Do **not** put `sub` on the query string.
 
 ---
 
