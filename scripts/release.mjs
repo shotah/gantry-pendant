@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Bump semver, commit package.json, annotated-tag (v* + floating latest), push.
- * Triggers GitHub Release (tag v*). Deploy to Workers is still `npm run deploy`.
+ * Triggers GitHub Release (tag v*) and Workers deploy (CI, after tests).
  *
  *   npm run release
  *   npm run release -- --bump=minor
@@ -92,4 +92,4 @@ if (args.skipPush) {
 gitLive(["push", "origin", "HEAD"]);
 gitLive(["push", "origin", next]);
 gitLive(["push", "--force", "origin", "refs/tags/latest"]);
-console.log(`Pushed HEAD, ${next}, and latest — GitHub Release should start.`);
+console.log(`Pushed HEAD, ${next}, and latest — GitHub Release + Workers deploy should start.`);

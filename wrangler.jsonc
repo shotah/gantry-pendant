@@ -21,7 +21,7 @@
   "kv_namespaces": [
     {
       "binding": "DIRECTORY",
-      // wrangler kv namespace create DIRECTORY — paste the id here for deploy
+      // wrangler kv namespace create DIRECTORY — paste the id, or set GitHub variable DIRECTORY_KV_ID
       "id": "directory-local",
       "preview_id": "directory-local"
     }

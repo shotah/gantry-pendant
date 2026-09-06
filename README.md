@@ -80,8 +80,8 @@ same secret. Type in one, see it in the other.
 ```bash
 npm run shot                     # assets/docs/*.png — needs `npm run dev`
 npm run secret                   # mint a bearer / mailbox secret
-npm run deploy                   # after `npm run build` — workers.dev
-npm run release                  # bump patch, tag, push (GitHub Release)
+npm run deploy                   # after `npm run build` — workers.dev (laptop)
+npm run release                  # bump patch, tag, push (GitHub Release + Workers)
 npm run release:dry              # print the next tag only
 ```
 
@@ -92,7 +92,8 @@ project as google-mcp. Scopes: `openid email profile` only. Redirect:
 `GOOGLE_CLIENT_SECRET` / `SESSION_SECRET` / `CRANE_BEARERS` in Worker
 secrets. Bind KV `DIRECTORY`. `ALLOWED_SUBS` is an optional extra.
 Empty crane list fails boot. The spike secret is rejected once Google
-is on.
+is on. GitHub Actions deploys on `main` and `v*` tags; Worker secrets
+stay on Cloudflare.
 
 Crane env (`CHANNEL=pendant`):
 
