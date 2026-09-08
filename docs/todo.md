@@ -37,7 +37,8 @@ Code for the mouth is in. These walks are still the second brain.
 
 ### Deploy + Google
 
-**Walk:** sign in on the deployed origin; two tabs are not enough.
+**Walk:** [deployment.md](deployment.md), then sign in on the deployed
+origin; two tabs are not enough.
 
 - [ ] Deploy to `workers.dev`
 - [ ] GCP Web application client (`openid email profile` only). Redirect

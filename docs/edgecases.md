@@ -2,7 +2,8 @@
 
 Things that bite after deploy, across **gantry-pendant**, **gantree**, and
 **ai-gantry**. How they fail, and how to cover them. Who talks:
-[setup.md](setup.md). Shape:
+[setup.md](setup.md). How it got to workers.dev:
+[deployment.md](deployment.md). Shape:
 [architecture.md](architecture.md). Auth:
 [security.md](security.md). What's left: [todo.md](todo.md).
 

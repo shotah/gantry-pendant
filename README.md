@@ -49,6 +49,7 @@ Every screen, Lamp theme, crane stand-in: [docs/screens.md](docs/screens.md).
 | File | What it is |
 | --- | --- |
 | [docs/todo.md](docs/todo.md) | What's left — walks, one allowlist, later |
+| [docs/deployment.md](docs/deployment.md) | Cloudflare once, then `npm run release` |
 | [docs/screens.md](docs/screens.md) | What the mouth looks like (phone shots) |
 | [docs/setup.md](docs/setup.md) | Admin / user / connect — what you paste where |
 | [docs/edgecases.md](docs/edgecases.md) | Gotchas across pendant + gantree + ai-gantry |
@@ -106,7 +107,8 @@ PENDANT_ALLOWED_USERS=<email or google-sub>
 Yard: pick **pendant** in the build wizard, paste those three, recreate.
 The console cookie never goes to this Worker. Gantree does **not** write
 Worker secrets and does not store a Google `sub` on the operator.
-End-to-end after deploy: [docs/setup.md](docs/setup.md).
+First Workers ship: [docs/deployment.md](docs/deployment.md). Then
+[docs/setup.md](docs/setup.md).
 
 ## This is not
 

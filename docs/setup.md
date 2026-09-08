@@ -75,19 +75,17 @@ phone -- Google --> Worker mailbox (room list) <-- crane (PENDANT_BEARER)
 ## Once (before any person)
 
 The Worker and the GCP client have to exist. Gantree cannot create them.
+Steps: [deployment.md](deployment.md).
 
-1. Deploy this repo. GitHub Actions deploys the Worker on push to
-   `main` and on `v*` tags (`npm run release`), after tests. Laptop:
+1. Deploy this repo ([deployment.md](deployment.md)). GitHub Actions
+   deploys the Worker on push to `main` and on `v*` tags
+   (`npm run release`), after tests. Laptop:
    `npm run build && npm run deploy`. Note the origin, e.g.
    `https://gantry-pendant.<account>.workers.dev`.
 
-   Repo **secrets** (GitHub → Settings → Secrets): `CLOUDFLARE_API_TOKEN`
-   (Edit Cloudflare Workers) and `CLOUDFLARE_ACCOUNT_ID`. Repo
-   **variable**: `DIRECTORY_KV_ID` from `npx wrangler kv namespace create DIRECTORY`.
-   Worker **secrets** stay on Cloudflare — CI does not put Google or
-   bearers in GitHub. First code deploy with no Worker secrets is `503
-   config` until you paste those (safe). Do not set `MAILBOX_SECRET` or
-   `PENDANT_DEV` on the Worker.
+   First code deploy with no Worker secrets is `503 config` until you
+   paste those (safe). Do not set `MAILBOX_SECRET` or `PENDANT_DEV` on
+   the Worker.
 2. GCP: **new Web application** client. Scopes `openid email profile`
    only. Redirect:
 
@@ -107,9 +105,8 @@ The Worker and the GCP client have to exist. Gantree cannot create them.
    ```
 
    Optional: `ALLOWED_SUBS` as a yard-wide extra (break-glass). The
-   crane list is the door. Bind KV `DIRECTORY` (`npx wrangler kv namespace
-   create DIRECTORY`). Put the id in GitHub variable `DIRECTORY_KV_ID`
-   (CI) or paste it into `wrangler.jsonc` (laptop deploy).
+   crane list is the door. KV bind + GitHub paste:
+   [deployment.md](deployment.md).
 
    The moment Google is on, `MAILBOX_SECRET` (two-tab spike) is
    rejected. Leave Worker-level Cloudflare Access **off**.
