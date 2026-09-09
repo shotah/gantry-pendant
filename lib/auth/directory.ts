@@ -1,5 +1,6 @@
 import { parseSlug } from "../mailbox/slug";
 import type { RoomUser } from "../mailbox/allow";
+import { roomAllows, type RoomSession } from "./room";
 
 export function directorySubKey(sub: string): string {
   return `sub:${sub}`;
@@ -139,4 +140,52 @@ export async function cranesFor(
     }
   }
   return [...all].sort();
+}
+
+/** Re-index this slug's current room onto KV (crane reconnect). Adds only. */
+export async function directoryRemember(
+  kv: DirectoryKv | null | undefined,
+  slug: string,
+  users: readonly RoomUser[],
+): Promise<void> {
+  if (!kv || !users.length) {
+    return;
+  }
+  await directoryApply(kv, slug, [], users);
+}
+
+export type RoomLookup = (slug: string) => Promise<RoomUser[]>;
+
+/**
+ * Cranes this session may join: KV directory plus each candidate slug's
+ * Durable Object room. A typed slug is a candidate; it is not membership.
+ */
+export async function admittedCranes(opts: {
+  kv?: DirectoryKv | null;
+  slugs: Iterable<string>;
+  session: RoomSession;
+  extraSubs?: string;
+  rooms: RoomLookup;
+}): Promise<string[]> {
+  const fromKv = opts.kv
+    ? await cranesFor(opts.kv, opts.session.sub, opts.session.email)
+    : [];
+  const out = new Set(fromKv);
+  const candidates = new Set<string>();
+  for (const raw of opts.slugs) {
+    const slug = parseSlug(raw);
+    if (slug) {
+      candidates.add(slug);
+    }
+  }
+  await Promise.all([...candidates].map(async (slug) => {
+    if (out.has(slug)) {
+      return;
+    }
+    const users = await opts.rooms(slug);
+    if (roomAllows(users, opts.session, opts.extraSubs)) {
+      out.add(slug);
+    }
+  }));
+  return [...out].sort();
 }

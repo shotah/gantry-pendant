@@ -1,8 +1,11 @@
 import { env } from "cloudflare:workers";
 import { unauthorized, tooMany } from "@/lib/auth/deny";
-import { cranesFor } from "@/lib/auth/directory";
+import { parseBearers } from "@/lib/auth/bearer";
+import { admittedCranes } from "@/lib/auth/directory";
 import { limitAuthRequest } from "@/lib/auth/limit";
 import { parseCookie, readSession, SESSION_COOKIE } from "@/lib/auth/session";
+import { fetchRoomUsers } from "@/lib/mailbox/allow";
+import { parseSlug } from "@/lib/mailbox/slug";
 import { DEV_USER } from "@/lib/dev/samples";
 import { devEnabled, hostFromRequest } from "@/lib/dev/mode";
 
@@ -24,9 +27,27 @@ export async function GET(req: Request) {
   if (!limitAuthRequest(req, session.sub)) {
     return tooMany();
   }
-  const cranes = env.DIRECTORY
-    ? await cranesFor(env.DIRECTORY, session.sub, session.email)
-    : [];
+  const typed = parseSlug(new URL(req.url).searchParams.get("slug") ?? "");
+  const slugs = [...parseBearers(env.CRANE_BEARERS).keys()];
+  if (typed) {
+    slugs.push(typed);
+  }
+  const cranes = await admittedCranes({
+    kv: env.DIRECTORY,
+    slugs,
+    session: {
+      sub: session.sub,
+      email: session.email,
+      emailVerified: session.emailVerified,
+    },
+    extraSubs: env.ALLOWED_SUBS,
+    rooms: async (slug) => {
+      if (!env.MAILBOX) {
+        return [];
+      }
+      return fetchRoomUsers(env.MAILBOX.get(env.MAILBOX.idFromName(slug)));
+    },
+  });
   return Response.json({
     sub: session.sub,
     email: session.email,

@@ -49,6 +49,12 @@ async function mailboxUpgrade(request: Request, env: Env): Promise<Response> {
     roomList,
   });
   if (!auth.ok) {
+    if (auth.error === "config") {
+      return Response.json({ error: "config" }, { status: 503 });
+    }
+    if (auth.error === "forbidden") {
+      return Response.json({ error: "unauthorized" }, { status: 403 });
+    }
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
   const headers = new Headers(request.headers);

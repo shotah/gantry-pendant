@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { directoryApply } from "../lib/auth/directory";
+import { directoryApply, directoryRemember } from "../lib/auth/directory";
 import { encodeFaceNotice, packAvatar, AVATAR_STORE_KEY, type StoredAvatar } from "../lib/avatar/store";
 import {
   ALLOW_STORE_KEY,
@@ -67,6 +67,9 @@ export class Mailbox extends DurableObject<Env> {
     }
     if (slug) {
       await this.ctx.storage.put(SLUG_STORE_KEY, slug);
+      if (role === "crane") {
+        await directoryRemember(this.env.DIRECTORY, slug, await this.roomUsers());
+      }
     }
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1], [role, rateId, userId ?? "", exp, email ?? "", verified]);

@@ -18,7 +18,7 @@ export type SpikePrincipal = { kind: "spike"; role: Role };
 export type Principal = PhonePrincipal | CranePrincipal | SpikePrincipal;
 
 export type HandshakeOk = { ok: true; principal: Principal };
-export type HandshakeErr = { ok: false; error: "unauthorized" | "config" };
+export type HandshakeErr = { ok: false; error: "unauthorized" | "forbidden" | "config" };
 export type HandshakeResult = HandshakeOk | HandshakeErr;
 
 export type HandshakeInput = {
@@ -90,7 +90,7 @@ export async function handshakeSlug(input: HandshakeSlugInput): Promise<Handshak
     return spikeHandshake(input.env, "phone", { ...input, role: "phone" });
   }
   const phone = await oidcHandshake({ ...input, role: "phone" }, now);
-  if (phone.ok) {
+  if (phone.ok || phone.error === "forbidden") {
     return phone;
   }
   return oidcHandshake({ ...input, role: "crane" }, now);
@@ -108,12 +108,15 @@ function spikeHandshake(env: AuthEnv, role: Role, input: HandshakeInput): Handsh
 async function oidcHandshake(input: HandshakeInput, now: number): Promise<HandshakeResult> {
   if (input.role === "phone") {
     const session = await phoneFromCookie(input.env, input.cookieHeader, now);
-    if (!session || !roomAllows(input.roomList, {
+    if (!session) {
+      return { ok: false, error: "unauthorized" };
+    }
+    if (!roomAllows(input.roomList, {
       sub: session.sub,
       email: session.email,
       emailVerified: session.emailVerified,
     }, input.env.ALLOWED_SUBS)) {
-      return { ok: false, error: "unauthorized" };
+      return { ok: false, error: "forbidden" };
     }
     return {
       ok: true,

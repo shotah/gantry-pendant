@@ -4,8 +4,10 @@ import {
   directoryApply,
   directoryDiff,
   directoryEmailKey,
+  directoryRemember,
   directorySubKey,
   parseSlugSet,
+  admittedCranes,
   type DirectoryKv,
 } from "@/lib/auth/directory";
 
@@ -68,5 +70,36 @@ describe("directory", () => {
     });
     expect(await cranesFor(kv, "1182", "ada@example.com")).toEqual(["ada", "kit"]);
     expect(await cranesFor(kv, "9999")).toEqual([]);
+  });
+
+  it("re-indexes a stored room onto KV on crane reconnect", async () => {
+    const kv = memoryKv();
+    await directoryRemember(kv, "tim", [{ email: "ada@example.com" }]);
+    expect(parseSlugSet(await kv.get(directoryEmailKey("ada@example.com")))).toEqual(new Set(["tim"]));
+    await directoryRemember(kv, "tim", []);
+    expect(parseSlugSet(await kv.get(directoryEmailKey("ada@example.com")))).toEqual(new Set(["tim"]));
+  });
+
+  it("adds a typed slug only when the Durable Object room admits", async () => {
+    const kv = memoryKv({
+      [directorySubKey("1182")]: JSON.stringify(["kit"]),
+    });
+    const rooms = new Map([
+      ["tim", [{ email: "ada@example.com" }]],
+      ["ghost", []],
+    ]);
+    const session = { sub: "1182", email: "ada@example.com", emailVerified: true };
+    expect(await admittedCranes({
+      kv,
+      slugs: ["tim", "ghost"],
+      session,
+      rooms: async (slug) => rooms.get(slug) ?? [],
+    })).toEqual(["kit", "tim"]);
+    expect(await admittedCranes({
+      kv,
+      slugs: ["ghost"],
+      session,
+      rooms: async (slug) => rooms.get(slug) ?? [],
+    })).toEqual(["kit"]);
   });
 });

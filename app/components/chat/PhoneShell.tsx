@@ -134,8 +134,16 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       return;
     }
     const cranes = me.cranes;
-    setSlug((cur) => (cranes.includes(cur) ? cur : cranes[0] ?? cur));
-  }, [cfg?.mode, me, phone]);
+    setSlug((cur) => {
+      if (cranes.includes(cur)) {
+        return cur;
+      }
+      if (slugTouched) {
+        return cur;
+      }
+      return cranes[0] ?? cur;
+    });
+  }, [cfg?.mode, me, phone, slugTouched]);
 
   useEffect(() => {
     if (!cfg?.dev || !sampleId) {
@@ -197,9 +205,6 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   }, [phone]);
 
   const cranes = me?.cranes ?? [];
-  const directoryEmpty = Boolean(
-    phone && cfg?.mode === "oidc" && !cfg.dev && me && cranes.length === 0,
-  );
   const roomSlug = (() => {
     if (!cfg) {
       return "";
@@ -207,10 +212,13 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     if (!phone || cfg.mode !== "oidc" || cfg.dev) {
       return slug;
     }
-    if (cranes.length) {
-      return cranes.includes(slug) ? slug : (cranes[0] ?? "");
+    if (cranes.includes(slug)) {
+      return slug;
     }
-    return slugTouched ? slug : "";
+    if (slugTouched) {
+      return slug;
+    }
+    return cranes[0] ?? "";
   })();
   const mailboxGap = Boolean(phone && cfg?.gap && !cfg.dev);
   const needGoogle = Boolean(
@@ -219,11 +227,48 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       || (Boolean(cfg?.google) && !me && !cfg?.dev)
     ),
   );
-  const waitingForCrane = directoryEmpty && !roomSlug;
   const listed = !phone || cfg?.mode !== "oidc" || Boolean(cfg.dev)
-    || cranes.includes(roomSlug)
-    || Boolean(directoryEmpty && roomSlug);
+    || cranes.includes(roomSlug);
+  const waitingForCrane = Boolean(
+    phone && cfg?.mode === "oidc" && !cfg.dev && me && !listed,
+  );
   const canSocket = Boolean(cfg && roomSlug && listed && (cfg.mode === "spike" ? secret : phone ? me : bearer));
+
+  useEffect(() => {
+    if (!phone || cfg?.mode !== "oidc" || cfg.dev || listed || !me) {
+      return;
+    }
+    let dead = false;
+    const load = () => {
+      const want = parseSlug(slug);
+      const q = want && slugTouched ? `?slug=${encodeURIComponent(want)}` : "";
+      void fetch(`/api/auth/me${q}`)
+        .then(async (r) => (r.ok ? r.json() as Promise<Me> : null))
+        .then((m) => {
+          if (dead || !m) {
+            return;
+          }
+          setMe((prev) => {
+            if (
+              prev
+              && prev.sub === m.sub
+              && prev.email === m.email
+              && JSON.stringify(prev.cranes ?? []) === JSON.stringify(m.cranes ?? [])
+            ) {
+              return prev;
+            }
+            return m;
+          });
+        })
+        .catch(() => undefined);
+    };
+    load();
+    const t = window.setInterval(load, 5000);
+    return () => {
+      dead = true;
+      window.clearInterval(t);
+    };
+  }, [cfg?.dev, cfg?.mode, listed, me, phone, slug, slugTouched]);
 
   const connect = useCallback(() => {
     if (stoppedRef.current || typeof window === "undefined" || !canSocket) {
@@ -543,10 +588,10 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         secret: cfg?.mode === "spike" ? secret || undefined : undefined,
         bearer: !phone && cfg?.mode === "oidc" ? bearer || undefined : undefined,
       };
-  const canEditFace = Boolean(roomSlug) && !needGoogle && !waitingForCrane && !mailboxGap;
+  const canEditFace = Boolean(listed && roomSlug) && !needGoogle && !waitingForCrane && !mailboxGap;
 
   const faceProps = {
-    slug: roomSlug,
+    slug: listed ? roomSlug : "",
     rev: avatarRev,
     editable: canEditFace,
     onRev: setAvatarRev,
@@ -577,7 +622,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
         <KitAvatar {...faceProps} size="lg" editable={false} />
         <p className="text-sm text-body">
-          Not on any crane yet — give this to your yard admin
+          {cranes.length
+            ? `Not on ${displaySlug(roomSlug) || "that crane"} yet`
+            : "Not on any crane yet — give this to your yard admin"}
         </p>
         {me?.email
           ? <p className="text-sm text-fg">{me.email}</p>
@@ -670,33 +717,41 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                     <select
                       className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
                       value={slug}
-                      onChange={(e) => setSlug(e.target.value)}
+                      onChange={(e) => {
+                        setSlugTouched(true);
+                        setSlug(e.target.value);
+                      }}
                     >
+                      {slug && !cranes.includes(slug)
+                        ? <option value={slug}>{displaySlug(slug)}</option>
+                        : null}
                       {cranes.map((c) => (
                         <option key={c} value={c}>{displaySlug(c)}</option>
                       ))}
                     </select>
                   </label>
                 )
-              : waitingForCrane || mailboxGap
-                ? null
-                : (
-                    <label className="flex flex-col gap-1 text-xs text-muted">
-                      Agent name
-                      <input
-                        className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
-                        value={slug}
-                        spellCheck={false}
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        autoComplete="off"
-                        onChange={(e) => {
-                          setSlugTouched(true);
-                          setSlug(e.target.value.toLowerCase());
-                        }}
-                      />
-                    </label>
-                  )}
+              : null}
+            {mailboxGap || (phone && cfg?.mode === "oidc" && waitingForCrane)
+              ? null
+              : (
+                  <label className="flex flex-col gap-1 text-xs text-muted">
+                    Agent name
+                    <input
+                      className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+                      value={slug}
+                      placeholder="the crane slug"
+                      spellCheck={false}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      autoComplete="off"
+                      onChange={(e) => {
+                        setSlugTouched(true);
+                        setSlug(e.target.value.toLowerCase());
+                      }}
+                    />
+                  </label>
+                )}
             {cfg?.mode === "spike" && !hideSecrets
               ? (
                   <label className="flex flex-col gap-1 text-xs text-muted">

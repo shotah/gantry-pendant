@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { handshakeSlug } from "@/lib/auth/handshake";
-import { configError, unauthorized } from "@/lib/auth/deny";
+import { configError, forbidden, unauthorized } from "@/lib/auth/deny";
 import { acceptJpeg } from "@/lib/avatar/jpeg";
 import { readAvatarUpload } from "@/lib/avatar/http";
 import { fetchRoomUsers } from "@/lib/mailbox/allow";
@@ -39,7 +39,13 @@ async function authorize(req: Request, slug: string): Promise<Response | null> {
   if (auth.ok) {
     return null;
   }
-  return auth.error === "config" ? configError() : unauthorized();
+  if (auth.error === "config") {
+    return configError();
+  }
+  if (auth.error === "forbidden") {
+    return forbidden();
+  }
+  return unauthorized();
 }
 
 function stubFor(slug: string): DurableObjectStub | null {

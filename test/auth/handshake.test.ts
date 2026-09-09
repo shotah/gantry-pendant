@@ -64,7 +64,7 @@ describe("handshake", () => {
       cookieHeader: `${SESSION_COOKIE}=junk`,
       now,
     });
-    expect(unknown).toEqual({ ok: false, error: "unauthorized" });
+    expect(unknown).toEqual({ ok: false, error: "forbidden" });
     expect(junk).toEqual({ ok: false, error: "unauthorized" });
   });
 
@@ -189,6 +189,24 @@ describe("handshakeSlug", () => {
     });
     expect(queryCrane).toEqual({ ok: false, error: "unauthorized" });
   });
+
+  it("does not try the crane bearer after a signed-in phone is refused the room", async () => {
+    const env = {
+      GOOGLE_CLIENT_ID: "id",
+      SESSION_SECRET: "sess-secret",
+      CRANE_BEARERS: "kit:crane-tok",
+    };
+    const now = Date.UTC(2026, 8, 4);
+    const session = await mintSession(env.SESSION_SECRET, { sub: "1182", email: "ada@x.com" }, now);
+    const phone = await handshakeSlug({
+      env,
+      slug: "kit",
+      cookieHeader: `${SESSION_COOKIE}=${encodeURIComponent(session)}`,
+      authorization: "Bearer crane-tok",
+      now,
+    });
+    expect(phone).toEqual({ ok: false, error: "forbidden" });
+  });
 });
 
 describe("handshake room list", () => {
@@ -238,7 +256,7 @@ describe("handshake room list", () => {
       roomList: [{ email: "ada@example.com" }],
       now,
     });
-    expect(refused).toEqual({ ok: false, error: "unauthorized" });
+    expect(refused).toEqual({ ok: false, error: "forbidden" });
   });
 
   it("still admits a static ALLOWED_SUBS extra", async () => {
@@ -261,7 +279,7 @@ describe("handshake room list", () => {
       cookieHeader: await cookie({ sub: ada, email: "ada@example.com", emailVerified: true }),
       now,
     });
-    expect(refused).toEqual({ ok: false, error: "unauthorized" });
+    expect(refused).toEqual({ ok: false, error: "forbidden" });
   });
 
   it("binds the crane bearer without ALLOWED_SUBS", async () => {
