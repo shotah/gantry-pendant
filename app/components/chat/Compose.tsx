@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { EmojiButton, EmojiPanel } from "./EmojiPicker";
+import { applyEmoji } from "@/app/lib/emoji";
 import { matchSlash, slashInsert, slashToken, type SlashCommand } from "@/app/lib/slash";
 
 function ClipIcon() {
@@ -178,17 +180,32 @@ export function Compose({
   catalog?: readonly SlashCommand[];
   initialText?: string;
 }) {
-  const [text, setText] = useState(initialText);
+  const [text, setText] = useState(() => applyEmoji(initialText, initialText.length, "send").text);
   const [dismissed, setDismissed] = useState(false);
   const [active, setActive] = useState(0);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [emojiQuery, setEmojiQuery] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
+  const caretRef = useRef<number | null>(null);
+  const insertAt = useRef(0);
+  const composing = useRef(false);
   const listId = useId();
   const matches = useMemo(() => (commands ? matchSlash(text, catalog) : []), [catalog, commands, text]);
   const waiting = Boolean(commands && catalog.length === 0 && slashToken(text) != null);
-  const open = Boolean(commands && !disabled && !dismissed && (matches.length > 0 || waiting));
+  const open = Boolean(commands && !disabled && !dismissed && !emojiOpen && (matches.length > 0 || waiting));
   const highlight = matches[Math.min(active, Math.max(0, matches.length - 1))];
   const attach = Boolean(onPhoto || commands || onGpsToggle || onPin);
+
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    const caret = caretRef.current;
+    if (!box || caret == null) {
+      return;
+    }
+    box.setSelectionRange(caret, caret);
+    caretRef.current = null;
+  }, [text]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.hash === "#compose") {
@@ -196,10 +213,36 @@ export function Compose({
     }
   }, []);
 
-  function setDraft(next: string) {
+  function setDraft(next: string, caret: number | null = null) {
+    caretRef.current = caret;
     setText(next);
     setDismissed(false);
     setActive(0);
+  }
+
+  function writeDraft(raw: string, cursor: number) {
+    if (composing.current) {
+      setDraft(raw, null);
+      return;
+    }
+    const next = applyEmoji(raw, cursor, "type");
+    const caret = next.text === raw ? cursor : next.cursor;
+    if (emojiOpen) {
+      insertAt.current = caret;
+    }
+    setDraft(next.text, next.text === raw ? null : next.cursor);
+  }
+
+  function insertEmoji(emoji: string) {
+    const box = boxRef.current;
+    const focused = box != null && document.activeElement === box;
+    const start = focused ? (box.selectionStart ?? text.length) : insertAt.current;
+    const end = focused ? (box.selectionEnd ?? start) : start;
+    const next = `${text.slice(0, start)}${emoji}${text.slice(end)}`;
+    const caret = start + emoji.length;
+    insertAt.current = caret;
+    setDraft(next, caret);
+    box?.focus();
   }
 
   function pick(cmd: SlashCommand) {
@@ -209,15 +252,17 @@ export function Compose({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const t = text.trim();
+    const t = applyEmoji(text, text.length, "send").text.trim();
     if (!t || disabled) {
       return;
     }
     onSend(t);
+    setEmojiOpen(false);
     setDraft("");
   }
 
   function toggleCommands() {
+    setEmojiOpen(false);
     if (open) {
       setDismissed(true);
       boxRef.current?.focus();
@@ -229,6 +274,15 @@ export function Compose({
       setText("/");
     }
     boxRef.current?.focus();
+  }
+
+  function toggleEmoji() {
+    if (!emojiOpen) {
+      insertAt.current = boxRef.current?.selectionStart ?? text.length;
+    }
+    setEmojiOpen((v) => !v);
+    setEmojiQuery("");
+    setDismissed(true);
   }
 
   return (
@@ -247,6 +301,16 @@ export function Compose({
                 }
                 e.target.value = "";
               }}
+            />
+          )
+        : null}
+      {emojiOpen
+        ? (
+            <EmojiPanel
+              query={emojiQuery}
+              onQuery={setEmojiQuery}
+              onPick={insertEmoji}
+              onClose={() => setEmojiOpen(false)}
             />
           )
         : null}
@@ -293,7 +357,7 @@ export function Compose({
           <textarea
             ref={boxRef}
             id="compose"
-            className={`block min-h-11 w-full resize-none rounded-xl border border-edge bg-canvas px-3 py-2 text-sm text-fg ${attach ? "pr-9" : ""}`}
+            className={`block min-h-11 w-full resize-none rounded-xl border border-edge bg-canvas py-2 pl-10 text-sm text-fg ${attach ? "pr-9" : "pr-3"}`}
             rows={2}
             value={text}
             placeholder={placeholder ?? "Message"}
@@ -302,7 +366,14 @@ export function Compose({
             aria-autocomplete="list"
             aria-expanded={open}
             aria-controls={open ? listId : undefined}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => writeDraft(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+            onCompositionStart={() => {
+              composing.current = true;
+            }}
+            onCompositionEnd={(e) => {
+              composing.current = false;
+              writeDraft(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length);
+            }}
             onKeyDown={(e) => {
               if (open && highlight) {
                 if (e.key === "ArrowDown") {
@@ -331,6 +402,11 @@ export function Compose({
                 submit(e);
               }
             }}
+          />
+          <EmojiButton
+            disabled={disabled}
+            open={emojiOpen}
+            onToggle={toggleEmoji}
           />
           {attach
             ? (

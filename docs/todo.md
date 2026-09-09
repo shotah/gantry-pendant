@@ -4,7 +4,8 @@ What's left. The mouth talks in code; Telegram stays production until
 the walks are real on a phone. Pitch: [README.md](../README.md). Why:
 [design.md](design.md). Wire: [architecture.md](architecture.md). Authn:
 [security.md](security.md). Who talks: [setup.md](setup.md). Misses:
-[edgecases.md](edgecases.md).
+[edgecases.md](edgecases.md). Typing dots:
+[agent_typing_response_todo.md](agent_typing_response_todo.md).
 
 A line is done when the **walk** works without a second brain. Scope is
 which checkout you touch.
@@ -140,14 +141,16 @@ PWA path is painful.
       lock-screen cron when no phone socket. Installed PWA, iOS 16.4+
 - [ ] **Custom hostname** — cookies + OAuth redirect; crane URL
       updated; recreate
-- [ ] **"Kit is thinking"** `ack` when the Handler starts
+- [ ] **Typing action** — crane `kind: "typing"`, not inbound `ack`.
+      Walk: [agent_typing_response_todo.md](agent_typing_response_todo.md)
 - [ ] Sliding session refresh (today is hard 7d)
 - [ ] Prune stale entries in the DO rate-limit map
 
 ### ai-gantry
 
 - [ ] Streaming placeholder + edit (`ReplyWriter`); phone replaces the
-      last Kit bubble, does not append per chunk
+      last Kit bubble, does not append per chunk. Different from
+      typing: [agent_typing_response_todo.md](agent_typing_response_todo.md)
 
 ### Expo (when a bookmark is not enough)
 

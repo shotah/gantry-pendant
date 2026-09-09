@@ -89,4 +89,22 @@ describe("Compose", () => {
     );
     expect((screen.getByRole("button", { name: "drop pin" }) as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it("inserts from the emoji picker and converts colon codes", () => {
+    const onSend = vi.fn();
+    render(<Compose onSend={onSend} />);
+    const box = screen.getByPlaceholderText("Message");
+    fireEvent.click(screen.getByRole("button", { name: "emoji" }));
+    expect(screen.getByRole("dialog", { name: "Emoji" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: ":shrug:" }));
+    expect((box as HTMLTextAreaElement).value).toBe("🤷");
+
+    fireEvent.change(box, { target: { value: "ok :fire:" } });
+    expect((box as HTMLTextAreaElement).value).toBe("ok 🔥");
+
+    fireEvent.change(box, { target: { value: "yo :D" } });
+    expect((box as HTMLTextAreaElement).value).toBe("yo :D");
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(onSend).toHaveBeenCalledWith("yo 😀");
+  });
 });
