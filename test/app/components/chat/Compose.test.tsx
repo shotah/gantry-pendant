@@ -90,6 +90,13 @@ describe("Compose", () => {
     expect((screen.getByRole("button", { name: "drop pin" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it("warms GPS when the composer is focused", () => {
+    const onEngage = vi.fn();
+    render(<Compose onSend={vi.fn()} onEngage={onEngage} />);
+    fireEvent.focus(screen.getByPlaceholderText("Message"));
+    expect(onEngage).toHaveBeenCalledOnce();
+  });
+
   it("inserts from the emoji picker and converts colon codes", () => {
     const onSend = vi.fn();
     render(<Compose onSend={onSend} />);

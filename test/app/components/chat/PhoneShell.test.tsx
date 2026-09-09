@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PhoneShell } from "@/app/components/chat/PhoneShell";
 import { DEV_USER, MOCK_REPLIES, SAMPLE_LINES } from "@/lib/dev/samples";
 import { TYPING_TTL_MS } from "@/lib/mailbox/typing";
+import { clearGeoCache } from "@/lib/phone/geo";
 
 function stubAuth(dev: boolean) {
   vi.stubGlobal("fetch", async (input: RequestInfo) => {
@@ -80,6 +81,34 @@ async function connectSpike() {
   return liveSocket();
 }
 
+function stubGeo(lat = 47.6, lon = -122.3, accuracy = 8) {
+  Object.defineProperty(navigator, "geolocation", {
+    configurable: true,
+    value: {
+      getCurrentPosition(success: (p: GeolocationPosition) => void) {
+        success({
+          coords: {
+            latitude: lat,
+            longitude: lon,
+            accuracy,
+            altitude: null,
+            altitudeAccuracy: null,
+            heading: null,
+            speed: null,
+            toJSON() {
+              return {};
+            },
+          },
+          timestamp: 1,
+          toJSON() {
+            return {};
+          },
+        });
+      },
+    },
+  });
+}
+
 beforeEach(() => {
   window.history.replaceState({}, "", "/");
   window.localStorage.removeItem("pendant.geo");
@@ -100,6 +129,7 @@ afterEach(() => {
   Reflect.deleteProperty(navigator, "clipboard");
   Reflect.deleteProperty(document, "hidden");
   FakeSocket.instances = [];
+  clearGeoCache();
 });
 
 describe("PhoneShell", () => {
@@ -241,6 +271,49 @@ describe("PhoneShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("hi")).toBeTruthy();
     expect(geo).not.toHaveBeenCalled();
+  });
+
+  it("attaches GPS on the inbound frame", async () => {
+    stubGeo();
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Message Kit/), { target: { value: "near me" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("near me")).toBeTruthy();
+    expect(ws.send).toHaveBeenCalled();
+    const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as {
+      text?: string;
+      kind?: string;
+      context?: { geo?: { lat: number; lon: number; accuracy_m?: number } };
+    };
+    expect(frame.kind).toBe("inbound");
+    expect(frame.text).toBe("near me");
+    expect(frame.text).not.toContain("[location]");
+    expect(frame.context?.geo).toEqual({ lat: 47.6, lon: -122.3, accuracy_m: 8 });
+    expect(screen.getByRole("button", { name: "attach" }).getAttribute("title")).toBe("pin ±8m this send");
+  });
+
+  it("sends a silent pin when GPS returns a fix", async () => {
+    stubGeo(1, 2, 5);
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "attach" }));
+    fireEvent.click(screen.getByRole("button", { name: "drop pin" }));
+    expect(await screen.findByText("pin ±5m this send")).toBeTruthy();
+    expect(ws.send).toHaveBeenCalled();
+    const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as {
+      kind?: string;
+      text?: string;
+      context?: { geo?: { lat: number; lon: number } };
+    };
+    expect(frame.kind).toBe("pin");
+    expect(frame.text).toBeUndefined();
+    expect(frame.context?.geo).toEqual({ lat: 1, lon: 2, accuracy_m: 5 });
+    expect(screen.getByText(/Nothing yet/)).toBeTruthy();
   });
 
   it("does not append a bubble for a silent pin without a fix", async () => {

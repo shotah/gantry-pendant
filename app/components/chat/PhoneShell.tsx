@@ -27,7 +27,7 @@ import type { ConfigGap } from "@/lib/auth/mode";
 import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
 import { parseSlug } from "@/lib/mailbox/slug";
 import { buildContext } from "@/lib/phone/context";
-import { geoHint } from "@/lib/phone/geo";
+import { GEO_TIMEOUT_MS, GEO_WARM_MS, geoHint } from "@/lib/phone/geo";
 import { encodeFrame, type Role, type WireFrame } from "@/lib/mailbox/frame";
 import { clearsTyping, TYPING_TTL_MS } from "@/lib/mailbox/typing";
 import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
@@ -106,6 +106,8 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const idSeq = useRef(0);
   const [typing, setTyping] = useState(false);
   const typingTimer = useRef(0);
+  const gpsOnRef = useRef(true);
+  const geoWarm = useRef(false);
   const phone = role === "phone";
   const painting = Boolean(cfg?.dev && sampleId);
   const localEcho = Boolean(cfg?.dev && !sampleId && phone);
@@ -186,6 +188,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       return;
     }
     const on = browserGeoPref();
+    gpsOnRef.current = on;
     setGpsOn(on);
     if (!on) {
       setGpsHint("GPS off");
@@ -490,9 +493,25 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     wakeRef.current = await browserWakeLock();
   }
 
-  async function phoneContext(wantGeo: boolean) {
+  async function warmGps() {
+    if (!phone || !gpsOnRef.current || geoWarm.current) {
+      return;
+    }
+    geoWarm.current = true;
+    const geo = await browserGeo(GEO_WARM_MS);
+    if (!gpsOnRef.current) {
+      geoWarm.current = false;
+      return;
+    }
+    if (!geo.ok && geo.reason === "unavailable") {
+      geoWarm.current = false;
+    }
+    setGpsHint(geoHint(true, geo));
+  }
+
+  async function phoneContext(wantGeo: boolean, timeoutMs = GEO_TIMEOUT_MS) {
     const [geo, battery] = await Promise.all([
-      wantGeo ? browserGeo() : Promise.resolve({ ok: false as const, reason: "unavailable" as const }),
+      wantGeo ? browserGeo(timeoutMs) : Promise.resolve({ ok: false as const, reason: "unavailable" as const }),
       browserBattery(),
     ]);
     return {
@@ -574,7 +593,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       }
       return;
     }
-    const { geo, context } = await phoneContext(true);
+    const { geo, context } = await phoneContext(true, GEO_WARM_MS);
     setGpsHint(geoHint(true, geo));
     if (!geo.ok) {
       return;
@@ -590,7 +609,12 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     setGpsOn((on) => {
       const next = !on;
       saveGeoPref(next);
+      gpsOnRef.current = next;
+      geoWarm.current = false;
       setGpsHint(next ? "GPS attaches on send if the OS allows it." : "GPS off");
+      if (next) {
+        void warmGps();
+      }
       return next;
     });
   }
@@ -724,6 +748,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           onSend={(t) => void sendText(t)}
           onPhoto={phone ? (f) => void sendPhoto(f) : undefined}
           onPin={phone ? () => void sendPin() : undefined}
+          onEngage={phone ? () => void warmGps() : undefined}
         />
       </>
     );

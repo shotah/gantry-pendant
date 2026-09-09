@@ -164,6 +164,7 @@ export function Compose({
   gpsHint,
   gpsOn = true,
   onGpsToggle,
+  onEngage,
   commands,
   catalog = [],
   initialText = "",
@@ -176,6 +177,7 @@ export function Compose({
   gpsHint?: string;
   gpsOn?: boolean;
   onGpsToggle?: () => void;
+  onEngage?: () => void;
   commands?: boolean;
   catalog?: readonly SlashCommand[];
   initialText?: string;
@@ -387,6 +389,7 @@ export function Compose({
             aria-expanded={open}
             aria-controls={open ? listId : undefined}
             onChange={(e) => writeDraft(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+            onFocus={() => onEngage?.()}
             onCompositionStart={() => {
               composing.current = true;
             }}

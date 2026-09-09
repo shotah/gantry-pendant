@@ -1,5 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserGeo } from "@/app/lib/geo";
+import { clearGeoCache } from "@/lib/phone/geo";
+
+afterEach(() => {
+  clearGeoCache();
+  vi.unstubAllGlobals();
+});
 
 describe("browserGeo", () => {
   it("is unavailable without navigator.geolocation", async () => {
@@ -32,6 +38,5 @@ describe("browserGeo", () => {
       },
     });
     expect(await browserGeo()).toEqual({ ok: true, geo: { lat: 9, lon: 8, accuracy_m: 4 } });
-    vi.unstubAllGlobals();
   });
 });
