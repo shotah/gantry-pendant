@@ -17,6 +17,21 @@ dashboard first.
 Local deploy (debug wrangler on this machine): `npm run build && npm run deploy`.
 Prefer CI.
 
+`.dev.vars` / `.env` are Worker **app** env (Google, session, bearers,
+`PENDANT_DEV`). They are not a place for the Cloudflare API token.
+
+| Thing | Where it lives |
+| --- | --- |
+| Cloudflare login on this laptop | `npx wrangler login` (OAuth under `~/.config/.wrangler`) |
+| CI deploy to Workers | GitHub **secrets** `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` |
+| KV namespace id | GitHub **variable** `DIRECTORY_KV_ID` (not a secret; 32 hex) |
+| Google / session / crane bearers | Cloudflare Worker secrets (`wrangler secret put`), or `.dev.vars` on loopback |
+
+Wrangler may offer to paste the KV id into `wrangler.jsonc`. Decline, or
+revert — leave `directory-local` in git. CI injects the real id from the
+GitHub variable. `remote: true` on that binding would make local preview
+talk to production KV.
+
 ---
 
 ## Once — Cloudflare, then GitHub, then ship
@@ -39,8 +54,9 @@ npx wrangler login
 npx wrangler kv namespace create DIRECTORY
 ```
 
-Copy the `id` (32 hex characters). That is `DIRECTORY_KV_ID`. Leave
-`wrangler.jsonc` on `directory-local` in git — CI injects the real id.
+Copy the `id` (32 hex characters). That is `DIRECTORY_KV_ID`. If wrangler
+asks to add it to `wrangler.jsonc`, say **no** (or revert). Leave
+`directory-local` in git — CI injects the real id from the GitHub variable.
 
 ### 3. GitHub Actions credentials
 
