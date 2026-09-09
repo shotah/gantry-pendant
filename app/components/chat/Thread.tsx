@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { MarkdownBody } from "./MarkdownBody";
 
 export type ChatBubble = {
   id: string;
@@ -39,7 +40,7 @@ export function Thread({ messages, empty }: { messages: ChatBubble[]; empty?: Re
               {m.photo
                 ? <img src={m.photo} alt="" className="mb-2 max-h-48 rounded-lg" />
                 : null}
-              {m.text ? <p className="whitespace-pre-wrap">{m.text}</p> : null}
+              {m.text ? <MarkdownBody text={m.text} /> : null}
               {mine && m.pending
                 ? <p className="mt-1 text-[10px] text-dim">sending</p>
                 : null}

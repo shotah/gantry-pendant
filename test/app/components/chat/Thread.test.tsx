@@ -44,4 +44,14 @@ describe("Thread", () => {
     expect(screen.getByText("yo")).toBeTruthy();
     expect(screen.queryByText("sending")).toBeNull();
   });
+
+  it("paints kit markdown instead of the source marks", () => {
+    render(
+      <Thread
+        messages={[{ id: "2", from: "kit", text: "Try **this** path", at: 2 }]}
+      />,
+    );
+    expect(screen.getByText("this").tagName).toBe("STRONG");
+    expect(screen.queryByText("Try **this** path")).toBeNull();
+  });
 });
