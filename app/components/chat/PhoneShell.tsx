@@ -8,6 +8,7 @@ import { Compose } from "./Compose";
 import { ConfigGapNote } from "./ConfigGapNote";
 import { InstallApp } from "./InstallApp";
 import { KitAvatar } from "./KitAvatar";
+import { NotifyEnable } from "./NotifyEnable";
 import { SettingsMenu } from "./SettingsMenu";
 import { bubbleFrom, Thread, type ChatBubble } from "./Thread";
 import { mailboxUrl, parseIncoming } from "@/app/lib/socket";
@@ -16,6 +17,7 @@ import { browserBumpBadge, browserClearBadge } from "@/app/lib/badge";
 import { browserGeo } from "@/app/lib/geo";
 import { browserBuzzPush } from "@/app/lib/haptic";
 import { browserNet } from "@/app/lib/net";
+import { browserNotifyIncoming } from "@/app/lib/notify";
 import { fileToPhoto } from "@/app/lib/photo";
 import { browserGeoPref, saveGeoPref } from "@/app/lib/prefs";
 import { applyFont, fontFromQuery } from "@/app/lib/font";
@@ -410,6 +412,12 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         wakeRef.current = null;
         browserBuzzPush(frame.kind);
         badgeRef.current = browserBumpBadge(badgeRef.current, frame.kind);
+        browserNotifyIncoming({
+          kind: frame.kind,
+          title: displaySlug(roomSlug),
+          text: frame.text,
+          photo: Boolean(frame.images?.[0]?.url),
+        });
       }
     };
   }, [bearer, canSocket, cfg?.mode, phone, role, roomSlug, secret]);
@@ -742,6 +750,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         <SettingsMenu>
           <div className="flex flex-col gap-2">
             <InstallApp placement="block" />
+            {phone ? <NotifyEnable /> : null}
             {phone && cfg?.mode === "oidc" && cranes.length
               ? (
                   <label className="flex flex-col gap-1 text-xs text-muted">

@@ -11,7 +11,9 @@ describe("pwa", () => {
     expect(PENDANT_MANIFEST.start_url).toBe("/");
     expect(PENDANT_MANIFEST.icons.some((i) => i.src === "/icon.svg")).toBe(true);
     expect(PENDANT_MANIFEST.shortcuts.map((s) => s.url)).toEqual(["/#compose", "/?pin=1"]);
-    expect(swInstallIssues(readFileSync("public/sw.js", "utf8"))).toEqual([]);
+    const sw = readFileSync("public/sw.js", "utf8");
+    expect(swInstallIssues(sw)).toEqual([]);
+    expect(sw).toMatch(/notificationclick/);
   });
 
   it("names the gaps Chromium cares about", () => {

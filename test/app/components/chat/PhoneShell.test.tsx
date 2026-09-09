@@ -98,6 +98,7 @@ afterEach(() => {
   document.documentElement.removeAttribute("data-font");
   Reflect.deleteProperty(navigator, "geolocation");
   Reflect.deleteProperty(navigator, "clipboard");
+  Reflect.deleteProperty(document, "hidden");
   FakeSocket.instances = [];
 });
 
@@ -195,6 +196,7 @@ describe("PhoneShell", () => {
     expect(screen.getByRole("button", { name: "color theme" })).toBeTruthy();
     expect(screen.getByRole("radiogroup", { name: "Font size" })).toBeTruthy();
     expect(screen.getByRole("radio", { name: "Small" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("button", { name: "Enable notifications" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Open crane stand-in" })).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Agent name"), { target: { value: "Ada" } });
     expect((screen.getByLabelText("Agent name") as HTMLInputElement).value).toBe("ada");
@@ -311,6 +313,27 @@ describe("PhoneShell", () => {
     });
     expect(screen.getByText("hello kit")).toBeTruthy();
     expect(screen.queryByText("sending")).toBeNull();
+  });
+
+  it("toasts a hidden reply when notifications are granted", async () => {
+    const constructed: string[] = [];
+    class FakeNotification {
+      static permission: NotificationPermission = "granted";
+      constructor(title: string) {
+        constructed.push(title);
+      }
+    }
+    vi.stubGlobal("Notification", FakeNotification);
+    const ws = await connectSpike();
+    Object.defineProperty(document, "hidden", { configurable: true, value: true });
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "yo from kit" }));
+    });
+    expect(await screen.findByText("yo from kit")).toBeTruthy();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(constructed).toEqual(["Kit"]);
   });
 
   it("does not duplicate a row when the same frame id arrives twice", async () => {
