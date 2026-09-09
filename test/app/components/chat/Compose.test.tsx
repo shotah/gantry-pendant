@@ -107,4 +107,19 @@ describe("Compose", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(onSend).toHaveBeenCalledWith("yo 😀");
   });
+
+  it("stacks emoji and attach on the left of the draft", () => {
+    render(<Compose onSend={vi.fn()} onPhoto={vi.fn()} />);
+    const emoji = screen.getByRole("button", { name: "emoji" });
+    const attach = screen.getByRole("button", { name: "attach" });
+    const box = screen.getByPlaceholderText("Message");
+    const send = screen.getByRole("button", { name: "Send" });
+    expect(emoji.compareDocumentPosition(attach) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(attach.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(box.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const rail = emoji.parentElement;
+    expect(rail?.contains(attach)).toBe(true);
+    expect(rail?.className.split(/\s+/)).toEqual(expect.arrayContaining(["flex", "flex-col"]));
+    expect(send.className.split(/\s+/)).toEqual(expect.arrayContaining(["self-stretch"]));
+  });
 });

@@ -9,12 +9,12 @@ const PLUGINS = [remarkGfm, remarkBreaks];
 
 const BUBBLE: Components = {
   p: ({ children }) => <p className="my-1 first:mt-0 last:mb-0">{children}</p>,
-  h1: ({ children }) => <h1 className="mt-2 mb-1 text-base font-semibold text-fg">{children}</h1>,
-  h2: ({ children }) => <h2 className="mt-2 mb-1 text-sm font-semibold text-fg">{children}</h2>,
-  h3: ({ children }) => <h3 className="mt-1.5 mb-1 text-sm font-medium text-fg">{children}</h3>,
-  h4: ({ children }) => <h4 className="mt-1.5 mb-1 text-sm font-medium text-fg">{children}</h4>,
-  h5: ({ children }) => <h5 className="mt-1 mb-1 text-sm font-medium text-fg">{children}</h5>,
-  h6: ({ children }) => <h6 className="mt-1 mb-1 text-sm font-medium text-fg">{children}</h6>,
+  h1: ({ children }) => <h1 className="mt-2 mb-1 text-[1.15em] font-semibold text-fg">{children}</h1>,
+  h2: ({ children }) => <h2 className="mt-2 mb-1 text-[1.05em] font-semibold text-fg">{children}</h2>,
+  h3: ({ children }) => <h3 className="mt-1.5 mb-1 font-medium text-fg">{children}</h3>,
+  h4: ({ children }) => <h4 className="mt-1.5 mb-1 font-medium text-fg">{children}</h4>,
+  h5: ({ children }) => <h5 className="mt-1 mb-1 font-medium text-fg">{children}</h5>,
+  h6: ({ children }) => <h6 className="mt-1 mb-1 font-medium text-fg">{children}</h6>,
   ul: ({ children }) => <ul className="my-1 list-disc space-y-0.5 pl-4">{children}</ul>,
   ol: ({ children }) => <ol className="my-1 list-decimal space-y-0.5 pl-4">{children}</ol>,
   li: ({ children }) => <li className="leading-relaxed">{children}</li>,
@@ -38,10 +38,10 @@ const BUBBLE: Components = {
   code: ({ className, children }) => {
     const block = Boolean(className);
     if (block) {
-      return <code className={`${className ?? ""} font-mono text-[12px]`}>{children}</code>;
+      return <code className={`${className ?? ""} font-mono text-[0.85em]`}>{children}</code>;
     }
     return (
-      <code className="rounded bg-track px-1 py-0.5 font-mono text-[12px] text-fg">{children}</code>
+      <code className="rounded bg-track px-1 py-0.5 font-mono text-[0.85em] text-fg">{children}</code>
     );
   },
   pre: ({ children }) => (
@@ -52,7 +52,7 @@ const BUBBLE: Components = {
   ),
   table: ({ children }) => (
     <div className="my-1 overflow-x-auto">
-      <table className="w-full border-collapse text-xs">{children}</table>
+      <table className="w-full border-collapse text-[0.9em]">{children}</table>
     </div>
   ),
   th: ({ children }) => (

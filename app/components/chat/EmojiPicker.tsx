@@ -37,7 +37,7 @@ export function EmojiButton({
       aria-haspopup="dialog"
       aria-expanded={open}
       disabled={disabled}
-      className={`absolute bottom-1.5 left-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full p-0 ${
+      className={`flex h-7 w-7 min-h-0 shrink-0 items-center justify-center rounded-full p-0 ${
         open ? "text-mark" : "text-muted"
       } disabled:opacity-40`}
       onClick={onToggle}

@@ -83,6 +83,8 @@ async function connectSpike() {
 beforeEach(() => {
   window.history.replaceState({}, "", "/");
   window.localStorage.removeItem("pendant.geo");
+  window.localStorage.removeItem("pendant.font");
+  document.documentElement.removeAttribute("data-font");
 });
 
 afterEach(() => {
@@ -92,6 +94,8 @@ afterEach(() => {
   vi.restoreAllMocks();
   window.history.replaceState({}, "", "/");
   window.localStorage.removeItem("pendant.geo");
+  window.localStorage.removeItem("pendant.font");
+  document.documentElement.removeAttribute("data-font");
   Reflect.deleteProperty(navigator, "geolocation");
   Reflect.deleteProperty(navigator, "clipboard");
   FakeSocket.instances = [];
@@ -180,6 +184,7 @@ describe("PhoneShell", () => {
     expect(screen.getByText("Kit")).toBeTruthy();
     expect(screen.queryByLabelText("Agent name")).toBeNull();
     expect(screen.queryByRole("button", { name: "color theme" })).toBeNull();
+    expect(screen.queryByRole("radiogroup", { name: "Font size" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Open crane stand-in" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "settings" }));
     expect(screen.getByRole("dialog", { name: "Settings" })).toBeTruthy();
@@ -188,10 +193,23 @@ describe("PhoneShell", () => {
     expect((screen.getByLabelText("Agent name") as HTMLInputElement).value).toBe("kit");
     expect(screen.getByLabelText("Agent access secret")).toBeTruthy();
     expect(screen.getByRole("button", { name: "color theme" })).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: "Font size" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Small" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("link", { name: "Open crane stand-in" })).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Agent name"), { target: { value: "Ada" } });
     expect((screen.getByLabelText("Agent name") as HTMLInputElement).value).toBe("ada");
     expect(screen.getByText("Ada")).toBeTruthy();
+  });
+
+  it("applies a chat font size from settings", async () => {
+    stubAuth(true);
+    render(<PhoneShell />);
+    expect(await screen.findByText("live")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Large" }));
+    expect(document.documentElement.getAttribute("data-font")).toBe("lg");
+    expect(localStorage.getItem("pendant.font")).toBe("lg");
+    expect(screen.getByRole("radio", { name: "Large" }).getAttribute("aria-checked")).toBe("true");
   });
 
   it("paints the harness command picker for the cmds sample", async () => {
@@ -304,6 +322,20 @@ describe("PhoneShell", () => {
     });
     expect(await screen.findByText("yo from kit")).toBeTruthy();
     expect(screen.getAllByText("yo from kit")).toHaveLength(1);
+  });
+
+  it("paints a flushed inbound as your bubble next to Kit", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "in-1", kind: "inbound", text: "from me" }));
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "from kit" }));
+    });
+    expect(await screen.findByText("from me")).toBeTruthy();
+    expect(screen.getByText("from kit")).toBeTruthy();
+    const mine = screen.getByText("from me").closest("div[class*='bg-you']");
+    const kit = screen.getByText("from kit").closest("div[class*='bg-kit']");
+    expect(mine).toBeTruthy();
+    expect(kit).toBeTruthy();
   });
 
   it("does not treat inbound ack as typing", async () => {

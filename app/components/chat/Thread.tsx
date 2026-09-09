@@ -13,10 +13,18 @@ export type ChatBubble = {
   pending?: boolean;
 };
 
+/** Flushed inbound is your mouth; everything else follows the viewer role. */
+export function bubbleFrom(viewerIsPhone: boolean, kind?: string): ChatBubble["from"] {
+  if (viewerIsPhone && kind === "inbound") {
+    return "you";
+  }
+  return viewerIsPhone ? "kit" : "you";
+}
+
 export function Thread({ messages, empty }: { messages: ChatBubble[]; empty?: ReactNode }) {
   if (!messages.length) {
     return empty ?? (
-      <p className="px-4 py-8 text-center text-sm text-dim">
+      <p className="px-4 py-8 text-center text-chat text-dim">
         Nothing yet. Type below — the other side of this room hears it.
       </p>
     );
@@ -28,21 +36,21 @@ export function Thread({ messages, empty }: { messages: ChatBubble[]; empty?: Re
         return (
           <li key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
             <div
-              className={`max-w-[85%] rounded-2xl border px-3 py-2 text-sm leading-relaxed ${
+              className={`max-w-[85%] rounded-2xl border px-3 py-2 text-chat leading-relaxed ${
                 mine
                   ? "border-accent-line bg-you text-fg"
                   : "border-line bg-kit text-body shadow-sm"
               }`}
             >
               {m.kind === "push"
-                ? <p className="mb-1 text-[10px] uppercase tracking-wide text-dim">ping</p>
+                ? <p className="mb-1 text-[0.7em] uppercase tracking-wide text-dim">ping</p>
                 : null}
               {m.photo
                 ? <img src={m.photo} alt="" className="mb-2 max-h-48 rounded-lg" />
                 : null}
               {m.text ? <MarkdownBody text={m.text} /> : null}
               {mine && m.pending
-                ? <p className="mt-1 text-[10px] text-dim">sending</p>
+                ? <p className="mt-1 text-[0.7em] text-dim">sending</p>
                 : null}
             </div>
           </li>

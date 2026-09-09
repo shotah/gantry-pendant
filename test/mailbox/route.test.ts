@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { persistRole, phoneKindAllowed, resolvePhoneKind, routeTag } from "@/lib/mailbox/route";
+import { persistInboundForPhone, persistRole, phoneKindAllowed, resolvePhoneKind, routeTag } from "@/lib/mailbox/route";
 import type { WireFrame } from "@/lib/mailbox/frame";
 
 describe("route", () => {
@@ -53,5 +53,13 @@ describe("route", () => {
     expect(persistRole("phone", "pin")).toBeUndefined();
     expect(persistRole("phone", "ack")).toBeUndefined();
     expect(persistRole("crane", "typing", "ada")).toBeUndefined();
+  });
+
+  it("mirrors inbound onto the phone queue so a refresh can replay your bubbles", () => {
+    expect(persistInboundForPhone("phone", "inbound")).toBe(true);
+    expect(persistInboundForPhone("phone", "pin")).toBe(false);
+    expect(persistInboundForPhone("phone", "ack")).toBe(false);
+    expect(persistInboundForPhone("crane", "inbound")).toBe(false);
+    expect(persistInboundForPhone("crane", "reply")).toBe(false);
   });
 });

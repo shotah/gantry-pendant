@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { Thread } from "@/app/components/chat/Thread";
+import { bubbleFrom, Thread } from "@/app/components/chat/Thread";
 
 afterEach(() => {
   cleanup();
@@ -23,6 +23,7 @@ describe("Thread", () => {
     expect(screen.getByText("hi")).toBeTruthy();
     expect(screen.getByText("yo")).toBeTruthy();
     expect(screen.getByText("ping")).toBeTruthy();
+    expect(screen.getByText("hi").closest(".text-chat")).toBeTruthy();
   });
 
   it("marks your pending bubble as sending", () => {
@@ -53,5 +54,13 @@ describe("Thread", () => {
     );
     expect(screen.getByText("this").tagName).toBe("STRONG");
     expect(screen.queryByText("Try **this** path")).toBeNull();
+  });
+
+  it("treats flushed inbound as your bubble on the phone", () => {
+    expect(bubbleFrom(true, "inbound")).toBe("you");
+    expect(bubbleFrom(true, "reply")).toBe("kit");
+    expect(bubbleFrom(true, "push")).toBe("kit");
+    expect(bubbleFrom(false, "inbound")).toBe("you");
+    expect(bubbleFrom(false, "reply")).toBe("you");
   });
 });

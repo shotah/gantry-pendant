@@ -9,6 +9,7 @@ import {
   peekFor,
   pruneQueue,
   queuedFromList,
+  queueIdentity,
   queueStoreKey,
   shouldQueue,
   type Queued,
@@ -128,16 +129,27 @@ describe("queue", () => {
     expect(peekFor(q, "crane", 4).map((m) => m.id)).toEqual(["photo", "t1", "t2", "t3"]);
   });
 
-  it("sorts storage rows by time and names keys q:<id>", () => {
-    expect(queueStoreKey("abc")).toBe("q:abc");
+  it("sorts storage rows by time and names keys q:<to>:<id>", () => {
+    expect(queueStoreKey("abc", "phone")).toBe("q:phone:abc");
+    expect(queueStoreKey("abc", "crane")).toBe("q:crane:abc");
+    expect(queueIdentity({ id: "abc", to: "phone" })).toBe("phone:abc");
     expect(destKey("phone", "ada")).toBe("phone:ada");
     expect(destKey("crane")).toBe("crane:");
     const rows = new Map<string, Queued>([
-      ["q:b", msg({ id: "b", at: 2 })],
-      ["q:a", msg({ id: "a", at: 1 })],
+      ["q:phone:b", msg({ id: "b", at: 2 })],
+      ["q:phone:a", msg({ id: "a", at: 1 })],
     ]);
     expect(queuedFromList(rows).map((m) => m.id)).toEqual(["a", "b"]);
     expect(matchesFlush(msg({ to: "phone", userId: "ada" }), "phone", "ada")).toBe(true);
     expect(matchesFlush(msg({ to: "phone", userId: "bob" }), "phone", "ada")).toBe(false);
+  });
+
+  it("keeps the same frame id for phone history and a crane catch-up copy", () => {
+    const crane = msg({ id: "same", to: "crane", at: 1, kind: "inbound" });
+    const phone = msg({ id: "same", to: "phone", userId: "ada", at: 1, kind: "inbound" });
+    const next = enqueue([crane], phone, { now: 1 });
+    expect(next.map((m) => `${m.to}:${m.id}`).sort()).toEqual(["crane:same", "phone:same"]);
+    expect(peekFor(next, "phone", 1, { userId: "ada" }).map((m) => m.id)).toEqual(["same"]);
+    expect(peekFor(next, "crane", 1).map((m) => m.id)).toEqual(["same"]);
   });
 });

@@ -20,11 +20,12 @@ import {
   peekFor,
   pruneQueue,
   queuedFromList,
+  queueIdentity,
   queueStoreKey,
   QUEUE_STORE_PREFIX,
   type Queued,
 } from "../lib/mailbox/queue";
-import { persistRole, resolvePhoneKind, routeTag } from "../lib/mailbox/route";
+import { persistInboundForPhone, persistRole, resolvePhoneKind, routeTag } from "../lib/mailbox/route";
 import { parseEmailVerified, parseExpMs, socketMessageAllowed } from "../lib/mailbox/socketAuth";
 import { takeFrame, type DualLimit } from "../lib/mailbox/rate";
 import { cranePublishedTyping, phoneMustNotPublishTyping } from "../lib/mailbox/typing";
@@ -162,7 +163,7 @@ export class Mailbox extends DurableObject<Env> {
       if (out.since) {
         await this.dropAckedThrough(out.since, meta.userId);
       }
-      await this.ctx.storage.delete(queueStoreKey(out.id));
+      await this.deleteQueued({ id: out.id, to: "phone" });
       const cranes = this.ctx.getWebSockets("crane");
       for (const c of cranes) {
         c.send(encodeFrame(out));
@@ -200,6 +201,17 @@ export class Mailbox extends DurableObject<Env> {
           body,
           at: now,
           userId: out.user_id,
+          kind: out.kind,
+          bytes: utf8Bytes(body),
+        });
+      }
+      if (persistInboundForPhone(meta.role, out.kind)) {
+        await this.putQueued({
+          id: out.id,
+          to: "phone",
+          body,
+          at: now,
+          userId: out.user_id ?? "",
           kind: out.kind,
           bytes: utf8Bytes(body),
         });
@@ -317,7 +329,7 @@ export class Mailbox extends DurableObject<Env> {
     const { take } = drainFor(items, "crane", Date.now());
     for (const m of take) {
       ws.send(m.body);
-      await this.ctx.storage.delete(queueStoreKey(m.id));
+      await this.deleteQueued(m);
     }
   }
 
@@ -327,10 +339,10 @@ export class Mailbox extends DurableObject<Env> {
     const now = Date.now();
     const live = pruneQueue(all, now);
     if (live.length !== all.length) {
-      const keep = new Set(live.map((m) => m.id));
-      for (const m of all) {
-        if (!keep.has(m.id)) {
-          await this.ctx.storage.delete(queueStoreKey(m.id));
+      const keep = new Set(live.map((m) => queueIdentity(m)));
+      for (const [key, m] of rows) {
+        if (!keep.has(queueIdentity(m))) {
+          await this.ctx.storage.delete(key);
         }
       }
     }
@@ -340,16 +352,21 @@ export class Mailbox extends DurableObject<Env> {
   private async putQueued(msg: Queued): Promise<void> {
     const items = await this.loadQueue();
     const next = enqueue(items, msg, { now: Date.now() });
-    const nextIds = new Set(next.map((m) => m.id));
+    const nextKeys = new Set(next.map((m) => queueIdentity(m)));
     for (const m of items) {
-      if (!nextIds.has(m.id)) {
-        await this.ctx.storage.delete(queueStoreKey(m.id));
+      if (!nextKeys.has(queueIdentity(m))) {
+        await this.deleteQueued(m);
       }
     }
-    if (nextIds.has(msg.id)) {
-      const stored = next.find((m) => m.id === msg.id) ?? msg;
-      await this.ctx.storage.put(queueStoreKey(msg.id), stored);
+    if (nextKeys.has(queueIdentity(msg))) {
+      const stored = next.find((m) => queueIdentity(m) === queueIdentity(msg)) ?? msg;
+      await this.ctx.storage.put(queueStoreKey(msg.id, msg.to), stored);
     }
+  }
+
+  private async deleteQueued(item: Pick<Queued, "id" | "to">): Promise<void> {
+    await this.ctx.storage.delete(queueStoreKey(item.id, item.to));
+    await this.ctx.storage.delete(QUEUE_STORE_PREFIX + item.id);
   }
 
   private async dropAckedThrough(since: string, userId?: string): Promise<void> {
@@ -357,7 +374,7 @@ export class Mailbox extends DurableObject<Env> {
     const uid = userId ?? "";
     for (const m of items) {
       if (m.to === "phone" && (m.userId ?? "") === uid && m.id <= since) {
-        await this.ctx.storage.delete(queueStoreKey(m.id));
+        await this.deleteQueued(m);
       }
     }
   }

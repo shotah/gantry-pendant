@@ -1,16 +1,39 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { isIos, isStandalone, listenInstallPrompt, type InstallChoice } from "@/app/lib/install";
+import {
+  installHintOn,
+  isIos,
+  isStandalone,
+  listenInstallPrompt,
+  writeInstallHint,
+  type InstallChoice,
+} from "@/app/lib/install";
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3 w-3" aria-hidden>
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        d="M4 4l8 8M12 4l-8 8"
+      />
+    </svg>
+  );
+}
 
 export function InstallApp({ placement }: { placement: "header" | "block" }) {
   const [choice, setChoice] = useState<InstallChoice | null>(null);
   const [standalone, setStandalone] = useState(false);
   const [ios, setIos] = useState(false);
+  const [hint, setHint] = useState(true);
 
   useEffect(() => {
     setStandalone(isStandalone(window, navigator));
     setIos(isIos(navigator));
+    setHint(installHintOn(window.localStorage));
     return listenInstallPrompt(setChoice, window);
   }, []);
 
@@ -19,17 +42,31 @@ export function InstallApp({ placement }: { placement: "header" | "block" }) {
   }
 
   if (placement === "header") {
-    if (!choice) {
+    if (!choice || !hint) {
       return null;
     }
     return (
-      <button
-        type="button"
-        className="ml-auto shrink-0 text-xs text-mark underline"
-        onClick={() => void choice.prompt()}
-      >
-        Install
-      </button>
+      <span className="ml-auto flex shrink-0 items-center gap-0.5">
+        <button
+          type="button"
+          className="text-xs text-mark underline"
+          onClick={() => void choice.prompt()}
+        >
+          Install
+        </button>
+        <button
+          type="button"
+          aria-label="Dismiss install"
+          title="Dismiss"
+          className="flex h-6 w-6 min-h-0 items-center justify-center rounded-md text-muted hover:bg-track hover:text-fg"
+          onClick={() => {
+            writeInstallHint(window.localStorage, false);
+            setHint(false);
+          }}
+        >
+          <CloseIcon />
+        </button>
+      </span>
     );
   }
 

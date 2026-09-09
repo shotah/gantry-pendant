@@ -69,7 +69,7 @@ function AttachChip({
   }
 
   return (
-    <span ref={root} className="absolute right-1.5 top-1.5 z-10">
+    <span ref={root} className="relative">
       <button
         type="button"
         aria-label="attach"
@@ -77,7 +77,7 @@ function AttachChip({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-visible rounded-full p-0 text-muted"
+        className="relative flex h-7 w-7 min-h-0 shrink-0 items-center justify-center overflow-visible rounded-full p-0 text-muted"
         onClick={() => setOpen((v) => !v)}
       >
         <ClipIcon />
@@ -91,7 +91,7 @@ function AttachChip({
               id={menuId}
               role="dialog"
               aria-label="Attach"
-              className="absolute right-0 bottom-full z-20 mb-1 w-52 rounded-xl border border-line bg-panel p-1.5 shadow-lg"
+              className="absolute bottom-full left-0 z-20 mb-1 w-52 rounded-xl border border-line bg-panel p-1.5 shadow-lg"
             >
               {onPhoto
                 ? (
@@ -352,12 +352,32 @@ export function Compose({
             </div>
           )
         : null}
-      <div className="flex items-center gap-2">
-        <div className="relative min-h-11 min-w-0 flex-1">
+      <div className="flex items-stretch gap-2">
+        <div className="flex min-h-11 min-w-0 flex-1 items-stretch rounded-xl border border-edge bg-canvas">
+          <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 py-0.5 pl-0.5">
+            <EmojiButton
+              disabled={disabled}
+              open={emojiOpen}
+              onToggle={toggleEmoji}
+            />
+            {attach
+              ? (
+                  <AttachChip
+                    gpsOn={Boolean(onGpsToggle || onPin) && gpsOn}
+                    gpsHint={gpsHint}
+                    disabled={disabled}
+                    onPhoto={onPhoto ? () => fileRef.current?.click() : undefined}
+                    onCommands={commands ? toggleCommands : undefined}
+                    onToggle={onGpsToggle}
+                    onPin={onPin}
+                  />
+                )
+              : null}
+          </div>
           <textarea
             ref={boxRef}
             id="compose"
-            className={`block min-h-11 w-full resize-none rounded-xl border border-edge bg-canvas py-2 pl-10 text-sm text-fg ${attach ? "pr-9" : "pr-3"}`}
+            className="block min-h-11 min-w-0 flex-1 resize-none border-0 bg-transparent py-2 pl-1 pr-3 text-chat text-fg outline-none"
             rows={2}
             value={text}
             placeholder={placeholder ?? "Message"}
@@ -403,29 +423,11 @@ export function Compose({
               }
             }}
           />
-          <EmojiButton
-            disabled={disabled}
-            open={emojiOpen}
-            onToggle={toggleEmoji}
-          />
-          {attach
-            ? (
-                <AttachChip
-                  gpsOn={Boolean(onGpsToggle || onPin) && gpsOn}
-                  gpsHint={gpsHint}
-                  disabled={disabled}
-                  onPhoto={onPhoto ? () => fileRef.current?.click() : undefined}
-                  onCommands={commands ? toggleCommands : undefined}
-                  onToggle={onGpsToggle}
-                  onPin={onPin}
-                />
-              )
-            : null}
         </div>
         <button
           type="submit"
           disabled={disabled || !text.trim()}
-          className="shrink-0 rounded-xl border border-accent-line bg-accent-soft px-3 py-2 text-sm text-mark disabled:opacity-40"
+          className="flex shrink-0 items-center justify-center self-stretch rounded-xl border border-accent-line bg-accent-soft px-3 text-sm text-mark disabled:opacity-40"
         >
           Send
         </button>

@@ -13,8 +13,12 @@ export type Queued = {
   bytes: number;
 };
 
-export function queueStoreKey(id: string): string {
-  return QUEUE_STORE_PREFIX + id;
+export function queueStoreKey(id: string, to: Role): string {
+  return `${QUEUE_STORE_PREFIX}${to}:${id}`;
+}
+
+export function queueIdentity(item: Pick<Queued, "id" | "to">): string {
+  return `${item.to}:${item.id}`;
 }
 
 export function shouldQueue(kind?: string): boolean {

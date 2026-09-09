@@ -7,6 +7,7 @@ import { InstallApp } from "@/app/components/chat/InstallApp";
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  window.localStorage.removeItem("pendant.install");
   Reflect.deleteProperty(window, "matchMedia");
 });
 
@@ -36,6 +37,31 @@ describe("InstallApp", () => {
     });
     expect(prompt).toHaveBeenCalledOnce();
     expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
+  });
+
+  it("lets you dismiss the header hint without losing Install in settings", () => {
+    const prompt = vi.fn().mockResolvedValue({ outcome: "accepted" });
+    render(
+      <>
+        <InstallApp placement="header" />
+        <InstallApp placement="block" />
+      </>,
+    );
+    firePrompt(prompt);
+    expect(screen.getByRole("button", { name: "Install" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss install" }));
+    expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Install app" })).toBeTruthy();
+    expect(window.localStorage.getItem("pendant.install")).toBe("off");
+  });
+
+  it("does not show the header hint after it was dismissed", () => {
+    window.localStorage.setItem("pendant.install", "off");
+    const prompt = vi.fn().mockResolvedValue({ outcome: "accepted" });
+    render(<InstallApp placement="header" />);
+    firePrompt(prompt);
+    expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Dismiss install" })).toBeNull();
   });
 
   it("hides the control once the page is already a standalone app", () => {

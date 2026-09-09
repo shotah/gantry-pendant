@@ -12,6 +12,20 @@ export type InstallChoice = {
   prompt: () => Promise<void>;
 };
 
+export const INSTALL_HINT_KEY = "pendant.install";
+
+type Getter = { getItem(key: string): string | null };
+type Setter = { setItem(key: string, value: string): void };
+
+/** Default on. Only `"off"` hides the header Install hint. */
+export function installHintOn(storage: Getter | null | undefined): boolean {
+  return storage?.getItem(INSTALL_HINT_KEY) !== "off";
+}
+
+export function writeInstallHint(storage: Setter, on: boolean): void {
+  storage.setItem(INSTALL_HINT_KEY, on ? "on" : "off");
+}
+
 type PromptEvent = Event & {
   prompt: () => Promise<unknown>;
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { FontSelect } from "../shared/FontSelect";
 import { ThemeSelect } from "../shared/ThemeSelect";
 import type { SlashCommand } from "@/app/lib/slash";
 import { Compose } from "./Compose";
@@ -8,7 +9,7 @@ import { ConfigGapNote } from "./ConfigGapNote";
 import { InstallApp } from "./InstallApp";
 import { KitAvatar } from "./KitAvatar";
 import { SettingsMenu } from "./SettingsMenu";
-import { Thread, type ChatBubble } from "./Thread";
+import { bubbleFrom, Thread, type ChatBubble } from "./Thread";
 import { mailboxUrl, parseIncoming } from "@/app/lib/socket";
 import { browserBattery } from "@/app/lib/battery";
 import { browserBumpBadge, browserClearBadge } from "@/app/lib/badge";
@@ -17,6 +18,7 @@ import { browserBuzzPush } from "@/app/lib/haptic";
 import { browserNet } from "@/app/lib/net";
 import { fileToPhoto } from "@/app/lib/photo";
 import { browserGeoPref, saveGeoPref } from "@/app/lib/prefs";
+import { applyFont, fontFromQuery } from "@/app/lib/font";
 import { applyTheme, themeFromQuery } from "@/app/lib/theme";
 import { browserWakeLock, releaseScreenWake, type WakeLockSentinel } from "@/app/lib/wake";
 import type { ConfigGap } from "@/lib/auth/mode";
@@ -117,6 +119,10 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     const theme = themeFromQuery(q.get("theme"));
     if (theme) {
       applyTheme(theme);
+    }
+    const font = fontFromQuery(q.get("font"));
+    if (font) {
+      applyFont(font);
     }
   }, []);
 
@@ -388,12 +394,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         }
         seenIds.current.add(id);
       }
-      const from = phone ? "kit" : "you";
       setMessages((prev) => [
         ...prev,
         {
           id: id ?? `${Date.now()}-${prev.length}`,
-          from,
+          from: bubbleFrom(phone, frame.kind),
           text: frame.text ?? "",
           kind: frame.kind,
           at: Date.now(),
@@ -691,7 +696,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             empty={(
               <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
                 <KitAvatar {...faceProps} size="lg" editable={false} />
-                <p className="text-sm text-dim">
+                <p className="text-chat text-dim">
                   Nothing yet. Type below — or / for harness commands.
                 </p>
               </div>
@@ -722,7 +727,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         <div className="flex min-w-0 items-center gap-2">
           <KitAvatar {...faceProps} size="md" />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-fg">{title}</p>
+            <p className="truncate text-chat font-medium text-fg">{title}</p>
             <p className="text-[11px] text-dim">
               <span className={status === "up" ? "text-ok" : "text-dim"}>
                 {status === "up" ? "live" : status === "down" ? "down" : "idle"}
@@ -810,6 +815,10 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             <div className="flex flex-col gap-1">
               <span className="text-xs text-muted">Theme</span>
               <ThemeSelect />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted">Font size</span>
+              <FontSelect />
             </div>
             {(cfg?.dev || (cfg?.google && phone))
               ? (

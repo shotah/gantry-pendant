@@ -50,7 +50,7 @@ body {
   input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
   select,
   textarea {
-    font-size: 1rem !important;
+    font-size: max(1rem, var(--chat-font, 1rem)) !important;
     min-height: 2.75rem;
   }
 

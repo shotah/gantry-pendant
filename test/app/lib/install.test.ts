@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { isIos, isStandalone, listenInstallPrompt } from "@/app/lib/install";
+import {
+  INSTALL_HINT_KEY,
+  installHintOn,
+  isIos,
+  isStandalone,
+  listenInstallPrompt,
+  writeInstallHint,
+} from "@/app/lib/install";
 
 describe("install", () => {
   it("treats standalone display-mode as installed", () => {
@@ -33,5 +40,22 @@ describe("install", () => {
     target.dispatchEvent(new Event("appinstalled"));
     expect(onChange).toHaveBeenLastCalledWith(null);
     stop();
+  });
+
+  it("defaults the header hint on and only treats off as dismissed", () => {
+    const mem = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => mem.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        mem.set(k, v);
+      },
+    };
+    expect(installHintOn(null)).toBe(true);
+    expect(installHintOn(storage)).toBe(true);
+    writeInstallHint(storage, false);
+    expect(mem.get(INSTALL_HINT_KEY)).toBe("off");
+    expect(installHintOn(storage)).toBe(false);
+    writeInstallHint(storage, true);
+    expect(installHintOn(storage)).toBe(true);
   });
 });
