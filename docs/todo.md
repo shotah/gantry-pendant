@@ -44,7 +44,10 @@ origin; two tabs are not enough.
 - [ ] GCP Web application client (`openid email profile` only). Redirect
       = this origin — not `oauth-catch`, not `localhost:4100`
 - [ ] Worker secrets: Google + `SESSION_SECRET` + `CRANE_BEARERS`.
-      `ALLOWED_SUBS` optional. Spike `MAILBOX_SECRET` gone from prod
+      `ALLOWED_SUBS` optional. Spike `MAILBOX_SECRET` gone from prod.
+      **Gantree Settings + mint on build** — not this checkout
+      ([gantree manage_pendant_cf_todo.md](https://github.com/shotah/gantree/blob/main/docs/manage_pendant_cf_todo.md)).
+      Leftover: `npm run secrets:push`
 
 ### Pocket (P5)
 

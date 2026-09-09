@@ -9,14 +9,23 @@ This is **not** “add a field on the Gantree person and they can chat.”
 Gantree operates cranes. Chat is the crane’s list, enforced by this
 Worker. Saving a yard profile does not open the door.
 
----
+## Who provisions what
+
+| Piece | Where |
+| --- | --- |
+| Worker **code** (this app + Durable Object) | this repo — CI / `npm run release` |
+| Worker **secrets** (Google, session, `CRANE_BEARERS`) | Gantree **Settings → Pendant** |
+| Crane `.env` (channel, mailbox URL, bearer, allowlist) | Gantree **Build** / Pendant fold |
+
+Do not `npm run secrets:push` after the yard owns those secrets. A bulk
+put from this checkout can drop bearers Gantree minted.
 
 ## Short answer
 
 | Question | Today |
 | --- | --- |
 | Where do I add a human who may talk to an agent? | One list: crane `PENDANT_ALLOWED_USERS`. Recreate. The crane publishes it; this Worker enforces it. |
-| Is that all in Gantree? | The list, yes (wizard or Secrets). Worker secrets stay in Cloudflare: Google + session + **one bearer per crane**. |
+| Is that all in Gantree? | The list, yes. Worker secrets too: Settings → Pendant (Google + session) and Build (one bearer per crane). |
 | What do I add on the Gantree **user**? | Email (and, once learned, Google `sub`). Nothing that opens chat by itself. |
 | How does that update ai-gantry? | Recreate the crane. The harness reads `CHANNEL=pendant` + `PENDANT_*` at **boot**. Restart keeps a ghost list. |
 | How does the agent talk to that Google user? | Phone signs in on the pendant. `/api/auth/me` lists their cranes. Worker stamps `user_id` = `sub` and `email`. Crane ignores anyone not on `PENDANT_ALLOWED_USERS`. |
@@ -29,14 +38,16 @@ talk to Kit without ever logging into Gantree.
 ## What you paste (the connect)
 
 One human list. Email is a real match (verified Google claim,
-lowercased), not a label.
+lowercased), not a label. Gantree writes the crane `.env` and the
+Worker `CRANE_BEARERS` line. You paste Google client + Cloudflare token
+**once** in Settings.
 
 ```text
-Cloudflare Worker
-  CRANE_BEARERS=kit:<bearer>
+Cloudflare Worker   (Gantree Settings + Build)
+  GOOGLE_*  SESSION_SECRET  CRANE_BEARERS=kit:<bearer>
   # ALLOWED_SUBS is optional break-glass, not required
 
-Crane .env  (Gantree wizard or Secrets — this is what ai-gantry reads)
+Crane .env  (Gantree Build / Pendant fold — this is what ai-gantry reads)
   CHANNEL=pendant
   PENDANT_MAILBOX_URL=wss://gantry-pendant.<account>.workers.dev/ws/kit
   PENDANT_BEARER=<same bearer>
@@ -56,7 +67,8 @@ up on the Worker.
                     Gantree (yard)
                     operator + passphrase
                            |
-                           | writes crane .env only
+                           | Settings → Pendant  (Google, SESSION_SECRET)
+                           | Build / rotate      (CRANE_BEARERS + crane .env)
                            v
 phone -- Google --> Worker mailbox (room list) <-- crane (PENDANT_BEARER)
                          Durable Object /ws/kit
@@ -74,8 +86,8 @@ phone -- Google --> Worker mailbox (room list) <-- crane (PENDANT_BEARER)
 
 ## Once (before any person)
 
-The Worker and the GCP client have to exist. Gantree cannot create them.
-Steps: [deployment.md](deployment.md).
+The Worker **code** and the GCP client have to exist. Gantree cannot
+create those. Steps: [deployment.md](deployment.md).
 
 1. Deploy this repo ([deployment.md](deployment.md)). GitHub Actions
    deploys the Worker on push to `main` and on `v*` tags
@@ -83,11 +95,11 @@ Steps: [deployment.md](deployment.md).
    `npm run build && npm run deploy`. Note the origin, e.g.
    `https://gantry-pendant.<account>.workers.dev`.
 
-   First code deploy with no Worker secrets is `503 config` until you
-   paste those (safe). Do not set `MAILBOX_SECRET` or `PENDANT_DEV` on
-   the Worker.
+   First code deploy with no Worker secrets is `503 config` until
+   Gantree pushes those (safe). Do not set `MAILBOX_SECRET` or
+   `PENDANT_DEV` on the Worker.
 2. GCP: **new Web application** client. Scopes `openid email profile`
-   only. Redirect:
+   only. Redirect (Gantree Settings shows this after you save origin):
 
    ```text
    https://<that-origin>/api/auth/callback/google
@@ -95,18 +107,22 @@ Steps: [deployment.md](deployment.md).
 
    Not `oauth-catch`, not `localhost:4100`, not the google-mcp Desktop
    client.
-3. Cloudflare secrets on **this** Worker:
+3. **Gantree Settings → Pendant** (admin). Cloudflare API token (Edit
+   Cloudflare Workers), account id, Worker name, origin, Google client
+   id/secret. Save and push. That puts:
 
    ```text
    GOOGLE_CLIENT_ID
    GOOGLE_CLIENT_SECRET
-   SESSION_SECRET          # npm run secret
-   CRANE_BEARERS           # kit:<token>  — npm run secret
+   SESSION_SECRET          # minted if empty
    ```
 
    Optional: `ALLOWED_SUBS` as a yard-wide extra (break-glass). The
-   crane list is the door. KV bind + GitHub paste:
+   crane list is the door. KV bind + GitHub paste for **code** deploy:
    [deployment.md](deployment.md).
+
+   Leftover, no yard: `npm run secrets:push` from this `.env`. Do not
+   mix that with Gantree after the yard owns `CRANE_BEARERS`.
 
    The moment Google is on, `MAILBOX_SECRET` (two-tab spike) is
    rejected. Leave Worker-level Cloudflare Access **off**.
@@ -129,21 +145,18 @@ You are already a Gantree **admin**. Chat is still not this UI.
 and assigned cranes decide who may **operate** Kit (grant, Secrets,
 recreate) — not who may **message** her.
 
-On `/profile` you can store email and Telegram / Slack / Discord ids.
-Those do **not** become `PENDANT_ALLOWED_USERS`. Do not look for a
-Google field. There isn’t one.
+On `/profile` you can store email, Telegram / Slack / Discord ids, and
+a Google `sub` once it is learned. Those do **not** become
+`PENDANT_ALLOWED_USERS` until you tick the person on Kit’s Pendant
+fold (confirm-scary).
 
 ### B. Point Kit at the mailbox
 
-**New crane:** Build → channel **pendant** → paste
+**New crane:** Build → channel **pendant** → tick who may talk
+(email is enough). The yard mints the bearer, pushes `CRANE_BEARERS`,
+fills `PENDANT_MAILBOX_URL`. No paste from this checkout.
 
-- mailbox URL (`wss://…/ws/<this-slug>`)
-- mailbox bearer (same token as `CRANE_BEARERS` for that slug)
-- Google `sub` allowlist (`PENDANT_ALLOWED_USERS` — email, `sub`, or
-  `sub:email`)
-
-**Existing crane:** open Kit → **Secrets** → set `CHANNEL=pendant` and
-the three `PENDANT_*` keys (or change mouth from telegram). Save.
+**Existing crane:** Kit → Pendant fold → allowlist, or **Rotate bearer**.
 
 Then **recreate**, not restart. ai-gantry reads the list at boot. An
 empty `PENDANT_ALLOWED_USERS` fails boot (same as Telegram).
@@ -153,23 +166,21 @@ gate as Telegram. When `CHANNEL=pendant`, Gantree also POSTs that file
 to this Worker (`/api/avatar?slug=`). The phone can replace it from the
 header. Chat photos never become the face.
 
-Gantree does **not** push `CRANE_BEARERS` to Cloudflare. After you add
-a human, recreate Kit. The crane publishes `allow`; the room follows.
+After you add a human, recreate Kit. The crane publishes `allow`; the
+room follows. Bearer rotate from the panel is the instant kill if the
+crane is down.
 
 ### C. Add another human later
 
-1. Put their email (or `sub`) on `PENDANT_ALLOWED_USERS`.
+1. Kit → Pendant fold: tick the operator (or paste an email).
 2. Recreate Kit.
-
-Until a confirm-scary “add this operator to Kit’s pendant allowlist”
-exists, Secrets + recreate is the whole admin path.
 
 ### D. Yank / stolen phone
 
-1. Remove them from `PENDANT_ALLOWED_USERS`.
+1. Untick / remove from Kit’s Pendant list.
 2. Recreate the crane. Their socket closes `4401` when the new `allow`
    lands (stale list until then).
-3. Rotate `CRANE_BEARERS` + `PENDANT_BEARER` if the token leaked
+3. Rotate bearer on the Pendant fold if the token leaked
    (instant kill while the crane is down).
 4. Lock the phone; Google → sign out other sessions.
 
@@ -229,10 +240,9 @@ crane.
 
 ## Checklist (first working mouth)
 
-- [ ] Worker deployed; GCP redirect = this origin
-- [ ] Worker secrets: Google + session + `CRANE_BEARERS` (`ALLOWED_SUBS` optional)
+- [ ] Worker **code** deployed from this repo; GCP redirect = this origin
+- [ ] Gantree Settings → Pendant: Google + session (`ALLOWED_SUBS` optional)
 - [ ] KV `DIRECTORY` bound
-- [ ] Gantree: channel pendant, URL `/ws/<slug>`, same bearer, human list
-- [ ] Recreated
+- [ ] Gantree: Build channel pendant, tick humans, recreate (yard mints bearer)
 - [ ] Phone Google sign-in; crane list or “not on any crane yet”
 - [ ] Yard cookie never sent to the Worker

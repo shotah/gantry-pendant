@@ -80,7 +80,8 @@ same secret. Type in one, see it in the other.
 
 ```bash
 npm run shot                     # assets/docs/*.png — needs `npm run dev`
-npm run secret                   # mint a bearer / mailbox secret
+npm run secret                   # mint a loopback bearer / mailbox secret
+# npm run secrets:push           # leftover — Gantree Settings owns workers.dev secrets
 npm run deploy                   # after `npm run build` — workers.dev (laptop)
 npm run release                  # bump patch, tag, push (GitHub Release + Workers)
 npm run release:dry              # print the next tag only
@@ -89,14 +90,19 @@ npm run release:dry              # print the next tag only
 Google login is a **new Web application** client on the same GCP
 project as google-mcp. Scopes: `openid email profile` only. Redirect:
 `https://<this-origin>/api/auth/callback/google` — not the Pages
-`oauth-catch` URI, not `localhost:4100`. Put `GOOGLE_CLIENT_ID` /
-`GOOGLE_CLIENT_SECRET` / `SESSION_SECRET` / `CRANE_BEARERS` in Worker
-secrets. Bind KV `DIRECTORY`. `ALLOWED_SUBS` is an optional extra.
-Empty crane list fails boot. The spike secret is rejected once Google
-is on. GitHub Actions deploys on `main` and `v*` tags; Worker secrets
-stay on Cloudflare.
+`oauth-catch` URI, not `localhost:4100`.
 
-Crane env (`CHANNEL=pendant`):
+**This repo deploys Worker code.** Google / `SESSION_SECRET` /
+`CRANE_BEARERS` are **Gantree Settings → Pendant** and Build (mint a
+bearer per crane). Bind KV `DIRECTORY`. `ALLOWED_SUBS` is optional
+break-glass. Empty crane list fails boot. The spike secret is rejected
+once Google is on. GitHub Actions deploys on `main` and `v*` tags; CI
+never sees Worker app secrets.
+
+Leftover, no yard: `.env` + `npm run secrets:push`. Do not mix that
+with Gantree after the yard owns `CRANE_BEARERS`.
+
+Crane env (`CHANNEL=pendant`) is written by Gantree:
 
 ```env
 PENDANT_MAILBOX_URL=wss://gantry-pendant.<account>.workers.dev/ws/kit
@@ -104,11 +110,10 @@ PENDANT_BEARER=<bound to kit>
 PENDANT_ALLOWED_USERS=<email or google-sub>
 ```
 
-Yard: pick **pendant** in the build wizard, paste those three, recreate.
-The console cookie never goes to this Worker. Gantree does **not** write
-Worker secrets and does not store a Google `sub` on the operator.
-First Workers ship: [docs/deployment.md](docs/deployment.md). Then
-[docs/setup.md](docs/setup.md).
+Yard: Settings → Pendant once, then Build channel **pendant**, tick
+who may talk, recreate. No bearer paste. The console cookie never goes
+to this Worker. First Workers ship: [docs/deployment.md](docs/deployment.md).
+Then [docs/setup.md](docs/setup.md).
 
 ## This is not
 

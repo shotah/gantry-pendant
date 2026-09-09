@@ -20,12 +20,11 @@ This is not a product page. It is the second brain the walks still need.
 | Mouth | crane `.env` `PENDANT_ALLOWED_USERS` | Google `sub` or verified email | who the **agent** will answer |
 
 Gantree never sits in a chat turn. Saving a profile does **not** open the
-mailbox. Recreating a crane does **not** write Worker secrets. A yard
-`gantree_session` cookie on the Worker is ignored (and must stay that way).
+mailbox. Recreating a crane does **not** by itself push Google OAuth —
+that is Settings → Pendant, once. A yard `gantree_session` cookie on the
+Worker is ignored (and must stay that way).
 
-**Cover:** treat a new human as one list + recreate. Until a Gantree
-“add this operator to Kit’s pendant” button exists, the admin copies
-email or `sub` into `PENDANT_ALLOWED_USERS` by hand.
+**Cover:** treat a new human as Kit’s Pendant fold + recreate.
 
 ---
 
@@ -51,9 +50,11 @@ Email is a real match when Google says `email_verified`. The session
 id and `user_id` are always `sub`. Optional Worker `ALLOWED_SUBS` is
 break-glass, not a second copy of the crane list.
 
-Gantree Secrets writes the **crane** `.env`. It cannot see Cloudflare.
-`wrangler secret put CRANE_BEARERS` is the one Cloudflare paste per
-crane.
+Gantree Settings writes Worker Google / session. Gantree Build writes
+the **crane** `.env` and merges `CRANE_BEARERS`. Do not also
+`npm run secrets:push` from this checkout after that — a bulk put can
+drop yard-minted slugs. Bearer rotation on the Pendant fold is the
+instant kill if the crane is down.
 
 **Cover:** after the crane list, recreate (restart keeps a ghost
 allowlist). The room closes yanked sockets `4401` when the new `allow`
@@ -63,10 +64,9 @@ lands. Bearer rotation is the instant kill if the crane is down.
 
 ## How you even get a Google `sub`
 
-There is no Gantree field for it yet. Profile chat ids are Telegram /
-Slack / Discord only. Inject user copies those into `PERSONA.md`, not
-onto a crane allowlist (Telegram has its own confirm-scary copy; pendant
-does not).
+Profile can store a Google `sub` once learned (digits). Email is enough
+to start. Inject user copies email into `PERSONA.md` as text, not as a
+mailbox key. Kit’s Pendant fold writes `PENDANT_ALLOWED_USERS`.
 
 The OIDC callback **mints** a session for any verified Google account.
 The cookie opens no room. `/api/auth/me` returns `{ sub, email, cranes }`.
@@ -77,7 +77,7 @@ A stranger sees `cranes: []` and their own id — never anyone else’s.
 1. Sign in on the pendant. Empty crane list shows email + `sub` with a
    copy button. Send that to the yard admin. Do **not** put `sub` on
    the query string.
-2. Admin pastes email (or `sub`) into `PENDANT_ALLOWED_USERS`, recreates.
+2. Admin ticks them on Kit’s Pendant fold (email is enough), recreates.
 3. Next `/me` lists the crane. First frame carries `user_id` + `email`.
 
 ---
@@ -226,16 +226,14 @@ first. A long turn looks idle until the model finishes.
 ## What Gantree does **not** do
 
 - No chat route, no `/api/gantries/…/messages`.
-- No write to Worker `CRANE_BEARERS` (or optional `ALLOWED_SUBS`).
-- No Google `sub` on the operator row (Telegram-style copy button is
-  Later: “add this operator to Kit’s pendant allowlist”).
-- Operator **email** is a profile label and Inject-user fodder, not a
-  mailbox key and not a password reset.
+- No Worker **code** deploy (this repo’s CI still ships the Worker).
+- Operator **email** is not a password reset.
 - `repos/` is excluded from the yard `tsconfig` on purpose — this
   checkout typechecks itself.
 
-**Cover:** paste mailbox URL + bearer + human list in the wizard (or Secrets),
-recreate. Keep the Worker secrets in Cloudflare. One list, one recreate.
+**Cover:** Gantree Settings → Pendant once (Google + session). Build
+channel pendant (yard mints bearer). Recreate. Keep `MAILBOX_SECRET` /
+`PENDANT_DEV` off `workers.dev`.
 
 ---
 
@@ -244,7 +242,7 @@ recreate. Keep the Worker secrets in Cloudflare. One list, one recreate.
 1. Lock the phone; Google → sign out other sessions.
 2. Yank them from the **crane** list and recreate (next `allow` closes
    4401). Optional: yank from Worker `ALLOWED_SUBS` if you used it.
-3. Rotate `CRANE_BEARERS` + `PENDANT_BEARER`; recreate.
+3. Rotate Kit’s bearer from the Gantree Pendant fold; recreate.
 4. If `.env` leaked, assume the bearer is burned.
 
 A compromised allowlisted human is Telegram’s bar: they can still burn
@@ -256,9 +254,9 @@ Telegram pin.
 ## Checklist (after deploy)
 
 - [ ] GCP Web client, redirect = this origin, `openid email profile` only
-- [ ] Worker secrets: Google + session + `CRANE_BEARERS` (`ALLOWED_SUBS` optional)
+- [ ] Gantree Settings → Pendant: Google + session (`ALLOWED_SUBS` optional)
 - [ ] Spike `MAILBOX_SECRET` gone from prod
-- [ ] Crane `.env`: `CHANNEL=pendant`, URL `/ws/<slug>`, bearer, human list
+- [ ] Gantree Build channel pendant; yard minted bearer; human list
 - [ ] Recreated (not restarted)
 - [ ] Phone Google sign-in; unknown account never joins the DO
 - [ ] Kit’s bearer cannot open Ada’s slug

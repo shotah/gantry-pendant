@@ -96,6 +96,8 @@ gantree/                   yard — CHANNEL in the build wizard
 
 Gantree does not grow a chat route. The wizard has another mouth the
 way it already has Discord and Slack: env + allowlist, then recreate.
+Settings → Pendant pushes Worker Google / session; Build mints the
+crane bearer. This repo only deploys Worker **code**.
 
 ## Mailbox room
 

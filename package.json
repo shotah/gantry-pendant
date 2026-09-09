@@ -17,6 +17,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "secret": "node -e \"console.log(crypto.randomBytes(32).toString('base64url'))\"",
+    "secrets:push": "node scripts/push-secrets.mjs",
+    "secrets:push:dry": "node scripts/push-secrets.mjs --dry-run",
     "shot": "node scripts/shot.mjs",
     "release": "node scripts/release.mjs",
     "release:dry": "node scripts/release.mjs --dry-run",

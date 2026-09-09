@@ -1,31 +1,39 @@
 # Deployment — Cloudflare Worker
 
-Ship this app to `workers.dev`. After it is up, who may talk:
-[setup.md](setup.md).
+Ship **this app** (code) to `workers.dev`. After it is up, who may talk
+and how agents get bearers: [setup.md](setup.md).
 
 Pendant is a Cloudflare Worker, not a container. **gantree** and
 **ai-gantry** publish images; this repo does not. Wrangler creates the
-Worker named `gantry-pendant` on first deploy — do not create it in the
-dashboard first.
+Worker named `gantry-pendant` on first **code** deploy — do not create
+it in the dashboard first.
 
 | Step | Where |
 | --- | --- |
-| Cloudflare API token + account id + KV namespace | Once, then GitHub |
-| `npm run release` or push `main` | GitHub Actions deploys after tests |
-| Google + session + crane bearers | Worker secrets on Cloudflare, not GitHub |
+| Cloudflare API token + account id + KV namespace | Once, then GitHub (CI **code** deploy) |
+| `npm run release` or push `main` | GitHub Actions deploys **code** after tests |
+| Google + session + crane bearers | **Gantree Settings → Pendant** + Build. Not GitHub. Not this `.env` |
 
 Local deploy (debug wrangler on this machine): `npm run build && npm run deploy`.
 Prefer CI.
 
-`.dev.vars` / `.env` are Worker **app** env (Google, session, bearers,
-`PENDANT_DEV`). They are not a place for the Cloudflare API token.
+`.dev.vars` / `.env` are loopback Worker **app** env (`PENDANT_DEV`,
+spike `MAILBOX_SECRET`). They are not a place for the Cloudflare API
+token, and they are not the production secret store.
 
 | Thing | Where it lives |
 | --- | --- |
 | Cloudflare login on this laptop | `npx wrangler login` (OAuth under `~/.config/.wrangler`) |
-| CI deploy to Workers | GitHub **secrets** `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` |
+| CI **code** deploy to Workers | GitHub **secrets** `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` |
 | KV namespace id | GitHub **variable** `DIRECTORY_KV_ID` (not a secret; 32 hex) |
-| Google / session / crane bearers | Cloudflare Worker secrets (`wrangler secret put`), or `.dev.vars` on loopback |
+| Google / session / crane bearers | Gantree Settings → Pendant (yard sqlite). Leftover: `npm run secrets:push` |
+
+Wrangler may offer to paste the KV id into `wrangler.jsonc`. Decline, or
+revert — leave `directory-local` in git. CI injects the real id from the
+GitHub variable. `remote: true` on that binding would make local preview
+talk to production KV.
+
+---
 
 Wrangler may offer to paste the KV id into `wrangler.jsonc`. Decline, or
 revert — leave `directory-local` in git. CI injects the real id from the
@@ -72,7 +80,7 @@ This repo → **Settings → Secrets and variables → Actions**.
 - `DIRECTORY_KV_ID` — the 32-hex id from step 2
 
 Do **not** put `GOOGLE_*`, `SESSION_SECRET`, or `CRANE_BEARERS` here.
-Those stay on the Worker. CI never sees them.
+Those stay on the Worker, pushed from **Gantree**. CI never sees them.
 
 ### 4. Deploy
 
@@ -102,24 +110,33 @@ Do not set `MAILBOX_SECRET` or `PENDANT_DEV` on this Worker.
 
 ---
 
-## After the Worker exists — not GitHub
+## After the Worker exists — Gantree, not this `.env`
 
-### 5. Worker secrets (Cloudflare)
+### 5. Worker secrets (Google, session, agents)
 
-Same checkout, wrangler already logged in:
+**Gantree Settings → Pendant** (admin): Cloudflare API token with Edit
+Cloudflare Workers (can be a **second** token from the CI one, or the
+same template), account id, Worker name (`gantry-pendant`), origin,
+Google Web client. Save and push.
+
+**Gantree Build** (channel pendant): mints `CRANE_BEARERS` for that
+slug, writes crane `.env`. Recreate. Rotate from the crane’s Pendant
+fold.
+
+Walk: [setup.md](setup.md). Gantree
+[manage_pendant_cf_todo.md](https://github.com/shotah/gantree/blob/main/docs/manage_pendant_cf_todo.md).
 
 ```bash
-npm run secret                               # mint SESSION_SECRET
-npm run secret                               # mint a crane bearer
-npx wrangler secret put GOOGLE_CLIENT_ID
-npx wrangler secret put GOOGLE_CLIENT_SECRET
-npx wrangler secret put SESSION_SECRET
-npx wrangler secret put CRANE_BEARERS        # kit:<that-bearer>
+# Leftover — loopback without a yard, or break-glass.
+# Do not mix with Gantree after the yard owns CRANE_BEARERS.
+# cp .env.example .env
+# npm run secret
+# npm run secrets:push:dry
+# npm run secrets:push
 ```
 
-`CRANE_BEARERS` is `slug:token`. One crane cannot use another's token.
-Optional yard-wide extra: `npx wrangler secret put ALLOWED_SUBS`. The
-crane list is the door — this is break-glass only.
+`MAILBOX_SECRET` and `PENDANT_DEV` stay in `.env` / `.dev.vars` for
+loopback. Never put them on `workers.dev`.
 
 ### 6. Google OAuth client
 
@@ -130,28 +147,30 @@ wrong one). Scopes: `openid email profile` only. Redirect:
 https://gantry-pendant.<account>.workers.dev/api/auth/callback/google
 ```
 
-Not `oauth-catch`, not `localhost:4100`. Re-put `GOOGLE_CLIENT_ID` /
-`GOOGLE_CLIENT_SECRET` if the client was created after step 5.
+Not `oauth-catch`, not `localhost:4100`. Paste id/secret in Gantree
+Settings (it shows this URI after origin is saved).
 
 ### 7. Point a crane at it
 
-Mailbox URL, same bearer, human list, **recreate** (not restart). Walk:
-[setup.md](setup.md). Gantree does not write Worker secrets.
+Gantree Build → channel **pendant** → tick humans → recreate. No bearer
+paste. [setup.md](setup.md).
 
 ---
 
 ## Later deploys
 
-Skip 1–3. Skip 5–6 unless rotating a secret or the OAuth client.
+Skip 1–3. Skip 5–6 unless rotating Google or the origin.
 
 ```bash
 npm run release
 ```
 
-Or merge to `main`. Either one deploys after tests.
+Or merge to `main`. Either one deploys **code** after tests. Worker
+secrets stay put (Gantree / Cloudflare), not overwritten by CI.
 
-Rotate a bearer: `wrangler secret put CRANE_BEARERS`, put the same
-token on the crane as `PENDANT_BEARER`, recreate.
+Rotate a bearer: Gantree → Kit → Pendant fold → Rotate bearer, then
+recreate. Leftover: `npm run secrets:push` from this `.env` (can drop
+other slugs the yard minted).
 
 ---
 
@@ -173,7 +192,7 @@ Phone chat is this Worker plus a crane with `CHANNEL=pendant`.
 | --- | --- |
 | Workers job: “Set repo secrets CLOUDFLARE_…” | Step 3 missing. Re-run CI after paste. |
 | Workers job: DIRECTORY KV id is still the placeholder | GitHub **variable** `DIRECTORY_KV_ID` missing or not 32 hex. |
-| Site is `503 config` | Step 5 incomplete. Code deploy is fine. |
+| Site is `503 config` | Step 5 incomplete (Gantree Settings not pushed). Code deploy is fine. |
 | Google redirect mismatch | Step 6 URI is not this origin. |
 | Green deploy, empty crane list on the phone | Not a deploy miss — crane `PENDANT_ALLOWED_USERS` + recreate. [setup.md](setup.md). |
 
