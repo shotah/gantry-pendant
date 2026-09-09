@@ -37,12 +37,13 @@ ports. The Mini does not have to be the mailbox.
   &nbsp;
   <img src="assets/docs/thread.png" alt="Ada talking to Kit" width="180">
   &nbsp;
-  <img src="assets/docs/ping.png" alt="Cron ping in the thread" width="180">
+  <img src="assets/docs/stream.png" alt="Kit typing with a live draft" width="180">
   &nbsp;
-  <img src="assets/docs/photo.png" alt="Photo on an inbound turn" width="180">
+  <img src="assets/docs/emoji.png" alt="Emoji picker" width="180">
 </p>
 
-Every screen, Lamp theme, crane stand-in: [docs/screens.md](docs/screens.md).
+Every screen, Lamp, extra-large type, crane stand-in:
+[docs/screens.md](docs/screens.md).
 
 **Docs (the plan lives here, not in chat):**
 
@@ -71,9 +72,9 @@ npm run dev                      # http://127.0.0.1:3000 — Chrome can Install 
 ```
 
 Loopback with `PENDANT_DEV=1`: mock Ada, no Google. `/?sample=thread`
-(and `ping`, `photo`, `empty`, …) paints canned scenes.
-Compose without a sample gets canned Kit replies. Type the spike
-secret to join the real room.
+(and `stream`, `emoji`, `ping`, `photo`, `empty`, …) paints canned
+scenes. Compose without a sample gets canned Kit replies. Type the
+spike secret to join the real room.
 
 Open two tabs: `/` (phone) and `/crane` (crane stand-in). Same slug,
 same secret. Type in one, see it in the other.

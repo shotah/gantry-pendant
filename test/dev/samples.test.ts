@@ -55,6 +55,18 @@ describe("samples", () => {
     expect(sampleScene("cmds", "phone").draft).toBe("/");
     expect(sampleScene("cmds", "phone").catalog?.map((c) => c.name)).toEqual(["new", "status", "brief"]);
     expect(sampleScene("empty", "phone").draft).toBeUndefined();
+    expect(parseSample("stream")).toBe("stream");
+    expect(parseSample("emoji")).toBe("emoji");
+    const stream = sampleScene("stream", "phone");
+    expect(stream.typing).toBe(true);
+    expect(stream.messages.map((m) => m.kind)).toEqual([undefined, "draft"]);
+    expect(stream.messages[1]?.text).toBe(SAMPLE_LINES.streamDraft);
+    expect(sampleScene("emoji", "phone").emoji).toBe(true);
+    expect(sampleScene("emoji", "phone").messages.map((m) => m.text)).toEqual(
+      sampleScene("thread", "phone").messages.map((m) => m.text),
+    );
+    expect(sampleScene("thread", "phone").typing).toBeUndefined();
+    expect(sampleScene("thread", "phone").emoji).toBeUndefined();
   });
 
   it("rotates canned Kit replies", () => {

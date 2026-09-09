@@ -168,6 +168,7 @@ export function Compose({
   commands,
   catalog = [],
   initialText = "",
+  initialEmoji = false,
 }: {
   disabled?: boolean;
   placeholder?: string;
@@ -181,11 +182,12 @@ export function Compose({
   commands?: boolean;
   catalog?: readonly SlashCommand[];
   initialText?: string;
+  initialEmoji?: boolean;
 }) {
   const [text, setText] = useState(() => applyEmoji(initialText, initialText.length, "send").text);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(initialEmoji);
   const [active, setActive] = useState(0);
-  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(initialEmoji);
   const [emojiQuery, setEmojiQuery] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);

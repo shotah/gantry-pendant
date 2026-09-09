@@ -4,7 +4,7 @@
  *
  *   PENDANT_DEV=1 in .dev.vars, then `npm run dev`
  *   npm run shot
- *   npm run shot -- http://127.0.0.1:3000 thread ping
+ *   npm run shot -- http://127.0.0.1:3000 thread stream emoji
  *
  * Samples only paint on loopback with PENDANT_DEV (see lib/dev).
  */
@@ -58,6 +58,33 @@ const SHOTS = {
   },
   photo: { path: "/?sample=photo", sel: "[data-shot=phone]", text: "right hatch", phone: true },
   down: { path: "/?sample=down", sel: "[data-shot=phone]", text: "is the gate still open", phone: true },
+  stream: {
+    path: "/?sample=stream",
+    sel: "[data-shot=phone]",
+    text: "typing…",
+    phone: true,
+  },
+  emoji: {
+    path: "/?sample=emoji",
+    sel: "[aria-label=Emoji]",
+    phone: true,
+  },
+  "thread-xl": {
+    path: "/?sample=thread&font=xl",
+    sel: "[data-shot=phone]",
+    text: "Leave-by 20:50",
+    phone: true,
+    font: "xl",
+  },
+  settings: {
+    path: "/?sample=empty",
+    sel: "[aria-label=Settings]",
+    text: "Font size",
+    phone: true,
+    click: "[aria-label=settings]",
+    ready: "[data-shot=phone]",
+    readyText: "Nothing yet",
+  },
   crane: {
     path: "/crane?sample=crane",
     sel: "[data-shot=crane]",
@@ -229,12 +256,23 @@ try {
     const spec = SHOTS[name];
     await metrics(Boolean(spec.phone));
     const theme = spec.theme || "boom";
+    const font = spec.font || "sm";
     await evalJson(
       cdp,
-      `localStorage.setItem("pendant.theme", ${JSON.stringify(theme)}); document.documentElement.setAttribute("data-theme", ${JSON.stringify(theme)});`,
+      `localStorage.setItem("pendant.theme", ${JSON.stringify(theme)}); document.documentElement.setAttribute("data-theme", ${JSON.stringify(theme)}); localStorage.setItem("pendant.font", ${JSON.stringify(font)}); document.documentElement.setAttribute("data-font", ${JSON.stringify(font)});`,
     );
     await goto(base + spec.path);
-    await waitSel(spec.sel, spec.text);
+    await waitSel(spec.ready || spec.sel, spec.readyText || spec.text);
+    if (spec.click) {
+      const clicked = await evalJson(
+        cdp,
+        `(() => { const el = document.querySelector(${JSON.stringify(spec.click)}); if (!el) return false; el.click(); return true; })()`,
+      );
+      if (!clicked) {
+        throw new Error("click missed " + spec.click);
+      }
+      await waitSel(spec.sel, spec.text);
+    }
     await evalJson(cdp, "window.scrollTo(0,0)");
     await sleep(500);
     await shotView(`${name}.png`);

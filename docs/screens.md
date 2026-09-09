@@ -12,9 +12,10 @@ canned Ada/Kit turns — not a live crane.
 ## Phone
 
 The product viewport is a pocket (390×844). Theme defaults to Boom.
-Kit’s face sits in the header (tap to replace it). Empty and unsigned
-screens use the same mark. Fallback is the pendant glyph until a JPEG
-is saved on the Durable Object.
+Chat type defaults to Small; Extra large is a shot. Kit’s face sits in
+the header (tap to replace it). Compose has emoji on the left, attach
+under it. Empty and unsigned screens use the same mark. Fallback is the
+pendant glyph until a JPEG is saved on the Durable Object.
 
 <p align="center">
   <img src="../assets/docs/login.png" alt="Sign in with Google" width="220">
@@ -33,6 +34,14 @@ is saved on the Durable Object.
 </p>
 
 <p align="center">
+  <img src="../assets/docs/stream.png" alt="Kit typing with a live draft bubble" width="220">
+  &nbsp;
+  <img src="../assets/docs/emoji.png" alt="Emoji picker over the thread" width="220">
+  &nbsp;
+  <img src="../assets/docs/thread-xl.png" alt="Same thread at extra-large type" width="220">
+</p>
+
+<p align="center">
   <img src="../assets/docs/down.png" alt="Socket down, compose disabled" width="220">
   &nbsp;
   <img src="../assets/docs/thread-day.png" alt="Same thread in Lamp theme" width="220">
@@ -44,13 +53,17 @@ is saved on the Durable Object.
 | --- | --- | --- |
 | `login` | `/login` | Google door. The crane decides who may talk. |
 | `unsigned` | `/?sample=unsigned` | Same gate inside the shell. |
-| `empty` | `/?sample=empty` | Live, nothing said yet. Paperclip attach: photo, commands, GPS. |
+| `empty` | `/?sample=empty` | Live, nothing said yet. Emoji + paperclip (photo, commands, GPS). |
 | `cmds` | `/?sample=cmds` | Command picker. Live list is published by the crane (`cmds` frame); this sample paints a short stand-in. |
 | `thread` | `/?sample=thread` | Ada ↔ Kit. Pin is this-send. |
+| `stream` | `/?sample=stream` | Crane typing + italic draft bubble (⏳). |
+| `emoji` | `/?sample=emoji` | Same thread with the emoji tray open. |
 | `ping` | `/?sample=ping` | Cron `Push` — labeled **ping**. |
 | `photo` | `/?sample=photo` | Inbound image + text. |
 | `down` | `/?sample=down` | Other side gone. Compose locked. |
 | `thread-day` | `/?sample=thread&theme=lamp` | Lamp theme. Boom / Inlay / Lamp live in the picker. |
+| `thread-xl` | `/?sample=thread&font=xl` | Extra-large chat type. Small is the default. |
+| `settings` | `/?sample=empty` | Cog open — theme, font size, Install. |
 | `crane` | `/crane?sample=crane` | Loopback stand-in for the harness (`PENDANT_DEV`). |
 
 ---

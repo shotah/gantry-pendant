@@ -86,6 +86,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [prefsReady, setPrefsReady] = useState(false);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
   const [draft, setDraft] = useState("");
+  const [sampleEmoji, setSampleEmoji] = useState(false);
   const [catalog, setCatalog] = useState<SlashCommand[]>([]);
   const [avatarRev, setAvatarRev] = useState(0);
   const [faceHint, setFaceHint] = useState("");
@@ -169,6 +170,8 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     setStatus(scene.status);
     setDraft(scene.draft ?? "");
     setCatalog(scene.catalog ?? []);
+    setTyping(Boolean(scene.typing));
+    setSampleEmoji(Boolean(scene.emoji));
     if (scene.gpsHint) {
       setGpsHint(scene.gpsHint);
     }
@@ -766,7 +769,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           />
         </div>
         <Compose
-          key={`${sampleId ?? "live"}:${draft}`}
+          key={`${sampleId ?? "live"}:${draft}:${sampleEmoji ? "emoji" : ""}`}
           disabled={status !== "up"}
           placeholder={phone ? `Message ${title} · / for commands` : "Reply as the crane"}
           gpsHint={phone ? gpsHint : undefined}
@@ -775,6 +778,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           commands={phone}
           catalog={catalog}
           initialText={draft}
+          initialEmoji={sampleEmoji}
           onSend={(t) => void sendText(t)}
           onPhoto={phone ? (f) => void sendPhoto(f) : undefined}
           onPin={phone ? () => void sendPin() : undefined}

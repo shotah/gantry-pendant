@@ -7,7 +7,18 @@ export const DEV_USER = {
   cranes: ["ada"],
 };
 
-export const SAMPLE_IDS = ["unsigned", "empty", "cmds", "thread", "ping", "photo", "down", "crane"] as const;
+export const SAMPLE_IDS = [
+  "unsigned",
+  "empty",
+  "cmds",
+  "thread",
+  "ping",
+  "photo",
+  "down",
+  "crane",
+  "stream",
+  "emoji",
+] as const;
 
 export type SampleId = (typeof SAMPLE_IDS)[number];
 
@@ -27,6 +38,8 @@ export type SampleScene = {
   gpsHint?: string;
   draft?: string;
   catalog?: SlashCommand[];
+  typing?: boolean;
+  emoji?: boolean;
 };
 
 export const SAMPLE_LINES = {
@@ -40,6 +53,7 @@ export const SAMPLE_LINES = {
   photoYou: "This the right hatch?",
   photoKit: "Yes — port side, yellow tape. Don't step the wet plate.",
   craneKit: "Gate's on the latch until 21:00.",
+  streamDraft: "⏳ Gate's on the latch until 21:00. I'll ping you at…",
 } as const;
 
 /** Shot/loopback stand-in only. Live catalog comes from the crane cmds frame. */
@@ -150,7 +164,7 @@ export function sampleScene(id: SampleId, role: Role): SampleScene {
       status: "up",
     };
   }
-  return {
+  const thread: SampleScene = {
     id: "thread",
     messages: [
       bubble("t1", "you", SAMPLE_LINES.threadYou, { at: 1 }),
@@ -161,4 +175,20 @@ export function sampleScene(id: SampleId, role: Role): SampleScene {
     status: "up",
     gpsHint: role === "phone" ? "pin ±12m this send" : undefined,
   };
+  if (id === "stream") {
+    return {
+      id,
+      messages: [
+        bubble("s1", "you", SAMPLE_LINES.threadYou, { at: 1 }),
+        bubble("s2", "kit", SAMPLE_LINES.streamDraft, { kind: "draft", at: 2 }),
+      ],
+      status: "up",
+      typing: true,
+      gpsHint: role === "phone" ? "pin ±12m this send" : undefined,
+    };
+  }
+  if (id === "emoji") {
+    return { ...thread, id, emoji: true };
+  }
+  return thread;
 }

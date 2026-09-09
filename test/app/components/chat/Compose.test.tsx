@@ -115,6 +115,12 @@ describe("Compose", () => {
     expect(onSend).toHaveBeenCalledWith("yo 😀");
   });
 
+  it("opens the emoji picker when the sample asks", () => {
+    render(<Compose onSend={vi.fn()} initialEmoji />);
+    expect(screen.getByRole("dialog", { name: "Emoji" })).toBeTruthy();
+    expect(screen.getByLabelText("Search emoji")).toBeTruthy();
+  });
+
   it("stacks emoji and attach on the left of the draft", () => {
     render(<Compose onSend={vi.fn()} onPhoto={vi.fn()} />);
     const emoji = screen.getByRole("button", { name: "emoji" });

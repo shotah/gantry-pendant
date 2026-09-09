@@ -233,6 +233,14 @@ describe("PhoneShell", () => {
     expect(screen.getByText("Ada")).toBeTruthy();
   });
 
+  it("applies a chat font size from the query string", async () => {
+    window.history.replaceState({}, "", "/?sample=thread&font=xl");
+    stubAuth(true);
+    render(<PhoneShell />);
+    expect(await screen.findByText(SAMPLE_LINES.threadKit)).toBeTruthy();
+    expect(document.documentElement.getAttribute("data-font")).toBe("xl");
+  });
+
   it("applies a chat font size from settings", async () => {
     stubAuth(true);
     render(<PhoneShell />);
@@ -242,6 +250,25 @@ describe("PhoneShell", () => {
     expect(document.documentElement.getAttribute("data-font")).toBe("lg");
     expect(localStorage.getItem("pendant.font")).toBe("lg");
     expect(screen.getByRole("radio", { name: "Large" }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("paints typing and a draft bubble for the stream sample", async () => {
+    window.history.replaceState({}, "", "/?sample=stream");
+    stubAuth(true);
+    render(<PhoneShell />);
+    expect(await screen.findByText(/typing/)).toBeTruthy();
+    expect(screen.getByText(SAMPLE_LINES.streamDraft)).toBeTruthy();
+    expect(screen.getByText(SAMPLE_LINES.threadYou)).toBeTruthy();
+    expect(screen.getByText(SAMPLE_LINES.streamDraft).closest(".italic")).toBeTruthy();
+  });
+
+  it("opens the emoji picker for the emoji sample", async () => {
+    window.history.replaceState({}, "", "/?sample=emoji");
+    stubAuth(true);
+    render(<PhoneShell />);
+    expect(await screen.findByRole("dialog", { name: "Emoji" })).toBeTruthy();
+    expect(screen.getByLabelText("Search emoji")).toBeTruthy();
+    expect(screen.getByText(SAMPLE_LINES.threadKit)).toBeTruthy();
   });
 
   it("paints the harness command picker for the cmds sample", async () => {
