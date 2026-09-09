@@ -124,11 +124,11 @@ describe("PhoneShell", () => {
     expect(screen.queryByRole("button", { name: "Change Kit's photo" })).toBeNull();
   });
 
-  it("shows the Google gate when Google is on even if OIDC is not fully armed", async () => {
+  it("says a crane is missing instead of offering Google", async () => {
     vi.stubGlobal("fetch", async (input: RequestInfo) => {
       const url = String(input);
       if (url.includes("/api/auth/config")) {
-        return Response.json({ mode: null, google: true, dev: false });
+        return Response.json({ mode: null, google: true, dev: false, gap: "crane" });
       }
       if (url.includes("/api/auth/me")) {
         return new Response(null, { status: 401 });
@@ -136,7 +136,9 @@ describe("PhoneShell", () => {
       return new Response(null, { status: 404 });
     });
     render(<PhoneShell />);
-    expect(await screen.findByText("Sign in with Google to talk.")).toBeTruthy();
+    expect(await screen.findByText("No crane on this mailbox yet")).toBeTruthy();
+    expect(screen.getByText(/Gantree Build/)).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Continue with Google" })).toBeNull();
     expect(screen.queryByText(/Nothing yet/)).toBeNull();
   });
 
@@ -308,13 +310,34 @@ describe("PhoneShell", () => {
       value: { writeText: write },
     });
     stubOidc({ sub: DEV_USER.sub, email: "bob@example.com", cranes: [] });
+    stubSocket();
+    const fetches: string[] = [];
+    const inner = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input: RequestInfo) => {
+      fetches.push(String(input));
+      return inner(input);
+    });
     render(<PhoneShell />);
     expect(await screen.findByText(/not on any crane yet/i)).toBeTruthy();
     expect(screen.getByText("bob@example.com")).toBeTruthy();
     expect(screen.getByText(DEV_USER.sub)).toBeTruthy();
+    expect(FakeSocket.instances).toHaveLength(0);
+    expect(fetches.some((u) => u.includes("/api/avatar?slug=kit"))).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     expect(write).toHaveBeenCalledWith(`bob@example.com\n${DEV_USER.sub}`);
     expect(window.location.search).not.toContain("sub=");
+  });
+
+  it("dials a typed slug when the directory is empty", async () => {
+    stubOidc({ sub: DEV_USER.sub, email: "bob@example.com", cranes: [] });
+    stubSocket();
+    render(<PhoneShell />);
+    expect(await screen.findByText(/not on any crane yet/i)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Agent name"), { target: { value: "tim" } });
+    expect(await screen.findByText("Tim")).toBeTruthy();
+    expect(screen.queryByText(/not on any crane yet/i)).toBeNull();
+    expect(FakeSocket.instances.some((s) => s.url.includes("/ws/tim"))).toBe(true);
+    expect(FakeSocket.instances.some((s) => s.url.includes("/ws/kit"))).toBe(false);
   });
 });
 

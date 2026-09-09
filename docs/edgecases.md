@@ -40,9 +40,10 @@ Room    last allow frame (until the next dial)
 
 | Symptom | Usual cause |
 | --- | --- |
-| Google works, empty crane list, never joins | not on Kit’s `.env`, or Kit has not dialed since the edit |
+| Google works, empty crane list, never joins | not on Kit’s `.env`, or Kit has not dialed since the edit. A `401` on `/api/avatar?slug=kit` is the demo slug, not sign-in. |
 | Socket is live, Kit ignores the frame | on the room list, missing from `PENDANT_ALLOWED_USERS` (crane restarted, not recreated) |
 | Crane dies at boot | empty `PENDANT_ALLOWED_USERS` (fail-closed, same as Telegram) |
+| Phone: no crane on this mailbox yet | Google is on, no `CRANE_BEARERS` — Build a pendant crane |
 | Worker `/ws` is 503 `config` | Google is on but `SESSION_SECRET` / `CRANE_BEARERS` is empty |
 | Yanked human still talks | ghost list: recreate so the crane republishes `allow` |
 

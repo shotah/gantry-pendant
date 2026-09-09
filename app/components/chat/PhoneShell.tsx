@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ThemeSelect } from "../shared/ThemeSelect";
 import type { SlashCommand } from "@/app/lib/slash";
 import { Compose } from "./Compose";
+import { ConfigGapNote } from "./ConfigGapNote";
 import { KitAvatar } from "./KitAvatar";
 import { SettingsMenu } from "./SettingsMenu";
 import { Thread, type ChatBubble } from "./Thread";
@@ -17,13 +18,20 @@ import { fileToPhoto } from "@/app/lib/photo";
 import { browserGeoPref, saveGeoPref } from "@/app/lib/prefs";
 import { applyTheme, themeFromQuery } from "@/app/lib/theme";
 import { browserWakeLock, releaseScreenWake, type WakeLockSentinel } from "@/app/lib/wake";
+import type { ConfigGap } from "@/lib/auth/mode";
 import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
+import { parseSlug } from "@/lib/mailbox/slug";
 import { buildContext } from "@/lib/phone/context";
 import { geoHint } from "@/lib/phone/geo";
 import { encodeFrame, type Role, type WireFrame } from "@/lib/mailbox/frame";
 import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
 
-type AuthCfg = { mode: "spike" | "oidc" | null; google: boolean; dev?: boolean };
+type AuthCfg = {
+  mode: "spike" | "oidc" | null;
+  google: boolean;
+  dev?: boolean;
+  gap?: ConfigGap | null;
+};
 type Me = { sub: string; email?: string; cranes?: string[] } | null;
 
 const BACKOFF_MS = 1000;
@@ -59,6 +67,7 @@ function sendClientFrame(ws: WebSocket, frame: ClientFrame): void {
 
 export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [slug, setSlug] = useState("kit");
+  const [slugTouched, setSlugTouched] = useState(false);
   const [secret, setSecret] = useState("");
   const [bearer, setBearer] = useState("");
   const [cfg, setCfg] = useState<AuthCfg | null>(null);
@@ -96,6 +105,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     setSampleId(parseSample(q.get("sample")));
+    const fromQuery = parseSlug(q.get("slug") ?? "");
+    if (fromQuery) {
+      setSlug(fromQuery);
+      setSlugTouched(true);
+    }
     const theme = themeFromQuery(q.get("theme"));
     if (theme) {
       applyTheme(theme);
@@ -182,18 +196,34 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [phone]);
 
+  const cranes = me?.cranes ?? [];
+  const directoryEmpty = Boolean(
+    phone && cfg?.mode === "oidc" && !cfg.dev && me && cranes.length === 0,
+  );
+  const roomSlug = (() => {
+    if (!cfg) {
+      return "";
+    }
+    if (!phone || cfg.mode !== "oidc" || cfg.dev) {
+      return slug;
+    }
+    if (cranes.length) {
+      return cranes.includes(slug) ? slug : (cranes[0] ?? "");
+    }
+    return slugTouched ? slug : "";
+  })();
+  const mailboxGap = Boolean(phone && cfg?.gap && !cfg.dev);
   const needGoogle = Boolean(
-    phone && (
+    phone && !mailboxGap && (
       (cfg?.dev && sampleId === "unsigned")
       || (Boolean(cfg?.google) && !me && !cfg?.dev)
     ),
   );
-  const waitingForCrane = Boolean(
-    phone && cfg?.mode === "oidc" && !cfg.dev && me && !(me.cranes && me.cranes.length),
-  );
+  const waitingForCrane = directoryEmpty && !roomSlug;
   const listed = !phone || cfg?.mode !== "oidc" || Boolean(cfg.dev)
-    || Boolean(me?.cranes?.includes(slug));
-  const canSocket = Boolean(cfg && slug && listed && (cfg.mode === "spike" ? secret : phone ? me : bearer));
+    || cranes.includes(roomSlug)
+    || Boolean(directoryEmpty && roomSlug);
+  const canSocket = Boolean(cfg && roomSlug && listed && (cfg.mode === "spike" ? secret : phone ? me : bearer));
 
   const connect = useCallback(() => {
     if (stoppedRef.current || typeof window === "undefined" || !canSocket) {
@@ -215,7 +245,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     const url = mailboxUrl({
       host: window.location.host,
       protocol: window.location.protocol,
-      slug,
+      slug: roomSlug,
       role,
       secret: cfg?.mode === "spike" ? secret : undefined,
       bearer: !phone && cfg?.mode === "oidc" ? bearer : undefined,
@@ -308,7 +338,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         badgeRef.current = browserBumpBadge(badgeRef.current, frame.kind);
       }
     };
-  }, [bearer, canSocket, cfg?.mode, phone, role, secret, slug]);
+  }, [bearer, canSocket, cfg?.mode, phone, role, roomSlug, secret]);
 
   useEffect(() => {
     if (!canSocket || painting) {
@@ -503,8 +533,8 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   }
 
   const title = useMemo(
-    () => waitingForCrane ? "Pendant" : displaySlug(slug),
-    [waitingForCrane, slug],
+    () => waitingForCrane || mailboxGap ? "Pendant" : displaySlug(roomSlug),
+    [waitingForCrane, mailboxGap, roomSlug],
   );
   const hideSecrets = painting;
   const faceAuth = hideSecrets
@@ -513,16 +543,107 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         secret: cfg?.mode === "spike" ? secret || undefined : undefined,
         bearer: !phone && cfg?.mode === "oidc" ? bearer || undefined : undefined,
       };
-  const canEditFace = Boolean(slug) && !needGoogle && !waitingForCrane;
+  const canEditFace = Boolean(roomSlug) && !needGoogle && !waitingForCrane && !mailboxGap;
 
   const faceProps = {
-    slug: slug || "kit",
+    slug: roomSlug,
     rev: avatarRev,
     editable: canEditFace,
     onRev: setAvatarRev,
     onError: setFaceHint,
     ...faceAuth,
   };
+
+  let mouth: ReactNode;
+  if (needGoogle) {
+    mouth = (
+      <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+        <KitAvatar {...faceProps} size="lg" editable={false} />
+        <p className="text-sm text-body">Sign in with Google to talk.</p>
+        <a className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark" href="/api/auth/google">
+          Continue with Google
+        </a>
+      </main>
+    );
+  } else if (mailboxGap && cfg?.gap) {
+    mouth = (
+      <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+        <KitAvatar {...faceProps} size="lg" editable={false} />
+        <ConfigGapNote gap={cfg.gap} />
+      </main>
+    );
+  } else if (waitingForCrane) {
+    mouth = (
+      <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+        <KitAvatar {...faceProps} size="lg" editable={false} />
+        <p className="text-sm text-body">
+          Not on any crane yet — give this to your yard admin
+        </p>
+        {me?.email
+          ? <p className="text-sm text-fg">{me.email}</p>
+          : null}
+        <p className="break-all font-mono text-xs text-muted">{me?.sub}</p>
+        <button
+          type="button"
+          className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark"
+          onClick={() => void copyIdentity()}
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+        <label className="mt-4 flex w-full max-w-xs flex-col gap-1 text-left text-xs text-muted">
+          Agent name
+          <input
+            className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+            value={slugTouched ? slug : ""}
+            placeholder="the crane slug"
+            spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
+            autoComplete="off"
+            onChange={(e) => {
+              setSlugTouched(true);
+              setSlug(e.target.value.toLowerCase());
+            }}
+          />
+        </label>
+        <p className="max-w-xs text-xs text-dim">
+          The picker fills in after the crane dials. If you know the slug, type it.
+        </p>
+      </main>
+    );
+  } else {
+    mouth = (
+      <>
+        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+          <Thread
+            messages={messages}
+            empty={(
+              <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
+                <KitAvatar {...faceProps} size="lg" editable={false} />
+                <p className="text-sm text-dim">
+                  Nothing yet. Type below — or / for harness commands.
+                </p>
+              </div>
+            )}
+          />
+        </div>
+        <Compose
+          key={`${sampleId ?? "live"}:${draft}`}
+          disabled={status !== "up"}
+          placeholder={phone ? `Message ${title} · / for commands` : "Reply as the crane"}
+          gpsHint={phone ? gpsHint : undefined}
+          gpsOn={gpsOn}
+          onGpsToggle={phone ? toggleGps : undefined}
+          commands={phone}
+          catalog={catalog}
+          initialText={draft}
+          onSend={(t) => void sendText(t)}
+          onPhoto={phone ? (f) => void sendPhoto(f) : undefined}
+          onPin={phone ? () => void sendPin() : undefined}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas" data-shot={phone ? "phone" : "crane"}>
@@ -542,7 +663,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         </div>
         <SettingsMenu>
           <div className="flex flex-col gap-2">
-            {phone && cfg?.mode === "oidc" && me?.cranes?.length
+            {phone && cfg?.mode === "oidc" && cranes.length
               ? (
                   <label className="flex flex-col gap-1 text-xs text-muted">
                     Agent
@@ -551,13 +672,13 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                       value={slug}
                       onChange={(e) => setSlug(e.target.value)}
                     >
-                      {me.cranes.map((c) => (
+                      {cranes.map((c) => (
                         <option key={c} value={c}>{displaySlug(c)}</option>
                       ))}
                     </select>
                   </label>
                 )
-              : waitingForCrane
+              : waitingForCrane || mailboxGap
                 ? null
                 : (
                     <label className="flex flex-col gap-1 text-xs text-muted">
@@ -569,7 +690,10 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                         autoCapitalize="none"
                         autoCorrect="off"
                         autoComplete="off"
-                        onChange={(e) => setSlug(e.target.value.toLowerCase())}
+                        onChange={(e) => {
+                          setSlugTouched(true);
+                          setSlug(e.target.value.toLowerCase());
+                        }}
                       />
                     </label>
                   )}
@@ -613,7 +737,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                         ? <a className="text-xs text-dim underline" href="/crane">Open crane stand-in</a>
                         : <a className="text-xs text-dim underline" href="/">Open phone</a>
                       : null}
-                    {cfg?.google && phone
+                    {cfg?.google && phone && !cfg.gap
                       ? (
                           me
                             ? (
@@ -633,67 +757,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       {faceHint
         ? <p className="border-b border-line px-3 py-1 text-[11px] text-danger">{faceHint}</p>
         : null}
-      {needGoogle
-        ? (
-            <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-              <KitAvatar {...faceProps} size="lg" editable={false} />
-              <p className="text-sm text-body">Sign in with Google to talk.</p>
-              <a className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark" href="/api/auth/google">
-                Continue with Google
-              </a>
-            </main>
-          )
-        : waitingForCrane
-          ? (
-              <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-                <KitAvatar {...faceProps} size="lg" editable={false} />
-                <p className="text-sm text-body">
-                  Not on any crane yet — give this to your yard admin
-                </p>
-                {me?.email
-                  ? <p className="text-sm text-fg">{me.email}</p>
-                  : null}
-                <p className="break-all font-mono text-xs text-muted">{me?.sub}</p>
-                <button
-                  type="button"
-                  className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark"
-                  onClick={() => void copyIdentity()}
-                >
-                  {copied ? "Copied" : "Copy"}
-                </button>
-              </main>
-            )
-          : (
-              <>
-                <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
-                  <Thread
-                    messages={messages}
-                    empty={(
-                      <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
-                        <KitAvatar {...faceProps} size="lg" editable={false} />
-                        <p className="text-sm text-dim">
-                          Nothing yet. Type below — or / for harness commands.
-                        </p>
-                      </div>
-                    )}
-                  />
-                </div>
-                <Compose
-                  key={`${sampleId ?? "live"}:${draft}`}
-                  disabled={status !== "up"}
-                  placeholder={phone ? `Message ${title} · / for commands` : "Reply as the crane"}
-                  gpsHint={phone ? gpsHint : undefined}
-                  gpsOn={gpsOn}
-                  onGpsToggle={phone ? toggleGps : undefined}
-                  commands={phone}
-                  catalog={catalog}
-                  initialText={draft}
-                  onSend={(t) => void sendText(t)}
-                  onPhoto={phone ? (f) => void sendPhoto(f) : undefined}
-                  onPin={phone ? () => void sendPin() : undefined}
-                />
-              </>
-            )}
+      {mouth}
     </div>
   );
 }

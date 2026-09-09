@@ -1,22 +1,22 @@
 import { env } from "cloudflare:workers";
-import { configError } from "@/lib/auth/deny";
 import { authorizeUrl, encodeOAuthBind, newNonce, newPkce, newState } from "@/lib/auth/google";
-import { resolveAuthMode } from "@/lib/auth/mode";
+import { blockedGoogleStartLocation } from "@/lib/auth/mode";
 import { stateCookie } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export function GET(req: Request) {
-  const mode = resolveAuthMode(env);
-  if (!mode.ok || mode.mode !== "oidc" || !env.GOOGLE_CLIENT_ID) {
-    return configError();
+  const blocked = blockedGoogleStartLocation(env);
+  if (blocked) {
+    return new Response(null, { status: 302, headers: { Location: blocked } });
   }
+  const clientId = env.GOOGLE_CLIENT_ID?.trim() ?? "";
   const origin = new URL(req.url).origin;
   const state = newState();
   const pkce = newPkce();
   const nonce = newNonce();
   const location = authorizeUrl({
-    clientId: env.GOOGLE_CLIENT_ID,
+    clientId,
     origin,
     state,
     codeChallenge: pkce.challenge,
