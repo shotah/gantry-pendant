@@ -286,7 +286,7 @@ export function Compose({
   }
 
   return (
-    <form onSubmit={submit} className="relative border-t border-line bg-panel p-3">
+    <form onSubmit={submit} className="relative shrink-0 border-t border-line bg-panel p-3">
       {onPhoto
         ? (
             <input

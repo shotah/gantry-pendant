@@ -27,6 +27,7 @@ import {
 import { persistRole, resolvePhoneKind, routeTag } from "../lib/mailbox/route";
 import { parseEmailVerified, parseExpMs, socketMessageAllowed } from "../lib/mailbox/socketAuth";
 import { takeFrame, type DualLimit } from "../lib/mailbox/rate";
+import { cranePublishedTyping, phoneMustNotPublishTyping } from "../lib/mailbox/typing";
 
 const RATE_KEY = "rate";
 
@@ -124,7 +125,11 @@ export class Mailbox extends DurableObject<Env> {
     } else if (!out.kind) {
       out.kind = "reply";
     }
-    if (phoneMustNotPublishCmds(meta.role, out.kind) || phoneMustNotPublishAllow(meta.role, out.kind)) {
+    if (
+      phoneMustNotPublishCmds(meta.role, out.kind)
+      || phoneMustNotPublishAllow(meta.role, out.kind)
+      || phoneMustNotPublishTyping(meta.role, out.kind)
+    ) {
       ws.send(encodeFrame({ kind: "error", text: "bad frame" }));
       return;
     }
@@ -137,6 +142,16 @@ export class Mailbox extends DurableObject<Env> {
       await this.ctx.storage.put(CMDS_STORE_KEY, body);
       for (const p of this.ctx.getWebSockets("phone")) {
         p.send(body);
+      }
+      return;
+    }
+    if (cranePublishedTyping(meta.role, out.kind)) {
+      const tag = routeTag(meta.role, out);
+      if (tag && out.user_id) {
+        const body = encodeFrame({ kind: "typing", user_id: out.user_id });
+        for (const p of this.ctx.getWebSockets(tag)) {
+          p.send(body);
+        }
       }
       return;
     }

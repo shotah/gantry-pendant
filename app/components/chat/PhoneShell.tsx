@@ -5,6 +5,7 @@ import { ThemeSelect } from "../shared/ThemeSelect";
 import type { SlashCommand } from "@/app/lib/slash";
 import { Compose } from "./Compose";
 import { ConfigGapNote } from "./ConfigGapNote";
+import { InstallApp } from "./InstallApp";
 import { KitAvatar } from "./KitAvatar";
 import { SettingsMenu } from "./SettingsMenu";
 import { Thread, type ChatBubble } from "./Thread";
@@ -24,6 +25,7 @@ import { parseSlug } from "@/lib/mailbox/slug";
 import { buildContext } from "@/lib/phone/context";
 import { geoHint } from "@/lib/phone/geo";
 import { encodeFrame, type Role, type WireFrame } from "@/lib/mailbox/frame";
+import { clearsTyping, TYPING_TTL_MS } from "@/lib/mailbox/typing";
 import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
 
 type AuthCfg = {
@@ -98,6 +100,8 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const lastSeenId = useRef<string | undefined>(undefined);
   const seenIds = useRef(new Set<string>());
   const idSeq = useRef(0);
+  const [typing, setTyping] = useState(false);
+  const typingTimer = useRef(0);
   const phone = role === "phone";
   const painting = Boolean(cfg?.dev && sampleId);
   const localEcho = Boolean(cfg?.dev && !sampleId && phone);
@@ -184,6 +188,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   useEffect(() => {
     return () => {
       window.clearTimeout(echoTimer.current);
+      window.clearTimeout(typingTimer.current);
       void releaseScreenWake(wakeRef.current);
     };
   }, []);
@@ -313,6 +318,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         return;
       }
       setStatus("down");
+      setTyping(false);
+      window.clearTimeout(typingTimer.current);
+      typingTimer.current = 0;
       void releaseScreenWake(wakeRef.current);
       wakeRef.current = null;
       window.clearTimeout(reconnectTimer.current);
@@ -347,6 +355,22 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       if (frame.kind === "cmds") {
         setCatalog(frame.commands ?? []);
         return;
+      }
+      if (frame.kind === "typing") {
+        if (phone) {
+          setTyping(true);
+          window.clearTimeout(typingTimer.current);
+          typingTimer.current = window.setTimeout(() => {
+            setTyping(false);
+            typingTimer.current = 0;
+          }, TYPING_TTL_MS);
+        }
+        return;
+      }
+      if (phone && clearsTyping(frame.kind)) {
+        setTyping(false);
+        window.clearTimeout(typingTimer.current);
+        typingTimer.current = 0;
       }
       const id = clientFrameId(frame);
       if (frame.kind === "ack") {
@@ -661,7 +685,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   } else {
     mouth = (
       <>
-        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <Thread
             messages={messages}
             empty={(
@@ -693,8 +717,8 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas" data-shot={phone ? "phone" : "crane"}>
-      <header className="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
+    <div className="flex h-dvh flex-col overflow-hidden bg-canvas pb-[env(safe-area-inset-bottom)]" data-shot={phone ? "phone" : "crane"}>
+      <header className="flex shrink-0 items-center gap-2 border-b border-line bg-panel px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <KitAvatar {...faceProps} size="md" />
           <div className="min-w-0">
@@ -703,13 +727,16 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
               <span className={status === "up" ? "text-ok" : "text-dim"}>
                 {status === "up" ? "live" : status === "down" ? "down" : "idle"}
               </span>
+              {status === "up" && typing ? " · typing…" : null}
               {cfg?.dev && !painting ? " · dev" : null}
               {phone ? null : " · stand-in"}
             </p>
           </div>
         </div>
+        <InstallApp placement="header" />
         <SettingsMenu>
           <div className="flex flex-col gap-2">
+            <InstallApp placement="block" />
             {phone && cfg?.mode === "oidc" && cranes.length
               ? (
                   <label className="flex flex-col gap-1 text-xs text-muted">
@@ -810,7 +837,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         </SettingsMenu>
       </header>
       {faceHint
-        ? <p className="border-b border-line px-3 py-1 text-[11px] text-danger">{faceHint}</p>
+        ? <p className="shrink-0 border-b border-line px-3 py-1 text-[11px] text-danger">{faceHint}</p>
         : null}
       {mouth}
     </div>

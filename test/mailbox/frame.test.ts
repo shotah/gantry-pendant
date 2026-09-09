@@ -128,6 +128,14 @@ describe("frame", () => {
     expect(parseFrame(JSON.stringify({ text: "hi", user_id: "ada", id: "" })).ok).toBe(true);
   });
 
+  it("accepts a crane typing action", () => {
+    const got = parseFrame(JSON.stringify({ kind: "typing", user_id: "1182" }));
+    expect(got.ok && got.frame).toEqual({ kind: "typing", user_id: "1182" });
+    if (got.ok) {
+      expect(JSON.parse(encodeFrame(got.frame))).toEqual({ kind: "typing", user_id: "1182" });
+    }
+  });
+
   it("keeps ack id and optional since", () => {
     const got = parseFrame(JSON.stringify({ kind: "ack", id: "msg-1", since: "msg-0" }));
     expect(got.ok && got.frame).toEqual({ kind: "ack", id: "msg-1", since: "msg-0" });

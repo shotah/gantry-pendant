@@ -1,6 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import manifest from "@/app/manifest";
-import { chromeInstallIssues, PENDANT_MANIFEST, type WebAppManifest } from "@/app/lib/pwa";
+import { chromeInstallIssues, PENDANT_MANIFEST, swInstallIssues, type WebAppManifest } from "@/app/lib/pwa";
 
 describe("pwa", () => {
   it("meets Chrome's installable-manifest rules", () => {
@@ -10,6 +11,7 @@ describe("pwa", () => {
     expect(PENDANT_MANIFEST.start_url).toBe("/");
     expect(PENDANT_MANIFEST.icons.some((i) => i.src === "/icon.svg")).toBe(true);
     expect(PENDANT_MANIFEST.shortcuts.map((s) => s.url)).toEqual(["/#compose", "/?pin=1"]);
+    expect(swInstallIssues(readFileSync("public/sw.js", "utf8"))).toEqual([]);
   });
 
   it("names the gaps Chromium cares about", () => {
@@ -31,6 +33,10 @@ describe("pwa", () => {
       "prefer_related_applications must be false or omitted",
       "need a 192x192 PNG icon",
       "need a 512x512 PNG icon",
+    ]);
+    expect(swInstallIssues("self.addEventListener(\"install\", () => {});")).toEqual([
+      "need a fetch handler",
+      "fetch handler must skip non-navigation requests",
     ]);
   });
 });

@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PhoneShell } from "@/app/components/chat/PhoneShell";
 import { DEV_USER, MOCK_REPLIES, SAMPLE_LINES } from "@/lib/dev/samples";
+import { TYPING_TTL_MS } from "@/lib/mailbox/typing";
 
 function stubAuth(dev: boolean) {
   vi.stubGlobal("fetch", async (input: RequestInfo) => {
@@ -107,6 +108,22 @@ describe("PhoneShell", () => {
     expect(screen.queryByText("dev")).toBeNull();
   });
 
+  it("locks the shell to the viewport so the thread scrolls inside", async () => {
+    window.history.replaceState({}, "", "/?sample=thread");
+    stubAuth(true);
+    const { container } = render(<PhoneShell />);
+    expect(await screen.findByText(SAMPLE_LINES.threadKit)).toBeTruthy();
+    const shell = container.querySelector("[data-shot=phone]");
+    expect(shell).toBeTruthy();
+    const shellClass = shell?.className.split(/\s+/) ?? [];
+    expect(shellClass).toEqual(expect.arrayContaining(["h-dvh", "overflow-hidden"]));
+    expect(shellClass).not.toContain("min-h-dvh");
+    const thread = shell?.querySelector(".overflow-y-auto");
+    expect(thread?.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(["min-h-0", "flex-1", "overflow-y-auto"]),
+    );
+  });
+
   it("ignores sample query when not in dev", async () => {
     window.history.replaceState({}, "", "/?sample=thread");
     stubAuth(false);
@@ -166,6 +183,7 @@ describe("PhoneShell", () => {
     expect(screen.queryByRole("link", { name: "Open crane stand-in" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "settings" }));
     expect(screen.getByRole("dialog", { name: "Settings" })).toBeTruthy();
+    expect(screen.getByText(/Cast, save and share/)).toBeTruthy();
     expect(screen.getByLabelText("Agent name")).toBeTruthy();
     expect((screen.getByLabelText("Agent name") as HTMLInputElement).value).toBe("kit");
     expect(screen.getByLabelText("Agent access secret")).toBeTruthy();
@@ -286,6 +304,56 @@ describe("PhoneShell", () => {
     });
     expect(await screen.findByText("yo from kit")).toBeTruthy();
     expect(screen.getAllByText("yo from kit")).toHaveLength(1);
+  });
+
+  it("does not treat inbound ack as typing", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "ack", id: "msg-1" }));
+    });
+    expect(screen.getByText("live")).toBeTruthy();
+    expect(screen.queryByText(/typing/)).toBeNull();
+    expect(screen.getByText(/Nothing yet/)).toBeTruthy();
+  });
+
+  it("shows typing from the crane and clears it on reply", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "typing", user_id: "1182" }));
+    });
+    expect(screen.getByText(/typing/)).toBeTruthy();
+    expect(screen.getByText(/Nothing yet/)).toBeTruthy();
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "yo from kit" }));
+    });
+    expect(await screen.findByText("yo from kit")).toBeTruthy();
+    expect(screen.queryByText(/typing/)).toBeNull();
+  });
+
+  it("drops typing after the TTL if no reply arrives", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    vi.useFakeTimers();
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "typing", user_id: "1182" }));
+    });
+    expect(screen.getByText(/typing/)).toBeTruthy();
+    act(() => {
+      vi.advanceTimersByTime(TYPING_TTL_MS - 1);
+    });
+    expect(screen.getByText(/typing/)).toBeTruthy();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.queryByText(/typing/)).toBeNull();
   });
 
   it("picks from /me cranes and still lets you type another slug", async () => {

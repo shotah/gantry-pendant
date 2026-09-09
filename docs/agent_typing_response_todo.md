@@ -168,24 +168,24 @@ walk is a real crane (or `/` + live `CHANNEL=pendant`), not
 
 Wire + mailbox + header. No hatch.
 
-- [ ] `FrameKind` includes `typing`. `parseFrame` accepts
+- [x] `FrameKind` includes `typing`. `parseFrame` accepts
       `{ kind: "typing", user_id }`. Reject phone-originated `typing`
       (`phoneMustNotPublish` sibling of cmds/allow).
-- [ ] `shouldQueue("typing")` is false. `persistRole` undefined.
+- [x] `shouldQueue("typing")` is false. `persistRole` undefined.
       `routeTag("crane", { kind: "typing", user_id })` is that `sub`.
       Missing `user_id` → no fan-out.
-- [ ] DO: crane `typing` fans to `getWebSockets(user_id)` and
+- [x] DO: crane `typing` fans to `getWebSockets(user_id)` and
       **returns** (no `newQueueId`, no `putQueued`). Tests: not in
       flush/peek after a typing frame; Ada's socket gets it, Bob's
       does not.
-- [ ] `PhoneShell`: on `kind === "typing"` set a typing flag + TTL;
+- [x] `PhoneShell`: on `kind === "typing"` set a typing flag + TTL;
       do not `setMessages`. `reply` / `push` / `error` clear it.
       Subtitle `live · typing…`.
-- [ ] Tests: `test/mailbox/frame.test.ts`, `route.test.ts`,
+- [x] Tests: `test/mailbox/frame.test.ts`, `route.test.ts`,
       `queue.test.ts` (`shouldQueue("cmds")` is already false — add
       `typing`). Header/shell coverage for the subtitle + TTL +
       "inbound ack does not type".
-- [ ] `npm test`, `npm run typecheck`, `npm run lint` on what you
+- [x] `npm test`, `npm run typecheck`, `npm run lint` on what you
       touched.
 
 ---
@@ -194,19 +194,19 @@ Wire + mailbox + header. No hatch.
 
 Copy Telegram `startTyping`, not the stream writer.
 
-- [ ] Split `dispatch`'s Handle+reply into a `deliver`-shaped path.
+- [x] Split `dispatch`'s Handle+reply into a `deliver`-shaped path.
       After allowlist + not-silent-pin, `startTyping(sub)` then
       `Handle`, then **stop**, then write `reply` if non-empty.
-- [ ] `startTyping`: write `{ kind: "typing", user_id }` immediately
+- [x] `startTyping`: write `{ kind: "typing", user_id }` immediately
       and every 4s on the live conn (`writeOn` / `writeMu`). Stop
       channel + context cancel. Interval overridable in tests.
-- [ ] Ignore inbound `kind: "typing"` (add to the existing ignore
+- [x] Ignore inbound `kind: "typing"` (add to the existing ignore
       list next to `ack`/`reply`/`push`/`cmds`/`allow`).
-- [ ] Do **not** type on silent pin, missing text, deny, or `Push`.
-- [ ] Tests in `pendant_test.go`: fakeConn sees one or more `typing`
+- [x] Do **not** type on silent pin, missing text, deny, or `Push`.
+- [x] Tests in `pendant_test.go`: fakeConn sees one or more `typing`
       writes for that `user_id` **before** `reply`; pin-only inbound
       writes nothing; Push is still a single `push` frame.
-- [ ] `cmd/gantry/run.go`: still no `ReplyWriter` on pendant. Do not
+- [x] `cmd/gantry/run.go`: still no `ReplyWriter` on pendant. Do not
       sneak layer 2 in with this.
 
 ---

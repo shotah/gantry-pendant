@@ -30,7 +30,10 @@ describe("LoginDoor", () => {
       }
       return new Response(null, { status: 404 });
     });
-    render(<LoginDoor />);
+    const { container } = render(<LoginDoor />);
     expect(await screen.findByRole("link", { name: "Continue with Google" })).toBeTruthy();
+    const door = container.querySelector("[data-shot=login]");
+    expect(door?.className.split(/\s+/)).toEqual(expect.arrayContaining(["h-full"]));
+    expect(door?.className.split(/\s+/)).not.toContain("min-h-dvh");
   });
 });

@@ -6,6 +6,8 @@ describe("route", () => {
   it("sends reply to that user's sockets only", () => {
     expect(routeTag("crane", { kind: "reply", user_id: "ada" })).toBe("ada");
     expect(routeTag("crane", { kind: "reply" })).toBeUndefined();
+    expect(routeTag("crane", { kind: "typing", user_id: "ada" })).toBe("ada");
+    expect(routeTag("crane", { kind: "typing" })).toBeUndefined();
     expect(routeTag("crane", { kind: "error", user_id: "ada" })).toBe("ada");
     expect(routeTag("crane", { kind: "error" })).toBe("phone");
   });
@@ -34,6 +36,7 @@ describe("route", () => {
       { kind: "push" },
       { kind: "error" },
       { kind: "cmds" },
+      { kind: "typing" },
     ];
     for (const frame of banned) {
       expect(phoneKindAllowed(frame)).toBe(false);
@@ -49,5 +52,6 @@ describe("route", () => {
     expect(persistRole("phone", "inbound")).toBe("crane");
     expect(persistRole("phone", "pin")).toBeUndefined();
     expect(persistRole("phone", "ack")).toBeUndefined();
+    expect(persistRole("crane", "typing", "ada")).toBeUndefined();
   });
 });

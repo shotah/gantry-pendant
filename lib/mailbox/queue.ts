@@ -18,7 +18,7 @@ export function queueStoreKey(id: string): string {
 }
 
 export function shouldQueue(kind?: string): boolean {
-  return kind !== "pin" && kind !== "ack" && kind !== "cmds";
+  return kind !== "pin" && kind !== "ack" && kind !== "cmds" && kind !== "typing";
 }
 
 export function destKey(to: Role, userId?: string): string {

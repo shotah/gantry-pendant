@@ -14,6 +14,6 @@ describe("RegisterSW", () => {
     const register = vi.fn().mockResolvedValue({});
     vi.stubGlobal("navigator", { serviceWorker: { register } });
     render(<RegisterSW />);
-    expect(register).toHaveBeenCalledWith("/sw.js", { scope: "/" });
+    expect(register).toHaveBeenCalledWith("/sw.js", { scope: "/", updateViaCache: "none" });
   });
 });

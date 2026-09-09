@@ -93,3 +93,15 @@ export function chromeInstallIssues(manifest: WebAppManifest): string[] {
   }
   return issues;
 }
+
+/** Chromium still treats a no-op / missing fetch listener as "not a PWA" on some builds. */
+export function swInstallIssues(source: string): string[] {
+  const issues: string[] = [];
+  if (!/\.addEventListener\(\s*["']fetch["']/.test(source)) {
+    issues.push("need a fetch handler");
+  }
+  if (!/request\.mode\s*!==\s*["']navigate["']/.test(source)) {
+    issues.push("fetch handler must skip non-navigation requests");
+  }
+  return issues;
+}
