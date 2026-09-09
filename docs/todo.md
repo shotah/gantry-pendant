@@ -41,8 +41,10 @@ Code for the mouth is in. These walks are still the second brain.
 origin; two tabs are not enough.
 
 - [ ] Deploy to `workers.dev`
-- [ ] GCP Web application client (`openid email profile` only). Redirect
-      = this origin — not `oauth-catch`, not `localhost:4100`
+- [ ] GCP **Web application** client: JS origin = this origin; redirect
+      `/api/auth/callback/google`; scopes `openid email profile` only.
+      Not Desktop, not `oauth-catch`, not `localhost:4100`.
+      [setup.md](setup.md#once-before-any-person)
 - [ ] Worker secrets: Google + `SESSION_SECRET` + `CRANE_BEARERS`.
       `ALLOWED_SUBS` optional. Spike `MAILBOX_SECRET` gone from prod.
       **Gantree Settings + mint on build** — not this checkout

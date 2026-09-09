@@ -88,9 +88,12 @@ npm run release:dry              # print the next tag only
 ```
 
 Google login is a **new Web application** client on the same GCP
-project as google-mcp. Scopes: `openid email profile` only. Redirect:
-`https://<this-origin>/api/auth/callback/google` — not the Pages
-`oauth-catch` URI, not `localhost:4100`.
+project as google-mcp is fine. **APIs & Services → Credentials →
+OAuth client ID:** type Web application. JavaScript origin =
+this origin. Redirect =
+`https://<this-origin>/api/auth/callback/google`. Consent: `openid`
+`email` `profile` only. Not Desktop, not `oauth-catch`, not
+`localhost:4100`. Table: [docs/setup.md](docs/setup.md#once-before-any-person).
 
 **This repo deploys Worker code.** Google / `SESSION_SECRET` /
 `CRANE_BEARERS` are **Gantree Settings → Pendant** and Build (mint a

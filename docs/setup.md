@@ -98,18 +98,26 @@ create those. Steps: [deployment.md](deployment.md).
    First code deploy with no Worker secrets is `503 config` until
    Gantree pushes those (safe). Do not set `MAILBOX_SECRET` or
    `PENDANT_DEV` on the Worker.
-2. GCP: **new Web application** client. Scopes `openid email profile`
-   only. Redirect (Gantree Settings shows this after you save origin):
+2. GCP: **new Web application** client. Not Desktop, not the
+   google-mcp client. **APIs & Services → Credentials → Create
+   credentials → OAuth client ID.**
 
-   ```text
-   https://<that-origin>/api/auth/callback/google
-   ```
+   | Field | Value |
+   | --- | --- |
+   | Application type | **Web application** |
+   | Authorized JavaScript origins | `https://<that-origin>` |
+   | Authorized redirect URIs | `https://<that-origin>/api/auth/callback/google` |
 
-   Not `oauth-catch`, not `localhost:4100`, not the google-mcp Desktop
-   client.
-3. **Gantree Settings → Pendant** (admin). Cloudflare API token (Edit
-   Cloudflare Workers), account id, Worker name, origin, Google client
-   id/secret. Save and push. That puts:
+   Consent screen (once per project): **External** (or Internal if
+   Workspace-only). Scopes `openid`, `email`, `profile` only — no
+   Gmail/Drive. External + Testing: add yourself as a test user.
+
+   Gantree Settings shows the redirect after you save origin. Not
+   `oauth-catch`, not `localhost:4100`.
+3. **Gantree Settings → Pendant** (admin). Cloudflare API token
+   ([permissions](deployment.md#cloudflare-api-token)), account id,
+   Worker name, origin, Google client id/secret. Save and push. That
+   puts:
 
    ```text
    GOOGLE_CLIENT_ID

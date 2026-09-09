@@ -103,7 +103,7 @@ jobs:
           set -euo pipefail
           if [[ -z "${CLOUDFLARE_API_TOKEN}" || -z "${CLOUDFLARE_ACCOUNT_ID}" ]]; then
             echo "Set repo secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID."
-            echo "Token: Cloudflare dashboard → API Tokens → Edit Cloudflare Workers."
+            echo "Token: Account Workers Scripts Edit + Workers KV Storage Edit (see docs/deployment.md#cloudflare-api-token)."
             exit 1
           fi
       - name: Bind production DIRECTORY KV

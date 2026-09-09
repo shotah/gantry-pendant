@@ -124,6 +124,22 @@ describe("PhoneShell", () => {
     expect(screen.queryByRole("button", { name: "Change Kit's photo" })).toBeNull();
   });
 
+  it("shows the Google gate when Google is on even if OIDC is not fully armed", async () => {
+    vi.stubGlobal("fetch", async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.includes("/api/auth/config")) {
+        return Response.json({ mode: null, google: true, dev: false });
+      }
+      if (url.includes("/api/auth/me")) {
+        return new Response(null, { status: 401 });
+      }
+      return new Response(null, { status: 404 });
+    });
+    render(<PhoneShell />);
+    expect(await screen.findByText("Sign in with Google to talk.")).toBeTruthy();
+    expect(screen.queryByText(/Nothing yet/)).toBeNull();
+  });
+
   it("echoes a canned Kit reply in dev without a socket", async () => {
     stubAuth(true);
     render(<PhoneShell />);

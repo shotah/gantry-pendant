@@ -35,13 +35,6 @@ talk to production KV.
 
 ---
 
-Wrangler may offer to paste the KV id into `wrangler.jsonc`. Decline, or
-revert — leave `directory-local` in git. CI injects the real id from the
-GitHub variable. `remote: true` on that binding would make local preview
-talk to production KV.
-
----
-
 ## Once — Cloudflare, then GitHub, then ship
 
 Stop when the origin answers (even if it is `503 config` — that is
@@ -50,10 +43,35 @@ step 5).
 ### 1. Cloudflare account
 
 1. Dashboard → **Workers & Pages** → copy **Account ID** (right rail).
-2. Profile (top right) → **API Tokens** → **Create Token** → use the
-   **Edit Cloudflare Workers** template → copy the token **once**.
+2. Create an API token ([permissions below](#cloudflare-api-token)).
+   Copy it **once**.
 
 Do not click **Create Worker**.
+
+### Cloudflare API token
+
+Two jobs. **One token is enough** if it has all three account
+permissions. Not the Global API Key.
+
+| Job | Account permissions |
+| --- | --- |
+| GitHub CI (this repo, **code** deploy) | Workers Scripts **Edit**, Workers KV Storage **Edit**, Account Settings **Read** |
+| Gantree Settings (Google / session / `CRANE_BEARERS`) | Workers Scripts **Edit** only |
+
+**Quick create** (pre-fills the three CI perms; you still click Create
+Token in the dashboard):
+
+[Create gantry-pendant token](https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22account_settings%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22edit%22%7D%5D&accountId=%2A&zoneId=all&name=gantry-pendant)
+
+Or Profile → **API Tokens** → **Create Token** → template **Edit
+Cloudflare Workers**. Narrow “Include” to this account if you have
+more than one. Same token can go in GitHub **and** Gantree Settings.
+
+Yard-only (secrets, no deploy): Workers Scripts Edit is enough —
+[secrets-only token](https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%5D&accountId=%2A&zoneId=all&name=gantry-pendant%20secrets).
+
+No Zone permissions. No Workers Routes unless you add a custom
+hostname later.
 
 ### 2. One KV namespace
 
@@ -114,10 +132,9 @@ Do not set `MAILBOX_SECRET` or `PENDANT_DEV` on this Worker.
 
 ### 5. Worker secrets (Google, session, agents)
 
-**Gantree Settings → Pendant** (admin): Cloudflare API token with Edit
-Cloudflare Workers (can be a **second** token from the CI one, or the
-same template), account id, Worker name (`gantry-pendant`), origin,
-Google Web client. Save and push.
+**Gantree Settings → Pendant** (admin): Cloudflare API token
+([permissions](#cloudflare-api-token)), account id, Worker name
+(`gantry-pendant`), origin, Google Web client. Save and push.
 
 **Gantree Build** (channel pendant): mints `CRANE_BEARERS` for that
 slug, writes crane `.env`. Recreate. Rotate from the crane’s Pendant
@@ -140,15 +157,23 @@ loopback. Never put them on `workers.dev`.
 
 ### 6. Google OAuth client
 
-A **new Web application** client (the google-mcp Desktop client is the
-wrong one). Scopes: `openid email profile` only. Redirect:
+GCP → **APIs & Services → Credentials → Create credentials → OAuth
+client ID.** **Web application** (the google-mcp Desktop client is the
+wrong one).
 
-```text
-https://gantry-pendant.<account>.workers.dev/api/auth/callback/google
-```
+| Field | Value |
+| --- | --- |
+| Application type | **Web application** |
+| Authorized JavaScript origins | `https://gantry-pendant.<account>.workers.dev` |
+| Authorized redirect URIs | `https://gantry-pendant.<account>.workers.dev/api/auth/callback/google` |
 
-Not `oauth-catch`, not `localhost:4100`. Paste id/secret in Gantree
-Settings (it shows this URI after origin is saved).
+Consent screen (once per project): **External** (or Internal if
+Workspace-only). Scopes `openid`, `email`, `profile` only — no
+Gmail/Drive. External + Testing: add yourself as a test user. Not
+`oauth-catch`, not `localhost:4100`.
+
+Paste Client ID + Client secret in Gantree Settings → Pendant (it
+shows this URI after origin is saved).
 
 ### 7. Point a crane at it
 

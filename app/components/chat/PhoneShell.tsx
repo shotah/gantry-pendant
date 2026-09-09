@@ -185,7 +185,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const needGoogle = Boolean(
     phone && (
       (cfg?.dev && sampleId === "unsigned")
-      || (cfg?.mode === "oidc" && !me && !cfg.dev)
+      || (Boolean(cfg?.google) && !me && !cfg?.dev)
     ),
   );
   const waitingForCrane = Boolean(
