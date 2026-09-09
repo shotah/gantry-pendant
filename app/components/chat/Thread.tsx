@@ -48,7 +48,13 @@ export function Thread({ messages, empty }: { messages: ChatBubble[]; empty?: Re
               {m.photo
                 ? <img src={m.photo} alt="" className="mb-2 max-h-48 rounded-lg" />
                 : null}
-              {m.text ? <MarkdownBody text={m.text} /> : null}
+              {m.text
+                ? (
+                    <div className={m.kind === "draft" ? "italic text-dim" : undefined}>
+                      <MarkdownBody text={m.text} />
+                    </div>
+                  )
+                : null}
               {mine && m.pending
                 ? <p className="mt-1 text-[0.7em] text-dim">sending</p>
                 : null}

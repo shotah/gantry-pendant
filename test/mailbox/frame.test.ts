@@ -136,6 +136,19 @@ describe("frame", () => {
     }
   });
 
+  it("accepts a crane draft bubble", () => {
+    const got = parseFrame(JSON.stringify({
+      kind: "draft",
+      user_id: "1182",
+      text: "⏳ spinning up",
+    }));
+    expect(got.ok && got.frame).toEqual({
+      kind: "draft",
+      user_id: "1182",
+      text: "⏳ spinning up",
+    });
+  });
+
   it("keeps ack id and optional since", () => {
     const got = parseFrame(JSON.stringify({ kind: "ack", id: "msg-1", since: "msg-0" }));
     expect(got.ok && got.frame).toEqual({ kind: "ack", id: "msg-1", since: "msg-0" });

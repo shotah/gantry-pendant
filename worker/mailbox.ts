@@ -28,6 +28,7 @@ import {
 import { persistInboundForPhone, persistRole, resolvePhoneKind, routeTag } from "../lib/mailbox/route";
 import { parseEmailVerified, parseExpMs, socketMessageAllowed } from "../lib/mailbox/socketAuth";
 import { takeFrame, type DualLimit } from "../lib/mailbox/rate";
+import { cranePublishedDraft, phoneMustNotPublishDraft } from "../lib/mailbox/draft";
 import { cranePublishedTyping, phoneMustNotPublishTyping } from "../lib/mailbox/typing";
 
 const RATE_KEY = "rate";
@@ -102,11 +103,6 @@ export class Mailbox extends DurableObject<Env> {
       ws.send(encodeFrame({ kind: "error", text: parsed.error }));
       return;
     }
-    const limits = await this.take(meta.rateId, parsed.bytes);
-    if (!limits) {
-      ws.send(encodeFrame({ kind: "error", text: "rate" }));
-      return;
-    }
     const out: WireFrame = { ...parsed.frame };
     if (meta.role === "phone") {
       const kind = resolvePhoneKind(out);
@@ -126,10 +122,19 @@ export class Mailbox extends DurableObject<Env> {
     } else if (!out.kind) {
       out.kind = "reply";
     }
+    const skipRate = cranePublishedDraft(meta.role, out.kind);
+    if (!skipRate) {
+      const limits = await this.take(meta.rateId, parsed.bytes);
+      if (!limits) {
+        ws.send(encodeFrame({ kind: "error", text: "rate" }));
+        return;
+      }
+    }
     if (
       phoneMustNotPublishCmds(meta.role, out.kind)
       || phoneMustNotPublishAllow(meta.role, out.kind)
       || phoneMustNotPublishTyping(meta.role, out.kind)
+      || phoneMustNotPublishDraft(meta.role, out.kind)
     ) {
       ws.send(encodeFrame({ kind: "error", text: "bad frame" }));
       return;
@@ -150,6 +155,20 @@ export class Mailbox extends DurableObject<Env> {
       const tag = routeTag(meta.role, out);
       if (tag && out.user_id) {
         const body = encodeFrame({ kind: "typing", user_id: out.user_id });
+        for (const p of this.ctx.getWebSockets(tag)) {
+          p.send(body);
+        }
+      }
+      return;
+    }
+    if (cranePublishedDraft(meta.role, out.kind)) {
+      const tag = routeTag(meta.role, out);
+      if (tag && out.user_id) {
+        const body = encodeFrame({
+          kind: "draft",
+          user_id: out.user_id,
+          text: out.text ?? "",
+        });
         for (const p of this.ctx.getWebSockets(tag)) {
           p.send(body);
         }

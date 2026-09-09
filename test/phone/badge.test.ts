@@ -7,6 +7,7 @@ describe("badge", () => {
     expect(shouldBadge(true, "push")).toBe(true);
     expect(shouldBadge(true, "reply")).toBe(true);
     expect(shouldBadge(true, "cmds")).toBe(false);
+    expect(shouldBadge(true, "draft")).toBe(false);
   });
 
   it("bumps and clears the OS badge", () => {

@@ -42,6 +42,7 @@ type Me = { sub: string; email?: string; cranes?: string[] } | null;
 
 const BACKOFF_MS = 1000;
 const BACKOFF_MAX = 30_000;
+const DRAFT_BUBBLE_ID = "__draft__";
 
 type ClientFrame = {
   id?: string;
@@ -330,6 +331,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       }
       setStatus("down");
       setTyping(false);
+      setMessages((prev) => prev.filter((m) => m.id !== DRAFT_BUBBLE_ID));
       window.clearTimeout(typingTimer.current);
       typingTimer.current = 0;
       void releaseScreenWake(wakeRef.current);
@@ -378,6 +380,29 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         }
         return;
       }
+      if (frame.kind === "draft") {
+        if (!phone) {
+          return;
+        }
+        const text = frame.text ?? "";
+        setMessages((prev) => {
+          const rest = prev.filter((m) => m.id !== DRAFT_BUBBLE_ID);
+          if (!text.trim()) {
+            return rest;
+          }
+          return [
+            ...rest,
+            {
+              id: DRAFT_BUBBLE_ID,
+              from: "kit",
+              text,
+              kind: "draft",
+              at: Date.now(),
+            },
+          ];
+        });
+        return;
+      }
       if (phone && clearsTyping(frame.kind)) {
         setTyping(false);
         window.clearTimeout(typingTimer.current);
@@ -399,17 +424,22 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         }
         seenIds.current.add(id);
       }
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: id ?? `${Date.now()}-${prev.length}`,
-          from: bubbleFrom(phone, frame.kind),
-          text: frame.text ?? "",
-          kind: frame.kind,
-          at: Date.now(),
-          photo: frame.images?.[0]?.url,
-        },
-      ]);
+      setMessages((prev) => {
+        const rest = frame.kind === "reply"
+          ? prev.filter((m) => m.id !== DRAFT_BUBBLE_ID)
+          : prev;
+        return [
+          ...rest,
+          {
+            id: id ?? `${Date.now()}-${rest.length}`,
+            from: bubbleFrom(phone, frame.kind),
+            text: frame.text ?? "",
+            kind: frame.kind,
+            at: Date.now(),
+            photo: frame.images?.[0]?.url,
+          },
+        ];
+      });
       if (phone) {
         void releaseScreenWake(wakeRef.current);
         wakeRef.current = null;

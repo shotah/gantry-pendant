@@ -22,7 +22,7 @@ export function queueIdentity(item: Pick<Queued, "id" | "to">): string {
 }
 
 export function shouldQueue(kind?: string): boolean {
-  return kind !== "pin" && kind !== "ack" && kind !== "cmds" && kind !== "typing";
+  return kind !== "pin" && kind !== "ack" && kind !== "cmds" && kind !== "typing" && kind !== "draft";
 }
 
 export function destKey(to: Role, userId?: string): string {

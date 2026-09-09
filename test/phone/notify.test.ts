@@ -19,6 +19,7 @@ describe("notify", () => {
     expect(shouldNotify(true, "push", "default")).toBe(false);
     expect(shouldNotify(true, "inbound", "granted")).toBe(false);
     expect(shouldNotify(true, "cmds", "granted")).toBe(false);
+    expect(shouldNotify(true, "draft", "granted")).toBe(false);
   });
 
   it("reads permission and names the install / blocked gaps", () => {

@@ -8,6 +8,8 @@ describe("route", () => {
     expect(routeTag("crane", { kind: "reply" })).toBeUndefined();
     expect(routeTag("crane", { kind: "typing", user_id: "ada" })).toBe("ada");
     expect(routeTag("crane", { kind: "typing" })).toBeUndefined();
+    expect(routeTag("crane", { kind: "draft", user_id: "ada" })).toBe("ada");
+    expect(routeTag("crane", { kind: "draft" })).toBeUndefined();
     expect(routeTag("crane", { kind: "error", user_id: "ada" })).toBe("ada");
     expect(routeTag("crane", { kind: "error" })).toBe("phone");
   });
@@ -37,6 +39,7 @@ describe("route", () => {
       { kind: "error" },
       { kind: "cmds" },
       { kind: "typing" },
+      { kind: "draft" },
     ];
     for (const frame of banned) {
       expect(phoneKindAllowed(frame)).toBe(false);
@@ -53,6 +56,7 @@ describe("route", () => {
     expect(persistRole("phone", "pin")).toBeUndefined();
     expect(persistRole("phone", "ack")).toBeUndefined();
     expect(persistRole("crane", "typing", "ada")).toBeUndefined();
+    expect(persistRole("crane", "draft", "ada")).toBeUndefined();
   });
 
   it("mirrors inbound onto the phone queue so a refresh can replay your bubbles", () => {

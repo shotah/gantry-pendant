@@ -60,7 +60,18 @@ describe("Thread", () => {
     expect(bubbleFrom(true, "inbound")).toBe("you");
     expect(bubbleFrom(true, "reply")).toBe("kit");
     expect(bubbleFrom(true, "push")).toBe("kit");
+    expect(bubbleFrom(true, "draft")).toBe("kit");
     expect(bubbleFrom(false, "inbound")).toBe("you");
     expect(bubbleFrom(false, "reply")).toBe("you");
+  });
+
+  it("paints a draft bubble in italics", () => {
+    render(
+      <Thread
+        messages={[{ id: "d", from: "kit", text: "⏳ spinning up", kind: "draft", at: 1 }]}
+      />,
+    );
+    const body = screen.getByText("⏳ spinning up");
+    expect(body.closest(".italic")).toBeTruthy();
   });
 });

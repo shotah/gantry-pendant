@@ -23,7 +23,7 @@ export type PhoneContext = {
 
 export type FrameImage = { url: string };
 
-export type FrameKind = "inbound" | "reply" | "push" | "ack" | "error" | "pin" | "cmds" | "allow" | "typing";
+export type FrameKind = "inbound" | "reply" | "push" | "ack" | "error" | "pin" | "cmds" | "allow" | "typing" | "draft";
 
 export type WireFrame = {
   text?: string;
@@ -152,7 +152,7 @@ function parseIdField(raw: unknown): string | ParseErr | undefined {
   return raw.length ? raw : undefined;
 }
 
-const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds", "allow", "typing"]);
+const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds", "allow", "typing", "draft"]);
 
 /** Parse a mailbox frame. Never logs the body. */
 export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseOpts): ParseResult {

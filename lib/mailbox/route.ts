@@ -32,7 +32,7 @@ export function routeTag(from: Role, frame: WireFrame): string | undefined {
   if (frame.kind === "push") {
     return frame.user_id || "phone";
   }
-  if (frame.kind === "reply" || frame.kind === "typing") {
+  if (frame.kind === "reply" || frame.kind === "typing" || frame.kind === "draft") {
     return frame.user_id || undefined;
   }
   if (frame.kind === "error" && frame.user_id) {

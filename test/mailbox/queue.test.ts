@@ -50,11 +50,12 @@ describe("queue", () => {
     expect(newQueueId(1, () => 0.5)).toMatch(/^1-/);
   });
 
-  it("does not queue pin, ack, cmds, or typing", () => {
+  it("does not queue pin, ack, cmds, typing, or draft", () => {
     expect(shouldQueue("pin")).toBe(false);
     expect(shouldQueue("ack")).toBe(false);
     expect(shouldQueue("cmds")).toBe(false);
     expect(shouldQueue("typing")).toBe(false);
+    expect(shouldQueue("draft")).toBe(false);
     expect(shouldQueue("inbound")).toBe(true);
     expect(shouldQueue("reply")).toBe(true);
     expect(shouldQueue("push")).toBe(true);

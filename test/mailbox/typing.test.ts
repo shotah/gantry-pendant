@@ -21,6 +21,7 @@ describe("typing frames", () => {
     expect(clearsTyping("error")).toBe(true);
     expect(clearsTyping("ack")).toBe(false);
     expect(clearsTyping("typing")).toBe(false);
+    expect(clearsTyping("draft")).toBe(false);
     expect(clearsTyping("inbound")).toBe(false);
   });
 

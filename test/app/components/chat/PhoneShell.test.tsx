@@ -484,6 +484,44 @@ describe("PhoneShell", () => {
     expect(screen.queryByText(/typing/)).toBeNull();
   });
 
+  it("replaces a draft bubble in place and does not type from it", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "⏳ spinning up" }));
+    });
+    expect(await screen.findByText("⏳ spinning up")).toBeTruthy();
+    expect(screen.queryByText(/typing/)).toBeNull();
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "Making Calls: ✓" }));
+    });
+    expect(await screen.findByText("Making Calls: ✓")).toBeTruthy();
+    expect(screen.queryByText("⏳ spinning up")).toBeNull();
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "You rode 21mi." }));
+    });
+    expect(await screen.findByText("You rode 21mi.")).toBeTruthy();
+    expect(screen.queryByText("Making Calls: ✓")).toBeNull();
+  });
+
+  it("drops an empty draft without leaving a bubble", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "⏳ spinning up" }));
+    });
+    expect(await screen.findByText("⏳ spinning up")).toBeTruthy();
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "" }));
+    });
+    expect(screen.queryByText("⏳ spinning up")).toBeNull();
+    expect(screen.getByText(/Nothing yet/)).toBeTruthy();
+  });
+
   it("picks from /me cranes and still lets you type another slug", async () => {
     stubOidc({ sub: DEV_USER.sub, email: DEV_USER.email, cranes: ["kit", "ada"] });
     stubSocket();
