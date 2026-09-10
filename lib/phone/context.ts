@@ -22,7 +22,7 @@ export function buildContext(opts: {
   const ctx: PhoneContext = {
     at: now.toISOString(),
     tz: opts.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-    surface: opts.surface ?? "pendant",
+    surface: opts.surface ?? "browser",
   };
   if (opts.geo) {
     ctx.geo = opts.geo as Geo;

@@ -13,7 +13,7 @@ export type Geo = {
   speed_mps?: number;
 };
 
-export type Surface = "pendant" | "android" | "android_auto";
+export type Surface = "browser" | "android" | "android_auto";
 
 export type PhoneContext = {
   at?: string;
@@ -105,7 +105,7 @@ function parseContext(raw: unknown): PhoneContext | undefined {
   if (o.net === "wifi" || o.net === "cellular" || o.net === "unknown") {
     ctx.net = o.net;
   }
-  if (o.surface === "pendant" || o.surface === "android" || o.surface === "android_auto") {
+  if (o.surface === "browser" || o.surface === "android" || o.surface === "android_auto") {
     ctx.surface = o.surface;
   }
   return ctx;

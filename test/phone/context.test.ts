@@ -14,7 +14,7 @@ describe("phone context", () => {
     expect(withGeo.at).toBe("2026-09-04T20:00:00.000Z");
     expect(withGeo.tz).toBe("America/Los_Angeles");
     expect(withGeo.geo).toEqual({ lat: 47.6, lon: -122.3, accuracy_m: 8 });
-    expect(withGeo.surface).toBe("pendant");
+    expect(withGeo.surface).toBe("browser");
     const denied = buildContext({ now, timeZone: "UTC", geo: null, surface: "android_auto" });
     expect(denied.geo).toBeUndefined();
     expect(denied.surface).toBe("android_auto");

@@ -169,7 +169,7 @@ me" / leave-by / directions should not require a ritual pin.
 | `at` + IANA `tz` from the phone | Already have a clock footer; phone tz can beat a stale profile | No |
 | `battery` pct + charging | On the wire when the OS exposes it; prompt only if cron cares | No |
 | `net`: wifi / cellular | On the wire when `navigator.connection` exists (Chrome Android) | No |
-| `surface`: pendant / android / android_auto | Which mouth. This PWA always `pendant` (desk tab or Home Screen). Cab stamps `android` in-hand and `android_auto` on a head unit. Not viewport, not UA. | No |
+| `surface`: browser / android / android_auto | Which mouth. This PWA always `browser` (desk tab or Home Screen). Cab stamps `android` in-hand and `android_auto` on a head unit. Not viewport, not UA. | No |
 
 Do **not** stuff `[location]` into the user text on every send. That
 is how Telegram location messages work, and it would re-bill coords
@@ -183,7 +183,7 @@ context?: {
   geo?: { lat, lon, accuracy_m, alt_m?, heading?, speed_mps? }
   battery?: { pct, charging }
   net?: wifi | cellular | unknown
-  surface?: pendant | android | android_auto
+  surface?: browser | android | android_auto
 }
 ```
 

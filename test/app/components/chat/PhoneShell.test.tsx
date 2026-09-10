@@ -322,7 +322,7 @@ describe("PhoneShell", () => {
     expect(frame.text).toBe("near me");
     expect(frame.text).not.toContain("[location]");
     expect(frame.context?.geo).toEqual({ lat: 47.6, lon: -122.3, accuracy_m: 8 });
-    expect(frame.context?.surface).toBe("pendant");
+    expect(frame.context?.surface).toBe("browser");
     expect(screen.getByRole("button", { name: "attach" }).getAttribute("title")).toBe("pin ±8m this send");
   });
 

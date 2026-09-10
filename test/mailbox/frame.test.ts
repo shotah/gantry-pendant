@@ -52,20 +52,22 @@ describe("frame", () => {
   });
 
   it("keeps FE surface names and drops the rest", () => {
-    const pendant = parseFrame(JSON.stringify({ context: { surface: "pendant" } }));
+    const browser = parseFrame(JSON.stringify({ context: { surface: "browser" } }));
     const android = parseFrame(JSON.stringify({ context: { surface: "android" } }));
     const auto = parseFrame(JSON.stringify({ context: { surface: "android_auto" } }));
-    expect(pendant.ok && pendant.frame.context?.surface).toBe("pendant");
+    expect(browser.ok && browser.frame.context?.surface).toBe("browser");
     expect(android.ok && android.frame.context?.surface).toBe("android");
     expect(auto.ok && auto.frame.context?.surface).toBe("android_auto");
     const oldPhone = parseFrame(JSON.stringify({ context: { surface: "phone" } }));
     const oldCar = parseFrame(JSON.stringify({ context: { surface: "car" } }));
     const desktop = parseFrame(JSON.stringify({ context: { surface: "desktop" } }));
     const dash = parseFrame(JSON.stringify({ context: { surface: "android-auto" } }));
+    const pendant = parseFrame(JSON.stringify({ context: { surface: "pendant" } }));
     expect(oldPhone.ok && oldPhone.frame.context?.surface).toBeUndefined();
     expect(oldCar.ok && oldCar.frame.context?.surface).toBeUndefined();
     expect(desktop.ok && desktop.frame.context?.surface).toBeUndefined();
     expect(dash.ok && dash.frame.context?.surface).toBeUndefined();
+    expect(pendant.ok && pendant.frame.context?.surface).toBeUndefined();
   });
 
   it("rejects junk, oversize text, and bad images", () => {
