@@ -240,3 +240,8 @@ When that happens: `typing` can stop once `Started()` is true (dots
 then the bubble), or keep refreshing under the stream. Decide then.
 Do not invent a second `thinking` kind for CoT — that belongs in the
 bubble body, as Telegram already does.
+
+Mouth UI that sits next to this walk (not instead of it): crane-up vs
+phone `live`, and a stop control while `typing…` —
+[todo.md](todo.md#mouth-ui). Presence must not reuse inbound `ack`. Stop
+is `/cancel` plus Handle abort, not a fake hatch.

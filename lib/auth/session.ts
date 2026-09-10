@@ -83,6 +83,40 @@ export function parseCookie(header: string | null, name: string): string | undef
   return undefined;
 }
 
+/** `Authorization: Bearer <token>` — empty / missing / wrong scheme → undefined. */
+export function bearerToken(authorization: string | null | undefined): string | undefined {
+  const header = authorization?.trim() ?? "";
+  const prefix = "bearer ";
+  if (header.length < prefix.length || header.slice(0, prefix.length).toLowerCase() !== prefix) {
+    return undefined;
+  }
+  const token = header.slice(prefix.length).trim();
+  return token || undefined;
+}
+
+/**
+ * PWA sends the httpOnly cookie. Native cab sends the same JWE on
+ * `Authorization`. Cookie wins when both are present.
+ */
+export async function readSessionFromRequest(
+  secret: string,
+  opts: { cookieHeader?: string | null; authorization?: string | null },
+  now = Date.now(),
+): Promise<SessionClaims | null> {
+  const fromCookie = parseCookie(opts.cookieHeader ?? null, SESSION_COOKIE);
+  if (fromCookie) {
+    const claims = await readSession(secret, fromCookie, now);
+    if (claims) {
+      return claims;
+    }
+  }
+  const fromAuth = bearerToken(opts.authorization);
+  if (!fromAuth) {
+    return null;
+  }
+  return readSession(secret, fromAuth, now);
+}
+
 export function sessionCookie(value: string, secure: boolean, maxAgeSec = IDLE_MS / 1000): string {
   const bits = [
     `${SESSION_COOKIE}=${encodeURIComponent(value)}`,

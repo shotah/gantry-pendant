@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  bearerToken,
   clearCookie,
   mintSession,
   parseCookie,
   readSession,
+  readSessionFromRequest,
   SESSION_COOKIE,
   sessionCookie,
   stateCookie,
@@ -57,5 +59,25 @@ describe("session", () => {
     expect(parseCookie("a=1; pendant_session=hi%20x", SESSION_COOKIE)).toBe("hi x");
     expect(clearCookie(SESSION_COOKIE, false)).toContain("Max-Age=0");
     expect(stateCookie("abc", false)).toContain("pendant_oauth_state=abc");
+  });
+
+  it("reads the same JWE from cookie or Authorization (cookie wins)", async () => {
+    const now = Date.UTC(2026, 8, 4);
+    const token = await mintSession(secret, { sub: "1182", email: "ada@x.com" }, now);
+    const other = await mintSession(secret, { sub: "999" }, now);
+    expect(bearerToken(undefined)).toBeUndefined();
+    expect(bearerToken("Basic x")).toBeUndefined();
+    expect(bearerToken("Bearer")).toBeUndefined();
+    expect(bearerToken(`Bearer ${token}`)).toBe(token);
+    expect(await readSessionFromRequest(secret, { authorization: `Bearer ${token}` }, now + 1000)).toMatchObject({
+      sub: "1182",
+      email: "ada@x.com",
+    });
+    const cookieWins = await readSessionFromRequest(secret, {
+      cookieHeader: `${SESSION_COOKIE}=${encodeURIComponent(token)}`,
+      authorization: `Bearer ${other}`,
+    }, now + 1000);
+    expect(cookieWins?.sub).toBe("1182");
+    expect(await readSessionFromRequest(secret, { cookieHeader: "x=1" }, now)).toBeNull();
   });
 });

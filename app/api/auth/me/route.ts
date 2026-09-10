@@ -3,7 +3,7 @@ import { unauthorized, tooMany } from "@/lib/auth/deny";
 import { parseBearers } from "@/lib/auth/bearer";
 import { admittedCranes } from "@/lib/auth/directory";
 import { limitAuthRequest } from "@/lib/auth/limit";
-import { parseCookie, readSession, SESSION_COOKIE } from "@/lib/auth/session";
+import { readSessionFromRequest } from "@/lib/auth/session";
 import { fetchRoomUsers } from "@/lib/mailbox/allow";
 import { parseSlug } from "@/lib/mailbox/slug";
 import { DEV_USER } from "@/lib/dev/samples";
@@ -16,11 +16,13 @@ export async function GET(req: Request) {
     return Response.json(DEV_USER);
   }
   const secret = env.SESSION_SECRET?.trim();
-  const token = parseCookie(req.headers.get("Cookie"), SESSION_COOKIE);
-  if (!secret || !token) {
+  if (!secret) {
     return unauthorized();
   }
-  const session = await readSession(secret, token);
+  const session = await readSessionFromRequest(secret, {
+    cookieHeader: req.headers.get("Cookie"),
+    authorization: req.headers.get("Authorization"),
+  });
   if (!session) {
     return unauthorized();
   }

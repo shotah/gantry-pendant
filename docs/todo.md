@@ -126,13 +126,13 @@ coords, not a stale Telegram pin.
 
 Foreground cheap-PWA extras that are already in (battery, net, GPS
 toggle, silent pin, wake, haptic, badge, shortcuts, photo compress)
-need the pocket walk above, not more code. Do not start Expo until the
-PWA path is painful.
+need the pocket walk above, not more code. Mouth UI misses below wait
+on the same walk. Do not start Expo until the PWA path is painful.
 
 ### This repo
 
 - [ ] **Voice into compose** — `SpeechRecognition`; fill the textarea,
-      do not auto-send
+      do not auto-send. Not a voice-note bubble.
 - [ ] **Share target** — Android share sheet → compose (do not register
       `share_target` until the POST handler exists)
 - [ ] **Offline outbound queue** — page-side unsent frames; do not cache
@@ -145,16 +145,89 @@ PWA path is painful.
       Walk: [agent_typing_response_todo.md](agent_typing_response_todo.md)
 - [ ] Sliding session refresh (today is hard 7d)
 - [ ] Prune stale entries in the DO rate-limit map
+- [x] Native cab auth — `POST /api/auth/token` + phone `Authorization`
+      (session JWE). Client lives in `repos/gantry-cab`.
+
+### Mouth UI
+
+The shell is a thread, not a Telegram clone. These are the misses that
+still fight a phone talking to Kit. Not groups, stickers, or Mini Apps.
+
+**Walk (history):** kill the tab, reopen. Ada still sees the last
+turns, not an empty thread, while Kit's session is unchanged. The
+SQLite queue stays unread-only catch-up. This is a short persisted
+transcript for this `sub`. Cap it. Evict old. Do **not** cache chat in
+`sw.js`. Architecture already allowed later HTTP for history/media.
+
+- [ ] **Reload keeps the thread** — hydrate bubbles for this `user_id`
+      on connect. Not a second session store on the crane. Queue
+      (`QUEUE_*`, 1h) is not the transcript.
+
+**Walk (presence):** yank the crane. Header stays `live` (phone socket)
+but shows she is gone / inbound is queued. Bring the crane back:
+presence flips without a fake `typing…`. Inbound `ack` still must not
+type. Same anti-hatch as
+[agent_typing_response_todo.md](agent_typing_response_todo.md).
+
+- [ ] **Crane up vs phone live** — DO already knows the crane socket.
+      Overlay `asleep` / `queued` on the subtitle. `live` stays socket
+      health. Never infer from inbound `ack`.
+
+**Walk (photo):** type "this hatch?", paste a screenshot or pick a photo,
+Send. One inbound: caption + one JPEG. Attach must not fire a second
+empty-text turn. Paste-into-compose is a user attach, not a clipboard
+dump on the wire.
+
+- [ ] **Caption + attach** — photo sits on the draft until Send. Paste
+      image into the box. Camera (`capture`) is fine; gallery stays.
+      `IMAGE_MAX` stays 1.
+- [ ] **Pin on the bubble** — outbound that carried `context.geo` shows
+      `±Nm this send` (accuracy only). Tap opens maps. Do not
+      reverse-geocode. Do not put coords in `Text`. Silent pin stays
+      silent (no bubble).
+- [ ] **Timestamps** — `ChatBubble.at` is already there; paint time and
+      a day chip. Phone clock, not a second server now.
+- [ ] **Copy / retry** — long-press copies text (and fenced code).
+      Unacked inbound leaves `sending` forever today; flip to failed
+      and resend. Drop the ghost or reuse `id` — pick one, test ack
+      dedup.
+- [ ] **Stop a turn** — while `typing…`, a control that cancels Handle.
+      Empty `/cancel` already stops the ticker; the phone needs a
+      button. Crane must abort (other repo); this checkout only sends.
+- [ ] **Quote** — inbound can name the bubble `id` you are answering.
+      Kit sees which hatch photo. No thread-within-thread chrome.
+- [ ] **Inline confirm** — Kit asks "latch the gate?" with Yes / No.
+      Tap is a short inbound (or a dedicated kind), not a 👍 that
+      secretly starts Handle. Skip reactions.
+- [ ] **One non-image file** — log / `.ics` / pdf under the same byte
+      cap. Not a document dump. Crane must accept it (other repo).
+- [ ] **Draft survives reload** — compose text in localStorage. Not
+      the thread.
+- [ ] **Mute pings** — local pref: `push` does not badge / notify /
+      haptic. Socket still paints the bubble.
+- [ ] Photo lightbox / save; jump-to-bottom when a ping lands off the
+      floor; session chip when `/new` actually resets history.
 
 ### ai-gantry
 
 - [ ] Streaming placeholder + edit (`ReplyWriter`); phone replaces the
-      last Kit bubble, does not append per chunk. Different from
-      typing: [agent_typing_response_todo.md](agent_typing_response_todo.md)
+      last Kit bubble, does not append per chunk. Tool progress
+      (`UpdateProgress`) rides this writer, not a second typing kind.
+      Different from typing:
+      [agent_typing_response_todo.md](agent_typing_response_todo.md)
+- [ ] Honor pendant stop / `/cancel` so Handle aborts; typing ticker
+      dies before any reply
+- [ ] Reply-to: inbound names a prior frame `id`; Completer sees which
+      bubble (photo) Ada quoted
+- [ ] Inline Yes / No on a reply (Telegram callback shape). Pendant
+      paints buttons; tap is a short inbound, not a reaction
+- [ ] One non-image file on the channel under the chat cap (sibling of
+      `Images`, not a second mailbox)
 
 ### Expo (when a bookmark is not enough)
 
-Same Durable Object. New client. Do not fork the mailbox.
+Same Durable Object. New client. Do not fork the mailbox. Android Auto
+is **gantry-cab**, not this.
 
 - Background GPS / geofence, motion, reliable iOS lock-screen (APNs),
   Sign in with Apple only if a store/TestFlight build exists
@@ -172,11 +245,14 @@ optional after a custom hostname. Never "Protect this Worker".
 - Inbound port on the crane
 - Worker-level Cloudflare Access ("Protect this Worker")
 - Reusing `google-oauth.json` / Strava / Garmin as login
-- Feature-matching Telegram (groups, stickers, Mini Apps)
+- Feature-matching Telegram (groups, stickers, Mini Apps, reactions,
+  read receipts, mentions, link unfurl)
 - Gantree mobile layout
 - Putting the mailbox on the portal Worker
 - Mini Tailscale hub as the architecture (laptop hack only)
 - SSID / BSSID / Bluetooth / clipboard / contacts on the wire
+  (paste-into-compose is a photo attach, not a clipboard dump)
+- Guessing crane presence or typing from inbound `ack`
 - `watchPosition` in the background (PWA)
 - Reverse-geocode in the client
 - `[location]` prepended to every `Text`

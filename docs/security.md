@@ -156,9 +156,12 @@ They do not see chat or GPS unless **we** log it.
 
 Handshake mints the session and tags the socket (`sub`, `exp`). Google
 ID tokens do **not** ride later frames. The PWA WebSocket is
-same-origin and sends the httpOnly cookie; crane upgrade sends
-`Authorization: Bearer`. Bind DO id to the crane slug in that bearer
-(`kit` cannot write `ada`).
+same-origin and sends the httpOnly cookie. Native cab upgrades with
+`Authorization: Bearer` holding that same JWE (minted at
+`POST /api/auth/token` from a Google ID token + nonce). Crane upgrade
+sends `Authorization: Bearer` too — a **different** token, bound to the
+slug. Bind DO id to the crane slug in that crane bearer (`kit` cannot
+write `ada`).
 
 On every `webSocketMessage` the mailbox re-checks the **room list**
 (`sub` match, or verified email match) plus optional static
@@ -168,8 +171,9 @@ phone sockets and closes anyone no longer on it. Yanking a person
 takes effect when the crane republishes (recreate), or on the next
 frame if they were only on `ALLOWED_SUBS`.
 
-Worker session after Google: httpOnly JWE cookie, **hard 7-day `exp`
-at mint**. No sliding refresh. Sign in again after expiry. Not a JWT
+Worker session after Google: httpOnly JWE cookie on the PWA, **hard
+7-day `exp` at mint**. Cab stores the JWE on the device and sends it on
+the header. No sliding refresh. Sign in again after expiry. Not a JWT
 in `localStorage`.
 
 Phone frames are forced to `inbound | pin | ack` server-side. The

@@ -49,7 +49,7 @@ Every screen, Lamp, extra-large type, crane stand-in:
 
 | File | What it is |
 | --- | --- |
-| [docs/todo.md](docs/todo.md) | What's left — walks, one allowlist, later |
+| [docs/todo.md](docs/todo.md) | What's left — walks, one allowlist, mouth UI later |
 | [docs/deployment.md](docs/deployment.md) | Cloudflare once, then `npm run release` |
 | [docs/screens.md](docs/screens.md) | What the mouth looks like (phone shots) |
 | [docs/setup.md](docs/setup.md) | Admin / user / connect — what you paste where |
@@ -136,6 +136,7 @@ Then [docs/setup.md](docs/setup.md).
 | Piece | Repo | Job |
 | --- | --- | --- |
 | Client | **this repo** (Vinext `app/`) | Chat UI. Google sign-in. PWA. Same framework as Gantree, **Workers** target. |
+| Cab | **gantry-cab** (sister checkout) | Android Auto mouth. Same Worker. Native APK. |
 | Relay | same Worker (Durable Object) | Mailbox per crane. Phone and crane both dial **in**. |
 | Channel | **ai-gantry** `CHANNEL=pendant` | Same `Channel` / `Pusher` as Telegram. Allowlist. Cron can still ping you. |
 

@@ -66,6 +66,15 @@ describe("handshake", () => {
     });
     expect(unknown).toEqual({ ok: false, error: "forbidden" });
     expect(junk).toEqual({ ok: false, error: "unauthorized" });
+
+    const viaHeader = await handshake({
+      env,
+      slug: "kit",
+      role: "phone",
+      authorization: `Bearer ${session}`,
+      now,
+    });
+    expect(viaHeader).toEqual(phone);
   });
 
   it("binds the crane bearer to the slug", async () => {
@@ -181,6 +190,13 @@ describe("handshakeSlug", () => {
       now,
     });
     expect(crane).toEqual({ ok: true, principal: { kind: "crane", slug: "kit" } });
+    const phoneHeader = await handshakeSlug({
+      env,
+      slug: "kit",
+      authorization: `Bearer ${session}`,
+      now,
+    });
+    expect(phoneHeader.ok && phoneHeader.principal.kind === "phone" && phoneHeader.principal.sub).toBe("1182");
     const queryCrane = await handshakeSlug({
       env,
       slug: "kit",

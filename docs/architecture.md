@@ -183,20 +183,26 @@ browser reaches the board. Chat does not use it.
 ## Android / iPhone in this picture
 
 The architecture does not care about stores. The client is a WebSocket
-(and later HTTP for history/media) consumer of the Worker. Location
-uses the browser Geolocation API on send; Expo later if we want
-background or motion.
+(and later HTTP for history/media) consumer of the Worker. That later
+path is the **transcript** on reload, not the unread queue, and not
+`sw.js` — [todo.md](todo.md#mouth-ui). Location uses the browser
+Geolocation API on send. The car mouth is **gantry-cab** (native
+Android Auto), not Expo wrapping this UI.
 
 Vinext is Next-shaped on Vite: `app/manifest.ts` is a metadata route
 (`/manifest.webmanifest`, `application/manifest+json`). Icons and
 `public/sw.js` are static. Chrome Install is that manifest + 192/512
-PNGs on HTTPS (or loopback). No extra PWA plugin. Expo is later.
+PNGs on HTTPS (or loopback). No extra PWA plugin.
 
 ```text
-PWA (both phones)  ─┐
-Expo Android APK   ─┼─►  same Durable Object
-Expo iOS TestFlight─┘
+PWA (both phones)   ─┐
+gantry-cab (Auto)   ─┼─►  same Durable Object
 ```
+
+Native Android (the car mouth) is **gantry-cab**, a sister checkout. It
+does not wrap this Vinext app. Same frames, same Google `sub`. Phone
+auth is the session JWE on `Authorization` after `POST /api/auth/token`.
+The PWA still uses the httpOnly cookie.
 
 Push notifications are a **second** path. They do not replace the
 socket while the app is open. **Web Push** (VAPID from this Worker,

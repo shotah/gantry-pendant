@@ -48,7 +48,8 @@ Two phone ideas people mix up:
 6. **Client is TypeScript / Vinext.** Same `app/` muscle as Gantree.
    Gantree is Vinext **on Node** because it needs `docker.sock`. This
    app has no Docker — Vinext's actual happy path is Cloudflare
-   Workers. PWA first. Expo if a Home Screen bookmark is not enough.
+   Workers. PWA first. The car mouth is a native sister
+   (`gantry-cab`), not Expo wrapping this UI.
 7. **The phone may send more than text.** Telegram only gets a location
    when you drop a pin. Owning the client means a small **context**
    blob on the wire (GPS first). The prompt stays stingy; the session
@@ -201,8 +202,10 @@ updates, no Completer.
 vibrate + badge on inbound ping, manifest shortcuts (Message / Pin).
 
 **Later:** reverse-geocode is a maps **tool** on the crane, not a client
-field. Motion / "home" labels / voice / share-target / lock-screen
-push / Expo — [todo.md](todo.md).
+field. Captioned photo (paste screenshot, do not send on attach), pin
+chip on the outbound bubble, timestamps, copy/retry, crane-up vs
+`live`, reload-keeps-the-thread, voice / share-target / lock-screen
+push / Expo — [todo.md](todo.md). Motion / "home" labels stay Expo.
 
 **Never on the wire:** SSID / BSSID, Bluetooth neighbors, clipboard,
 contacts dump. Fingerprinting, not chat.
@@ -217,8 +220,8 @@ One web codebase.
 | Path | Android | iPhone | When |
 | --- | --- | --- | --- |
 | **PWA** | Install from Chrome | Add to Home Screen. Push exists since 16.4; background is still weak. | First client |
+| **gantry-cab** | Sideload APK + Android Auto | — | Spoken reply / reminders in the car |
 | **Expo** | Sideload APK | Apple Developer ($99/yr) + TestFlight (EAS can sign) | When PWA feels like a bookmark |
-| Kotlin + Swift | Fine | Painful | Not this experiment |
 
 Store listing is not the experiment. Sideload and a Home Screen icon are.
 

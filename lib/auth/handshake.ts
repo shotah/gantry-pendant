@@ -2,7 +2,7 @@ import { bearerForSlug, parseBearers } from "./bearer";
 import { type AuthEnv, type AuthMode, resolveAuthMode } from "./mode";
 import { roomAllows } from "./room";
 import { secretEqual } from "./secret";
-import { parseCookie, readSession, SESSION_COOKIE, type SessionClaims } from "./session";
+import { readSessionFromRequest, type SessionClaims } from "./session";
 import type { RoomUser } from "../mailbox/allow";
 import type { Role } from "../mailbox/frame";
 
@@ -48,17 +48,17 @@ function bearerFrom(
   return query?.trim() ?? "";
 }
 
-async function phoneFromCookie(
+async function phoneFromRequest(
   env: HandshakeInput["env"],
   cookieHeader: string | null | undefined,
+  authorization: string | null | undefined,
   now: number,
 ): Promise<SessionClaims | null> {
   const secret = env.SESSION_SECRET?.trim() ?? "";
-  const token = parseCookie(cookieHeader ?? null, SESSION_COOKIE);
-  if (!secret || !token) {
+  if (!secret) {
     return null;
   }
-  return readSession(secret, token, now);
+  return readSessionFromRequest(secret, { cookieHeader, authorization }, now);
 }
 
 /**
@@ -107,7 +107,7 @@ function spikeHandshake(env: AuthEnv, role: Role, input: HandshakeInput): Handsh
 
 async function oidcHandshake(input: HandshakeInput, now: number): Promise<HandshakeResult> {
   if (input.role === "phone") {
-    const session = await phoneFromCookie(input.env, input.cookieHeader, now);
+    const session = await phoneFromRequest(input.env, input.cookieHeader, input.authorization, now);
     if (!session) {
       return { ok: false, error: "unauthorized" };
     }
