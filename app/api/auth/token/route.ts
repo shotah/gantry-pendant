@@ -3,6 +3,7 @@ import { configError, tooMany, unauthorized } from "@/lib/auth/deny";
 import { limitAuthIp, limitAuthSub } from "@/lib/auth/limit";
 import { resolveAuthMode } from "@/lib/auth/mode";
 import { mintNativeSession, parseNativeTokenBody } from "@/lib/auth/native";
+import { hostFromRequest } from "@/lib/dev/mode";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
     ALLOWED_SUBS: env.ALLOWED_SUBS,
     CRANE_BEARERS: env.CRANE_BEARERS,
     MAILBOX_SECRET: env.MAILBOX_SECRET,
-  });
+  }, hostFromRequest(req));
   if (!mode.ok) {
     return configError();
   }

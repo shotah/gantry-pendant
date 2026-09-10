@@ -4,25 +4,31 @@ import type { WireFrame } from "@/lib/mailbox/frame";
 
 describe("route", () => {
   it("sends reply to that user's sockets only", () => {
-    expect(routeTag("crane", { kind: "reply", user_id: "ada" })).toBe("ada");
+    expect(routeTag("crane", { kind: "reply", user_id: "ada" })).toBe("sub:ada");
     expect(routeTag("crane", { kind: "reply" })).toBeUndefined();
-    expect(routeTag("crane", { kind: "typing", user_id: "ada" })).toBe("ada");
+    expect(routeTag("crane", { kind: "typing", user_id: "ada" })).toBe("sub:ada");
     expect(routeTag("crane", { kind: "typing" })).toBeUndefined();
-    expect(routeTag("crane", { kind: "draft", user_id: "ada" })).toBe("ada");
+    expect(routeTag("crane", { kind: "draft", user_id: "ada" })).toBe("sub:ada");
     expect(routeTag("crane", { kind: "draft" })).toBeUndefined();
-    expect(routeTag("crane", { kind: "error", user_id: "ada" })).toBe("ada");
-    expect(routeTag("crane", { kind: "error" })).toBe("phone");
+    expect(routeTag("crane", { kind: "error", user_id: "ada" })).toBe("sub:ada");
+    expect(routeTag("crane", { kind: "error" })).toBe("role:phone");
   });
 
   it("broadcasts push with no user_id and targets push with user_id", () => {
-    expect(routeTag("crane", { kind: "push" })).toBe("phone");
-    expect(routeTag("crane", { kind: "push", user_id: "ada" })).toBe("ada");
+    expect(routeTag("crane", { kind: "push" })).toBe("role:phone");
+    expect(routeTag("crane", { kind: "push", user_id: "ada" })).toBe("sub:ada");
   });
 
   it("sends phone frames to crane", () => {
-    expect(routeTag("phone", { kind: "inbound", text: "hi" })).toBe("crane");
-    expect(routeTag("phone", { kind: "pin" })).toBe("crane");
-    expect(routeTag("phone", { kind: "ack", id: "1" })).toBe("crane");
+    expect(routeTag("phone", { kind: "inbound", text: "hi" })).toBe("role:crane");
+    expect(routeTag("phone", { kind: "pin" })).toBe("role:crane");
+    expect(routeTag("phone", { kind: "ack", id: "1" })).toBe("role:crane");
+  });
+
+  it("does not collide user_id with role or verified tags", () => {
+    expect(routeTag("crane", { kind: "reply", user_id: "1" })).toBe("sub:1");
+    expect(routeTag("crane", { kind: "reply", user_id: "phone" })).toBe("sub:phone");
+    expect(routeTag("crane", { kind: "reply", user_id: "crane" })).toBe("sub:crane");
   });
 
   it("allows inbound pin ack from the phone and rejects crane kinds", () => {

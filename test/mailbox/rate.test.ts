@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RATE_BYTES_PER_MIN, RATE_FRAMES_PER_MIN } from "@/lib/mailbox/caps";
-import { principalKey, takeFrame, takeTokens } from "@/lib/mailbox/rate";
+import { principalKey, pruneDualLimits, takeFrame, takeTokens } from "@/lib/mailbox/rate";
 
 describe("rate", () => {
   it("allows a burst then 429s", () => {
@@ -29,5 +29,14 @@ describe("rate", () => {
     const fat = takeFrame(undefined, 0, RATE_BYTES_PER_MIN + 1);
     expect(fat.ok).toBe(false);
     expect(principalKey("sub", "abc")).toBe("sub:abc");
+  });
+
+  it("drops idle dual-limit rows", () => {
+    const now = 10_000;
+    const all = {
+      stale: { frames: { tokens: 1, updated: 0 }, bytes: { tokens: 1, updated: 0 } },
+      live: { frames: { tokens: 1, updated: now }, bytes: { tokens: 1, updated: now } },
+    };
+    expect(Object.keys(pruneDualLimits(all, now + 60_000))).toEqual(["live"]);
   });
 });

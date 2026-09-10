@@ -65,6 +65,7 @@ describe("google oidc helpers", () => {
       codeVerifier: "pkce-verifier",
       fetch: async (_url, init) => {
         expect(String(init?.body)).toContain("code_verifier=pkce-verifier");
+        expect(init?.signal).toBeDefined();
         return Response.json({ id_token: "tok" });
       },
     });

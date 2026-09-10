@@ -2,6 +2,7 @@ import { takeTokens, type Bucket } from "../mailbox/rate";
 
 /** Cheap login /me buckets. Same 429 body for every miss. */
 export const AUTH_RATE_PER_MIN = 20;
+export const AUTH_LIMIT_IDLE_MS = 60_000;
 
 export const authLimitStore = new Map<string, Bucket>();
 
@@ -9,7 +10,16 @@ export function resetAuthLimits(): void {
   authLimitStore.clear();
 }
 
+function pruneAuthLimits(now: number): void {
+  for (const [key, bucket] of authLimitStore) {
+    if (now - bucket.updated > AUTH_LIMIT_IDLE_MS) {
+      authLimitStore.delete(key);
+    }
+  }
+}
+
 export function takeAuthAttempt(key: string, now = Date.now()): boolean {
+  pruneAuthLimits(now);
   const got = takeTokens(authLimitStore.get(key), now, 1, {
     rate: AUTH_RATE_PER_MIN,
     burst: AUTH_RATE_PER_MIN,

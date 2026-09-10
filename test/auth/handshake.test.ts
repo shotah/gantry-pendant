@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { handshake, handshakeSlug, rateId, roleFromQuery, stampEmail, stampUserId } from "@/lib/auth/handshake";
+import { handshake, handshakePhone, handshakeSlug, rateId, roleFromQuery, stampEmail, stampUserId } from "@/lib/auth/handshake";
 import { mintSession, readSession, SESSION_COOKIE } from "@/lib/auth/session";
 
 describe("handshake", () => {
@@ -163,6 +163,17 @@ describe("handshake", () => {
     expect(stampUserId({ kind: "spike", role: "phone" })).toBe("spike");
     expect(stampUserId({ kind: "crane", slug: "kit" })).toBeUndefined();
   });
+
+  it("rejects the spike secret on a public host", async () => {
+    const r = await handshake({
+      env: { MAILBOX_SECRET: "shared" },
+      slug: "kit",
+      role: "phone",
+      authorization: "Bearer shared",
+      host: "gantry-pendant.example.workers.dev",
+    });
+    expect(r).toEqual({ ok: false, error: "config" });
+  });
 });
 
 describe("handshakeSlug", () => {
@@ -314,5 +325,69 @@ describe("handshake room list", () => {
       authorization: "Bearer crane-tok",
     });
     expect(kit).toEqual({ ok: true, principal: { kind: "crane", slug: "kit" } });
+  });
+});
+
+describe("handshakePhone", () => {
+  it("does not load the room when the session is missing", async () => {
+    const env = {
+      GOOGLE_CLIENT_ID: "id",
+      SESSION_SECRET: "sess-secret",
+      CRANE_BEARERS: "kit:crane-tok",
+    };
+    let loaded = false;
+    const r = await handshakePhone({
+      env,
+      slug: "kit",
+      loadRoom: async () => {
+        loaded = true;
+        return [];
+      },
+    });
+    expect(r).toEqual({ ok: false, error: "unauthorized" });
+    expect(loaded).toBe(false);
+  });
+
+  it("does not load the room for the spike secret", async () => {
+    let loaded = false;
+    const r = await handshakePhone({
+      env: { MAILBOX_SECRET: "shared" },
+      slug: "kit",
+      authorization: "Bearer shared",
+      loadRoom: async () => {
+        loaded = true;
+        return [];
+      },
+    });
+    expect(r.ok && r.principal.kind).toBe("spike");
+    expect(loaded).toBe(false);
+  });
+
+  it("loads the room after a session exists", async () => {
+    const env = {
+      GOOGLE_CLIENT_ID: "id",
+      SESSION_SECRET: "sess-secret",
+      CRANE_BEARERS: "kit:crane-tok",
+    };
+    const now = Date.UTC(2026, 8, 4);
+    const ada = "118212345678901234567";
+    const token = await mintSession(env.SESSION_SECRET, {
+      sub: ada,
+      email: "ada@example.com",
+      emailVerified: true,
+    }, now);
+    let loaded = 0;
+    const r = await handshakePhone({
+      env,
+      slug: "kit",
+      cookieHeader: `${SESSION_COOKIE}=${encodeURIComponent(token)}`,
+      now,
+      loadRoom: async () => {
+        loaded += 1;
+        return [{ sub: ada }];
+      },
+    });
+    expect(loaded).toBe(1);
+    expect(r.ok && r.principal.kind === "phone" && r.principal.sub).toBe(ada);
   });
 });

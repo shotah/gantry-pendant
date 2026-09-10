@@ -35,6 +35,7 @@ async function authorize(req: Request, slug: string): Promise<Response | null> {
     querySecret: url.searchParams.get("secret"),
     queryBearer: url.searchParams.get("bearer"),
     roomList,
+    host: hostFromRequest(req),
   });
   if (auth.ok) {
     return null;

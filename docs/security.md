@@ -205,6 +205,9 @@ from `ChatID` (Google `sub`).
 - `context.at` / `tz` are phone-supplied hints. Order by DO time.
 - Do not persist chat bodies in Worker KV "for later" unless we have a
   retention story. The crane's `gantry.db` is the mailbox dump.
+- Kit's face (`POST /api/avatar`) may be written by a listed phone or
+  the crane bearer. Family mouth: Ada changing Kit's photo is fine.
+  Cap is 5 MB JPEG; check `Content-Length` before buffering.
 - Web Push subscriptions (endpoint + keys) live on the crane's Durable
   Object, keyed by Google `sub`. Yanking a person from the room list
   drops them. A 410 from the push service drops that device. Do not log
@@ -238,7 +241,7 @@ from `ChatID` (Google `sub`).
 
 | When | Auth |
 | --- | --- |
-| Spike (two tabs) | One shared secret on the Worker. `?secret=` / `?bearer=` allowed here only. Not production. |
+| Spike (two tabs) | One shared secret on the Worker. `?secret=` / `?bearer=` allowed on **loopback** only. A leftover `MAILBOX_SECRET` on `workers.dev` is config, not a room. |
 | Phone on LTE | Google OIDC for the human + crane `Authorization: Bearer` |
 | Gantree wizard | Writes crane bearer + allowlist into `.env`; Worker secrets stay with this app |
 | `npm run dev` | `PENDANT_DEV=1` on **loopback only**: mock Ada, canned `?sample=` scenes, `/crane` stand-in. Not a session. Ignored on `workers.dev`. |

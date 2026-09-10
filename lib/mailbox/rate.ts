@@ -42,6 +42,23 @@ export function takeFrame(
   return { ok: frames.ok && byte.ok, limits: next };
 }
 
+export const RATE_IDLE_MS = 60_000;
+
+export function pruneDualLimits(
+  all: Record<string, DualLimit>,
+  now: number,
+  idleMs = RATE_IDLE_MS,
+): Record<string, DualLimit> {
+  const next: Record<string, DualLimit> = {};
+  for (const [key, limits] of Object.entries(all)) {
+    const updated = Math.max(limits.frames.updated, limits.bytes.updated);
+    if (now - updated <= idleMs) {
+      next[key] = limits;
+    }
+  }
+  return next;
+}
+
 export function principalKey(kind: string, id: string): string {
   return `${kind}:${id}`;
 }

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   AUTH_RATE_PER_MIN,
+  authLimitStore,
   clientIp,
   limitAuthIp,
   limitAuthRequest,
@@ -36,5 +37,15 @@ describe("auth rate limit", () => {
       expect(limitAuthRequest(req, "1182", now)).toBe(true);
     }
     expect(limitAuthRequest(req, "1182", now)).toBe(false);
+  });
+
+  it("evicts idle buckets so the map cannot grow forever", () => {
+    const now = 1_000;
+    for (let i = 0; i < 50; i += 1) {
+      takeAuthAttempt(`ip:10.0.0.${i}`, now);
+    }
+    expect(authLimitStore.size).toBe(50);
+    takeAuthAttempt("ip:new", now + 60_001);
+    expect(authLimitStore.size).toBe(1);
   });
 });

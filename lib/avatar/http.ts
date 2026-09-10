@@ -1,4 +1,6 @@
 import { parseSlug } from "../mailbox/slug";
+import { headerSaysTooLarge } from "../mailbox/caps";
+import { AVATAR_MAX_BYTES } from "./jpeg";
 
 /** `/api/avatar?slug=kit` — relative, for same-origin fetch. */
 export function avatarRequestPath(opts: {
@@ -54,12 +56,18 @@ export function mailboxToAvatarUrl(raw: string): string | null {
 export async function readAvatarUpload(
   req: Request,
 ): Promise<{ ok: true; bytes: Uint8Array } | { ok: false; detail: string }> {
+  if (headerSaysTooLarge(req.headers.get("content-length"), AVATAR_MAX_BYTES)) {
+    return { ok: false, detail: "image too large (max 5MB)" };
+  }
   const ctype = (req.headers.get("content-type") ?? "").toLowerCase();
   if (ctype.includes("multipart/form-data")) {
     return fileFromForm(req);
   }
   try {
     const bytes = new Uint8Array(await req.arrayBuffer());
+    if (bytes.byteLength > AVATAR_MAX_BYTES) {
+      return { ok: false, detail: "image too large (max 5MB)" };
+    }
     if (bytes.byteLength) {
       return { ok: true, bytes };
     }
@@ -78,7 +86,14 @@ async function fileFromForm(
     if (!(row instanceof Blob)) {
       return { ok: false, detail: "file required" };
     }
-    return { ok: true, bytes: new Uint8Array(await row.arrayBuffer()) };
+    if (row.size > AVATAR_MAX_BYTES) {
+      return { ok: false, detail: "image too large (max 5MB)" };
+    }
+    const bytes = new Uint8Array(await row.arrayBuffer());
+    if (bytes.byteLength > AVATAR_MAX_BYTES) {
+      return { ok: false, detail: "image too large (max 5MB)" };
+    }
+    return { ok: true, bytes };
   } catch {
     return { ok: false, detail: "multipart file required" };
   }

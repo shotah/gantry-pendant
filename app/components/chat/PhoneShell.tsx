@@ -12,6 +12,7 @@ import { NotifyEnable } from "./NotifyEnable";
 import { SettingsMenu } from "./SettingsMenu";
 import { bubbleFrom, Thread, type ChatBubble } from "./Thread";
 import { mailboxUrl, parseIncoming } from "@/app/lib/socket";
+import { capThread, rememberSeen } from "@/app/lib/thread";
 import { browserBattery } from "@/app/lib/battery";
 import { browserBumpBadge, browserClearBadge } from "@/app/lib/badge";
 import { browserGeo } from "@/app/lib/geo";
@@ -44,6 +45,8 @@ type Me = { sub: string; email?: string; cranes?: string[] } | null;
 
 const BACKOFF_MS = 1000;
 const BACKOFF_MAX = 30_000;
+const ME_POLL_MS = 15_000;
+const ME_POLL_MAX = 60_000;
 const DRAFT_BUBBLE_ID = "__draft__";
 
 type ClientFrame = {
@@ -86,13 +89,14 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [gpsHint, setGpsHint] = useState("GPS attaches on send if the OS allows it.");
   const [gpsOn, setGpsOn] = useState(true);
   const [prefsReady, setPrefsReady] = useState(false);
-  const [messages, setMessages] = useState<ChatBubble[]>([]);
+  const [messages, setMessagesRaw] = useState<ChatBubble[]>([]);
   const [draft, setDraft] = useState("");
   const [sampleEmoji, setSampleEmoji] = useState(false);
   const [catalog, setCatalog] = useState<SlashCommand[]>([]);
   const [avatarRev, setAvatarRev] = useState(0);
   const [faceHint, setFaceHint] = useState("");
   const [copied, setCopied] = useState(false);
+  const [meWait, setMeWait] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -116,6 +120,14 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const phone = role === "phone";
   const painting = Boolean(cfg?.dev && sampleId);
   const localEcho = Boolean(cfg?.dev && !sampleId && phone);
+
+  function setMessages(update: ChatBubble[] | ((prev: ChatBubble[]) => ChatBubble[])) {
+    if (typeof update === "function") {
+      setMessagesRaw((prev) => capThread(update(prev)));
+      return;
+    }
+    setMessagesRaw(capThread(update));
+  }
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -296,11 +308,22 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       return;
     }
     let dead = false;
+    let delay = ME_POLL_MS;
+    let timer = 0;
     const load = () => {
       const want = parseSlug(slug);
       const q = want && slugTouched ? `?slug=${encodeURIComponent(want)}` : "";
       void fetch(`/api/auth/me${q}`)
-        .then(async (r) => (r.ok ? r.json() as Promise<Me> : null))
+        .then(async (r) => {
+          if (r.status === 429) {
+            setMeWait(true);
+            delay = Math.min(delay * 2, ME_POLL_MAX);
+            return null;
+          }
+          setMeWait(false);
+          delay = ME_POLL_MS;
+          return r.ok ? r.json() as Promise<Me> : null;
+        })
         .then((m) => {
           if (dead || !m) {
             return;
@@ -317,13 +340,18 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             return m;
           });
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          if (dead) {
+            return;
+          }
+          timer = window.setTimeout(load, delay);
+        });
     };
     load();
-    const t = window.setInterval(load, 5000);
     return () => {
       dead = true;
-      window.clearInterval(t);
+      window.clearTimeout(timer);
     };
   }, [cfg?.dev, cfg?.mode, listed, me, phone, slug, slugTouched]);
 
@@ -456,7 +484,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         if (seenIds.current.has(id)) {
           return;
         }
-        seenIds.current.add(id);
+        rememberSeen(seenIds.current, id);
       }
       setMessages((prev) => {
         const rest = frame.kind === "reply"
@@ -605,7 +633,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     }
     const id = outbound ? mintFrameId(idSeq.current) : undefined;
     if (id) {
-      seenIds.current.add(id);
+      rememberSeen(seenIds.current, id);
     }
     if (outbound && id) {
       setMessages((prev) => [
@@ -767,6 +795,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           ? <p className="text-sm text-fg">{me.email}</p>
           : null}
         <p className="break-all font-mono text-xs text-muted">{me?.sub}</p>
+        {meWait
+          ? <p className="text-xs text-dim">give it a minute</p>
+          : null}
         <button
           type="button"
           className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark"

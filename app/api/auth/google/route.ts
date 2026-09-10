@@ -1,12 +1,13 @@
 import { env } from "cloudflare:workers";
 import { authorizeUrl, encodeOAuthBind, newNonce, newPkce, newState } from "@/lib/auth/google";
 import { blockedGoogleStartLocation } from "@/lib/auth/mode";
+import { hostFromRequest } from "@/lib/dev/mode";
 import { stateCookie } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export function GET(req: Request) {
-  const blocked = blockedGoogleStartLocation(env);
+  const blocked = blockedGoogleStartLocation(env, hostFromRequest(req));
   if (blocked) {
     return new Response(null, { status: 302, headers: { Location: blocked } });
   }

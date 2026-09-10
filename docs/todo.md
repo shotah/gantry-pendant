@@ -5,7 +5,8 @@ the walks are real on a phone. Pitch: [README.md](../README.md). Why:
 [design.md](design.md). Wire: [architecture.md](architecture.md). Authn:
 [security.md](security.md). Who talks: [setup.md](setup.md). Misses:
 [edgecases.md](edgecases.md). Typing dots:
-[agent_typing_response_todo.md](agent_typing_response_todo.md).
+[agent_typing_response_todo.md](agent_typing_response_todo.md). Bugs and
+security by phase: [audit_todo.md](audit_todo.md).
 
 A line is done when the **walk** works without a second brain. Scope is
 which checkout you touch.
@@ -144,10 +145,11 @@ on the same walk. Do not start Expo until the PWA path is painful.
       leftover `secrets:push` / `wrangler secret put`.
 - [ ] **Custom hostname** — cookies + OAuth redirect; crane URL
       updated; recreate
-- [ ] **Typing action** — crane `kind: "typing"`, not inbound `ack`.
-      Walk: [agent_typing_response_todo.md](agent_typing_response_todo.md)
+- [x] **Typing action** — pendant paints crane `kind: "typing"` (header
+      `live · typing…`). Crane emit walk:
+      [agent_typing_response_todo.md](agent_typing_response_todo.md)
 - [ ] Sliding session refresh (today is hard 7d)
-- [ ] Prune stale entries in the DO rate-limit map
+- [x] Prune stale entries in the DO rate-limit map
 - [x] Native cab auth — `POST /api/auth/token` + phone `Authorization`
       (session JWE). Client lives in `repos/gantry-cab`.
 
@@ -213,11 +215,9 @@ dump on the wire.
 
 ### ai-gantry
 
-- [ ] Streaming placeholder + edit (`ReplyWriter`); phone replaces the
-      last Kit bubble, does not append per chunk. Tool progress
-      (`UpdateProgress`) rides this writer, not a second typing kind.
-      Different from typing:
-      [agent_typing_response_todo.md](agent_typing_response_todo.md)
+- [x] Phone replaces the last Kit bubble on `kind: "draft"` (pendant).
+      Crane `ReplyWriter` still later — this is the stream writer, not
+      typing: [agent_typing_response_todo.md](agent_typing_response_todo.md)
 - [ ] Honor pendant stop / `/cancel` so Handle aborts; typing ticker
       dies before any reply
 - [ ] Reply-to: inbound names a prior frame `id`; Completer sees which

@@ -70,4 +70,17 @@ describe("auth mode", () => {
       gap: "session",
     });
   });
+
+  it("rejects spike mode off loopback", () => {
+    expect(resolveAuthMode({ MAILBOX_SECRET: "s" }, "gantry-pendant.example.workers.dev")).toEqual({
+      ok: false,
+      error: "config",
+    });
+    expect(resolveAuthMode({ MAILBOX_SECRET: "s" }, "127.0.0.1")).toEqual({ ok: true, mode: "spike" });
+    expect(publicAuthConfig({ MAILBOX_SECRET: "s" }, "example.workers.dev")).toEqual({
+      mode: null,
+      google: false,
+      gap: null,
+    });
+  });
 });

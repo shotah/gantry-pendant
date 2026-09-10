@@ -1,7 +1,7 @@
 import handler from "vinext/server/app-router-entry";
-import { handshake, rateId, roleFromQuery, stampEmail, stampUserId } from "../lib/auth/handshake";
+import { handshake, handshakePhone, rateId, roleFromQuery, stampEmail, stampUserId } from "../lib/auth/handshake";
 import { resolveAuthMode } from "../lib/auth/mode";
-import { stripUpgradeOp, upgradeOriginOk } from "../lib/auth/upgrade";
+import { stampMailboxHeaders, upgradeOriginOk } from "../lib/auth/upgrade";
 import { fetchRoomUsers } from "../lib/mailbox/allow";
 import { slugFromPath } from "../lib/mailbox/slug";
 import { Mailbox } from "./mailbox";
@@ -29,25 +29,30 @@ async function mailboxUpgrade(request: Request, env: Env): Promise<Response> {
   if (!upgradeOriginOk(request.headers.get("Origin"), url.origin)) {
     return new Response("forbidden", { status: 403 });
   }
-  const mode = resolveAuthMode(envOf(env));
+  const host = url.hostname;
+  const authEnv = envOf(env);
+  const mode = resolveAuthMode(authEnv, host);
   if (!mode.ok) {
     return Response.json({ error: "config" }, { status: 503 });
   }
-  const id = env.MAILBOX.idFromName(slug);
-  const stub = env.MAILBOX.get(id);
-  const roomList = mode.mode === "oidc" && role === "phone"
-    ? await fetchRoomUsers(stub)
-    : undefined;
-  const auth = await handshake({
-    env: envOf(env),
+  const handshakeIn = {
+    env: authEnv,
     slug,
-    role,
     cookieHeader: request.headers.get("Cookie"),
     authorization: request.headers.get("Authorization"),
     querySecret: url.searchParams.get("secret"),
     queryBearer: url.searchParams.get("bearer"),
-    roomList,
-  });
+    host,
+  };
+  const auth = role === "phone"
+    ? await handshakePhone({
+        ...handshakeIn,
+        loadRoom: async () => {
+          const stub = env.MAILBOX.get(env.MAILBOX.idFromName(slug));
+          return fetchRoomUsers(stub);
+        },
+      })
+    : await handshake({ ...handshakeIn, role });
   if (!auth.ok) {
     if (auth.error === "config") {
       return Response.json({ error: "config" }, { status: 503 });
@@ -57,26 +62,16 @@ async function mailboxUpgrade(request: Request, env: Env): Promise<Response> {
     }
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const headers = new Headers(request.headers);
-  headers.set("X-Pendant-Role", role);
-  headers.set("X-Pendant-Rate", rateId(mode.mode, auth.principal));
-  headers.set("X-Pendant-Slug", slug);
-  const sub = stampUserId(auth.principal);
-  if (sub) {
-    headers.set("X-Pendant-Sub", sub);
-  }
-  const email = stampEmail(auth.principal);
-  if (email) {
-    headers.set("X-Pendant-Email", email);
-  }
-  if (auth.principal.kind === "phone" && auth.principal.emailVerified) {
-    headers.set("X-Pendant-EmailVerified", "1");
-  }
-  if (auth.principal.kind === "phone" && auth.principal.exp !== undefined) {
-    headers.set("X-Pendant-Exp", String(auth.principal.exp));
-  }
-  headers.delete("Authorization");
-  stripUpgradeOp(headers);
+  const headers = stampMailboxHeaders(request, {
+    role,
+    rateId: rateId(mode.mode, auth.principal),
+    slug,
+    userId: stampUserId(auth.principal),
+    email: stampEmail(auth.principal),
+    emailVerified: auth.principal.kind === "phone" && auth.principal.emailVerified,
+    exp: auth.principal.kind === "phone" ? auth.principal.exp : undefined,
+  });
+  const stub = env.MAILBOX.get(env.MAILBOX.idFromName(slug));
   return stub.fetch(new Request(request, { headers }));
 }
 

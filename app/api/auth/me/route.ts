@@ -1,6 +1,5 @@
 import { env } from "cloudflare:workers";
 import { unauthorized, tooMany } from "@/lib/auth/deny";
-import { parseBearers } from "@/lib/auth/bearer";
 import { admittedCranes } from "@/lib/auth/directory";
 import { limitAuthRequest } from "@/lib/auth/limit";
 import { readSessionFromRequest } from "@/lib/auth/session";
@@ -30,13 +29,9 @@ export async function GET(req: Request) {
     return tooMany();
   }
   const typed = parseSlug(new URL(req.url).searchParams.get("slug") ?? "");
-  const slugs = [...parseBearers(env.CRANE_BEARERS).keys()];
-  if (typed) {
-    slugs.push(typed);
-  }
   const cranes = await admittedCranes({
     kv: env.DIRECTORY,
-    slugs,
+    slugs: typed ? [typed] : [],
     session: {
       sub: session.sub,
       email: session.email,

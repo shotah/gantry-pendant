@@ -4,6 +4,7 @@ import {
   directoryApply,
   directoryDiff,
   directoryEmailKey,
+  directoryIdle,
   directoryRemember,
   directorySubKey,
   parseSlugSet,
@@ -74,10 +75,21 @@ describe("directory", () => {
 
   it("re-indexes a stored room onto KV on crane reconnect", async () => {
     const kv = memoryKv();
-    await directoryRemember(kv, "tim", [{ email: "ada@example.com" }]);
+    expect(await directoryRemember(kv, "tim", [{ email: "ada@example.com" }])).toBe(true);
     expect(parseSlugSet(await kv.get(directoryEmailKey("ada@example.com")))).toEqual(new Set(["tim"]));
-    await directoryRemember(kv, "tim", []);
+    expect(await directoryRemember(kv, "tim", [])).toBe(true);
     expect(parseSlugSet(await kv.get(directoryEmailKey("ada@example.com")))).toEqual(new Set(["tim"]));
+  });
+
+  it("swallows a KV write miss on remember", async () => {
+    const kv: DirectoryKv = {
+      get: async () => null,
+      put: async () => {
+        throw new Error("limit");
+      },
+      delete: async () => undefined,
+    };
+    await expect(directoryRemember(kv, "kit", [{ email: "ada@example.com" }])).resolves.toBe(false);
   });
 
   it("adds a typed slug only when the Durable Object room admits", async () => {
@@ -101,5 +113,27 @@ describe("directory", () => {
       session,
       rooms: async (slug) => rooms.get(slug) ?? [],
     })).toEqual(["kit"]);
+  });
+
+  it("does not probe slugs that were not passed", async () => {
+    const probed: string[] = [];
+    const kv = memoryKv({
+      [directorySubKey("1182")]: JSON.stringify(["kit"]),
+    });
+    expect(await admittedCranes({
+      kv,
+      slugs: [],
+      session: { sub: "1182" },
+      rooms: async (slug) => {
+        probed.push(slug);
+        return [];
+      },
+    })).toEqual(["kit"]);
+    expect(probed).toEqual([]);
+    expect(directoryIdle(
+      [{ email: "ada@example.com" }],
+      [{ email: "ada@example.com" }],
+    )).toBe(true);
+    expect(directoryIdle([], [{ email: "ada@example.com" }])).toBe(false);
   });
 });

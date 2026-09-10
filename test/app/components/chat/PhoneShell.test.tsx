@@ -688,6 +688,29 @@ describe("PhoneShell", () => {
     expect(FakeSocket.instances.some((s) => s.url.includes("/ws/tim"))).toBe(true);
     expect(FakeSocket.instances.some((s) => s.url.includes("/ws/kit"))).toBe(false);
   });
+
+  it("paints give it a minute when /me is rate-limited", async () => {
+    let meCalls = 0;
+    vi.stubGlobal("fetch", async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.includes("/api/auth/config")) {
+        return Response.json({ mode: "oidc", google: true, dev: false });
+      }
+      if (url.includes("/api/auth/me")) {
+        meCalls += 1;
+        if (meCalls === 1) {
+          return Response.json({ sub: DEV_USER.sub, email: "bob@example.com", cranes: [] });
+        }
+        return new Response(null, { status: 429 });
+      }
+      return new Response(null, { status: 404 });
+    });
+    stubSocket();
+    render(<PhoneShell />);
+    expect(await screen.findByText(/not on any crane yet/i)).toBeTruthy();
+    expect(await screen.findByText(/give it a minute/i)).toBeTruthy();
+    expect(FakeSocket.instances).toHaveLength(0);
+  });
 });
 
 function stubOidc(me: { sub: string; email?: string; cranes: string[] } | null) {

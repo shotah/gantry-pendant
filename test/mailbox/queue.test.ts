@@ -5,12 +5,16 @@ import {
   drainFor,
   enqueue,
   matchesFlush,
+  mergeCursor,
   newQueueId,
   peekFor,
+  phoneMayDeleteQueued,
+  dropAcked,
   pruneQueue,
   queuedFromList,
   queueIdentity,
   queueStoreKey,
+  seqForSince,
   shouldQueue,
   type Queued,
 } from "@/lib/mailbox/queue";
@@ -143,6 +147,33 @@ describe("queue", () => {
     expect(queuedFromList(rows).map((m) => m.id)).toEqual(["a", "b"]);
     expect(matchesFlush(msg({ to: "phone", userId: "ada" }), "phone", "ada")).toBe(true);
     expect(matchesFlush(msg({ to: "phone", userId: "bob" }), "phone", "ada")).toBe(false);
+  });
+
+  it("does not let Bob's ack delete Ada's row or a broadcast", () => {
+    expect(phoneMayDeleteQueued(msg({ to: "phone", userId: "ada" }), "bob")).toBe(false);
+    expect(phoneMayDeleteQueued(msg({ to: "phone", userId: "ada" }), "ada")).toBe(true);
+    expect(phoneMayDeleteQueued(msg({ to: "phone", userId: "" }), "ada")).toBe(false);
+    expect(phoneMayDeleteQueued(msg({ to: "crane", userId: "ada" }), "ada")).toBe(false);
+    const items = [
+      msg({ id: "ada-1", userId: "ada", seq: 1, at: 1 }),
+      msg({ id: "all", userId: "", seq: 2, at: 2 }),
+      msg({ id: "bob-1", userId: "bob", seq: 3, at: 3 }),
+    ];
+    expect(dropAcked(items, { since: "ada-1", userId: "ada" }).map((m) => m.id)).toEqual(["all", "bob-1"]);
+  });
+
+  it("peeks by seq, not lexical id", () => {
+    const uuid = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+    const items = [
+      msg({ id: uuid, userId: "ada", seq: 1, at: 1 }),
+      msg({ id: "m-reply", userId: "ada", seq: 2, at: 2 }),
+    ];
+    expect(peekFor(items, "phone", 10, { userId: "ada", since: uuid }).map((m) => m.id)).toEqual(["m-reply"]);
+    expect(peekFor(items, "phone", 10, { userId: "ada", sinceSeq: 1 }).map((m) => m.id)).toEqual(["m-reply"]);
+    expect(seqForSince(items, uuid)).toBe(1);
+    expect(seqForSince(items, "2")).toBe(2);
+    expect(mergeCursor(0, 3)).toBe(3);
+    expect(mergeCursor(5, 2)).toBe(5);
   });
 
   it("keeps the same frame id for phone history and a crane catch-up copy", () => {

@@ -1,5 +1,6 @@
 import { hasGeo, hasImages, hasText, type FrameKind, type Role, type WireFrame } from "./frame";
 import { shouldQueue } from "./queue";
+import { roleTag, subTag } from "./tags";
 
 const PHONE_KINDS = new Set<FrameKind>(["inbound", "pin", "ack"]);
 
@@ -22,23 +23,24 @@ export function phoneKindAllowed(frame: WireFrame): boolean {
 }
 
 /**
- * Tag for `getWebSockets`. Phone-originated frames go to crane.
- * Crane `reply` requires `user_id`. Crane `push` with no `user_id` is `"phone"`.
+ * Tag for `getWebSockets`. Prefixed so `user_id` cannot collide with role /
+ * verified / email slots. Phone-originated frames go to the crane.
+ * Crane `reply` requires `user_id`. Crane `push` with no `user_id` is all phones.
  */
 export function routeTag(from: Role, frame: WireFrame): string | undefined {
   if (from === "phone") {
-    return "crane";
+    return roleTag("crane");
   }
   if (frame.kind === "push") {
-    return frame.user_id || "phone";
+    return frame.user_id ? subTag(frame.user_id) : roleTag("phone");
   }
   if (frame.kind === "reply" || frame.kind === "typing" || frame.kind === "draft") {
-    return frame.user_id || undefined;
+    return frame.user_id ? subTag(frame.user_id) : undefined;
   }
   if (frame.kind === "error" && frame.user_id) {
-    return frame.user_id;
+    return subTag(frame.user_id);
   }
-  return "phone";
+  return roleTag("phone");
 }
 
 /** Phone-bound frames always persist; crane-bound inbound persists only when no crane socket. */

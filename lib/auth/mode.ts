@@ -1,3 +1,5 @@
+import { loopbackHost } from "../dev/mode";
+
 export type AuthMode = "spike" | "oidc";
 export type ConfigGap = "session" | "crane";
 
@@ -33,9 +35,10 @@ export const CONFIG_GAP_COPY: Record<ConfigGap, { heading: string; detail: strin
 /**
  * Google configured → production (spike secret is gone).
  * `ALLOWED_SUBS` is an optional yard-wide extra, not a requirement.
- * Otherwise a shared mailbox secret is the two-tab spike.
+ * Otherwise a shared mailbox secret is the two-tab spike — loopback only.
+ * Omit `host` in unit tests; a non-loopback host with only MAILBOX_SECRET is config.
  */
-export function resolveAuthMode(env: AuthEnv): ModeResult {
+export function resolveAuthMode(env: AuthEnv, host?: string): ModeResult {
   const google = env.GOOGLE_CLIENT_ID?.trim() ?? "";
   if (google) {
     if (!env.SESSION_SECRET?.trim()) {
@@ -47,6 +50,9 @@ export function resolveAuthMode(env: AuthEnv): ModeResult {
     return { ok: true, mode: "oidc" };
   }
   if (env.MAILBOX_SECRET?.trim()) {
+    if (host != null && !loopbackHost(host)) {
+      return { ok: false, error: "config" };
+    }
     return { ok: true, mode: "spike" };
   }
   return { ok: false, error: "config" };
@@ -66,8 +72,8 @@ export function configGap(env: AuthEnv): ConfigGap | null {
   return null;
 }
 
-export function publicAuthConfig(env: AuthEnv): PublicAuthConfig {
-  const resolved = resolveAuthMode(env);
+export function publicAuthConfig(env: AuthEnv, host?: string): PublicAuthConfig {
+  const resolved = resolveAuthMode(env, host);
   return {
     mode: resolved.ok ? resolved.mode : null,
     google: Boolean(env.GOOGLE_CLIENT_ID?.trim()),
@@ -76,8 +82,8 @@ export function publicAuthConfig(env: AuthEnv): PublicAuthConfig {
 }
 
 /** `/api/auth/google` sends the phone home instead of a JSON 503. */
-export function blockedGoogleStartLocation(env: AuthEnv): "/" | null {
-  const mode = resolveAuthMode(env);
+export function blockedGoogleStartLocation(env: AuthEnv, host?: string): "/" | null {
+  const mode = resolveAuthMode(env, host);
   if (mode.ok && mode.mode === "oidc" && env.GOOGLE_CLIENT_ID?.trim()) {
     return null;
   }

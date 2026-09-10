@@ -83,6 +83,8 @@ export function decodeOAuthBind(raw: string | undefined): OAuthBind | null {
   }
 }
 
+export const GOOGLE_EXCHANGE_MS = 10_000;
+
 export type ExchangeFn = (url: string, init: RequestInit) => Promise<Response>;
 
 export async function exchangeCode(
@@ -93,6 +95,7 @@ export async function exchangeCode(
     origin: string;
     codeVerifier: string;
     fetch?: ExchangeFn;
+    signal?: AbortSignal;
   },
 ): Promise<{ idToken: string } | { error: string }> {
   const body = new URLSearchParams({
@@ -108,6 +111,7 @@ export async function exchangeCode(
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
+    signal: opts.signal ?? AbortSignal.timeout(GOOGLE_EXCHANGE_MS),
   });
   if (!res.ok) {
     return { error: "unauthorized" };

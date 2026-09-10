@@ -15,3 +15,9 @@ export const RATE_BYTES_PER_MIN = 256_000;
 export function utf8Bytes(s: string): number {
   return new TextEncoder().encode(s).byteLength;
 }
+
+/** True when Content-Length is present and over the cap. Missing length is not a pass. */
+export function headerSaysTooLarge(contentLength: string | null | undefined, max: number): boolean {
+  const n = Number(contentLength ?? "NaN");
+  return Number.isFinite(n) && n > max;
+}

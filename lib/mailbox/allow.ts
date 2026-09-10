@@ -95,3 +95,9 @@ export async function fetchRoomUsers(
 export function parseStoredSlug(raw: unknown): string | null {
   return typeof raw === "string" ? parseSlug(raw) : null;
 }
+
+export const ALLOW_HASH_KEY = "allow.hash";
+
+export function allowHash(users: readonly RoomUser[]): string {
+  return JSON.stringify(users);
+}

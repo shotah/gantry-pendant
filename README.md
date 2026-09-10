@@ -50,6 +50,7 @@ Every screen, Lamp, extra-large type, crane stand-in:
 | File | What it is |
 | --- | --- |
 | [docs/todo.md](docs/todo.md) | What's left — walks, one allowlist, mouth UI later |
+| [docs/audit_todo.md](docs/audit_todo.md) | Bugs, nice-to-haves, security by phase (dev / before go-live / after) |
 | [docs/deployment.md](docs/deployment.md) | Cloudflare once, then `npm run release` |
 | [docs/screens.md](docs/screens.md) | What the mouth looks like (phone shots) |
 | [docs/setup.md](docs/setup.md) | Admin / user / connect — what you paste where |

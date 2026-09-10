@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ALLOW_USERS_MAX,
+  allowHash,
   cranePublishedAllow,
   fetchRoomUsers,
   parseAllowUsers,
@@ -52,5 +53,7 @@ describe("allow frames", () => {
     })).toEqual([]);
     expect(parseStoredSlug("kit")).toBe("kit");
     expect(parseStoredSlug("Nope!")).toBeNull();
+    expect(allowHash([{ email: "ada@example.com" }])).toBe(allowHash([{ email: "ada@example.com" }]));
+    expect(allowHash([{ email: "ada@example.com" }])).not.toBe(allowHash([]));
   });
 });

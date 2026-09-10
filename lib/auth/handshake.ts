@@ -31,6 +31,7 @@ export type HandshakeInput = {
   queryBearer?: string | null;
   now?: number;
   roomList?: RoomUser[];
+  host?: string;
 };
 
 function bearerFrom(
@@ -66,7 +67,7 @@ async function phoneFromRequest(
  * When Google is on, the spike secret is rejected.
  */
 export async function handshake(input: HandshakeInput): Promise<HandshakeResult> {
-  const mode = resolveAuthMode(input.env);
+  const mode = resolveAuthMode(input.env, input.host);
   if (!mode.ok) {
     return { ok: false, error: "config" };
   }
@@ -79,9 +80,29 @@ export async function handshake(input: HandshakeInput): Promise<HandshakeResult>
 
 export type HandshakeSlugInput = Omit<HandshakeInput, "role">;
 
+/** Phone socket: session (or spike) first, then load the room. Does not wake a DO on a missing cookie. */
+export async function handshakePhone(
+  input: HandshakeSlugInput & { loadRoom: () => Promise<RoomUser[]> },
+): Promise<HandshakeResult> {
+  const mode = resolveAuthMode(input.env, input.host);
+  if (!mode.ok) {
+    return { ok: false, error: "config" };
+  }
+  const now = input.now ?? Date.now();
+  if (mode.mode === "spike") {
+    return spikeHandshake(input.env, "phone", { ...input, role: "phone" });
+  }
+  const session = await phoneFromRequest(input.env, input.cookieHeader, input.authorization, now);
+  if (!session) {
+    return { ok: false, error: "unauthorized" };
+  }
+  const roomList = await input.loadRoom();
+  return oidcHandshake({ ...input, role: "phone", roomList }, now);
+}
+
 /** HTTP face: phone cookie or crane bearer (or the spike secret). */
 export async function handshakeSlug(input: HandshakeSlugInput): Promise<HandshakeResult> {
-  const mode = resolveAuthMode(input.env);
+  const mode = resolveAuthMode(input.env, input.host);
   if (!mode.ok) {
     return { ok: false, error: "config" };
   }

@@ -51,4 +51,20 @@ describe("readAvatarUpload", () => {
     }));
     expect(empty.ok).toBe(false);
   });
+
+  it("rejects an upload whose Content-Length is over the cap", async () => {
+    const tooBig = await readAvatarUpload(new Request("https://x/api/avatar", {
+      method: "POST",
+      headers: { "Content-Type": "image/jpeg", "Content-Length": String(6 * 1024 * 1024) },
+      body: new Uint8Array([0xff, 0xd8, 0xff, 1]),
+    }));
+    expect(tooBig).toEqual({ ok: false, detail: "image too large (max 5MB)" });
+  });
+
+  it("rejects a multipart file whose size is over the cap", async () => {
+    const form = new FormData();
+    form.append("file", new Blob([new Uint8Array(6 * 1024 * 1024)], { type: "image/jpeg" }), "avatar.jpg");
+    const tooBig = await readAvatarUpload(new Request("https://x/api/avatar", { method: "POST", body: form }));
+    expect(tooBig).toEqual({ ok: false, detail: "image too large (max 5MB)" });
+  });
 });

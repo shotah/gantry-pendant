@@ -74,6 +74,16 @@ export function directoryDiff(
   };
 }
 
+export function directoryIdle(prev: readonly RoomUser[], next: readonly RoomUser[]): boolean {
+  const diff = directoryDiff(prev, next);
+  return (
+    diff.addSubs.length === 0
+    && diff.dropSubs.length === 0
+    && diff.addEmails.length === 0
+    && diff.dropEmails.length === 0
+  );
+}
+
 export type DirectoryKv = {
   get(key: string): Promise<string | null>;
   put(key: string, value: string): Promise<void>;
@@ -105,6 +115,9 @@ export async function directoryApply(
 ): Promise<void> {
   const name = parseSlug(slug);
   if (!name) {
+    return;
+  }
+  if (prev.length && directoryIdle(prev, next)) {
     return;
   }
   const diff = directoryDiff(prev, next);
@@ -147,11 +160,17 @@ export async function directoryRemember(
   kv: DirectoryKv | null | undefined,
   slug: string,
   users: readonly RoomUser[],
-): Promise<void> {
+): Promise<boolean> {
   if (!kv || !users.length) {
-    return;
+    return true;
   }
-  await directoryApply(kv, slug, [], users);
+  try {
+    await directoryApply(kv, slug, [], users);
+    return true;
+  } catch {
+    // KV is an index, not the door. A write miss must not fail the upgrade.
+    return false;
+  }
 }
 
 export type RoomLookup = (slug: string) => Promise<RoomUser[]>;

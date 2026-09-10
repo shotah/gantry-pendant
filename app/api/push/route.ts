@@ -4,9 +4,11 @@ import { handshake, stampEmail, stampUserId } from "@/lib/auth/handshake";
 import { limitAuthRequest } from "@/lib/auth/limit";
 import { readSessionFromRequest } from "@/lib/auth/session";
 import { fetchRoomUsers } from "@/lib/mailbox/allow";
+import { headerSaysTooLarge } from "@/lib/mailbox/caps";
 import { parseSlug } from "@/lib/mailbox/slug";
 import { parsePushDelete, parsePushPut } from "@/lib/push/subscription";
 import { readVapid } from "@/lib/push/vapid";
+import { hostFromRequest } from "@/lib/dev/mode";
 
 export const dynamic = "force-dynamic";
 
@@ -65,13 +67,21 @@ async function mutate(req: Request, method: "PUT" | "DELETE"): Promise<Response>
   if (!vapid) {
     return new Response(null, { status: 404 });
   }
-  const length = Number(req.headers.get("content-length") ?? "0");
-  if (Number.isFinite(length) && length > PUSH_JSON_MAX) {
+  if (headerSaysTooLarge(req.headers.get("content-length"), PUSH_JSON_MAX)) {
+    return tooLarge();
+  }
+  let buf: ArrayBuffer;
+  try {
+    buf = await req.arrayBuffer();
+  } catch {
+    return badFrame();
+  }
+  if (buf.byteLength > PUSH_JSON_MAX) {
     return tooLarge();
   }
   let raw: unknown;
   try {
-    raw = await req.json();
+    raw = JSON.parse(new TextDecoder().decode(buf)) as unknown;
   } catch {
     return badFrame();
   }
@@ -92,6 +102,7 @@ async function mutate(req: Request, method: "PUT" | "DELETE"): Promise<Response>
     cookieHeader: req.headers.get("Cookie"),
     authorization: req.headers.get("Authorization"),
     roomList,
+    host: hostFromRequest(req),
   });
   if (!auth.ok) {
     if (auth.error === "config") {

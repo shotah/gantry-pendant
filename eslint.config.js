@@ -45,6 +45,7 @@ export default tseslint.config(
       "no-empty": ["error", { allowEmptyCatch: true }],
       "no-useless-assignment": "error",
       "no-control-regex": "error",
+      "no-console": "error",
     },
   },
 );
