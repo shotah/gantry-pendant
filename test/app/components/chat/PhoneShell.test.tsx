@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PhoneShell } from "@/app/components/chat/PhoneShell";
 import { DEV_USER, MOCK_REPLIES, SAMPLE_LINES } from "@/lib/dev/samples";
@@ -621,7 +621,9 @@ describe("PhoneShell", () => {
     stubSocket();
     render(<PhoneShell />);
     expect(await screen.findByText("Tim")).toBeTruthy();
-    expect(FakeSocket.instances.some((s) => s.url.includes("/ws/tim"))).toBe(true);
+    await waitFor(() => {
+      expect(FakeSocket.instances.some((s) => s.url.includes("/ws/tim"))).toBe(true);
+    });
     expect(FakeSocket.instances.some((s) => s.url.includes("/ws/kit"))).toBe(false);
   });
 
@@ -684,9 +686,11 @@ describe("PhoneShell", () => {
     render(<PhoneShell />);
     expect(await screen.findByText(/not on any crane yet/i)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Agent name"), { target: { value: "tim" } });
-    expect(await screen.findByText("Tim")).toBeTruthy();
+    expect(await screen.findByPlaceholderText(/Message Tim/)).toBeTruthy();
     expect(screen.queryByText(/not on any crane yet/i)).toBeNull();
-    expect(FakeSocket.instances.some((s) => s.url.includes("/ws/tim"))).toBe(true);
+    await waitFor(() => {
+      expect(FakeSocket.instances.some((s) => s.url.includes("/ws/tim"))).toBe(true);
+    });
     expect(FakeSocket.instances.some((s) => s.url.includes("/ws/kit"))).toBe(false);
   });
 
