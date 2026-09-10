@@ -45,7 +45,7 @@ type Me = { sub: string; email?: string; cranes?: string[] } | null;
 
 const BACKOFF_MS = 1000;
 const BACKOFF_MAX = 30_000;
-const ME_POLL_MS = 15_000;
+const ME_POLL_MS = 10_000;
 const ME_POLL_MAX = 60_000;
 const DRAFT_BUBBLE_ID = "__draft__";
 

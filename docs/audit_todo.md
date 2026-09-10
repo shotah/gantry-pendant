@@ -140,7 +140,7 @@ limit is 20/min/IP, so two phones behind one NAT on the "not on any
 crane yet" screen hit 429 and the poll went quiet with no hint.
 
 - [x] `/me` probes only the typed slug (KV is the index). Phone polls
-      at 15 s with backoff and paints "give it a minute" on 429.
+      at 10 s with backoff and paints "give it a minute" on 429.
       `test/auth/directory.test.ts`,
       `test/app/components/chat/PhoneShell.test.tsx`.
 
