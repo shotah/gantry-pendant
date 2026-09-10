@@ -206,9 +206,9 @@ The PWA still uses the httpOnly cookie.
 
 Push notifications are a **second** path. They do not replace the
 socket while the app is open. **Web Push** (VAPID from this Worker,
-installed PWA, iOS 16.4+) is later. Native APNs / FCM is later still;
-Cloudflare will not send native APNs for us. Apple's Web Push endpoint
-is a different thing.
+installed PWA, iOS 16.4+) fires when that human has no phone socket.
+Native APNs / FCM is later still; Cloudflare will not send native APNs
+for us. Apple's Web Push endpoint is a different thing.
 
 ## Why not these shapes
 

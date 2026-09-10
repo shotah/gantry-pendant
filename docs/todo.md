@@ -125,7 +125,8 @@ coords, not a stale Telegram pin.
 ## Later
 
 Foreground cheap-PWA extras that are already in (battery, net, GPS
-toggle, silent pin, wake, haptic, badge, shortcuts, photo compress)
+toggle, silent pin, wake, haptic, badge, shortcuts, photo compress,
+Web Push once VAPID is on the Worker)
 need the pocket walk above, not more code. Mouth UI misses below wait
 on the same walk. Do not start Expo until the PWA path is painful.
 
@@ -137,8 +138,10 @@ on the same walk. Do not start Expo until the PWA path is painful.
       `share_target` until the POST handler exists)
 - [ ] **Offline outbound queue** — page-side unsent frames; do not cache
       chat in `sw.js`
-- [ ] **Web Push** — VAPID in Worker secrets; subscribe after Google;
-      lock-screen cron when no phone socket. Installed PWA, iOS 16.4+
+- [x] **Web Push** — VAPID in Worker secrets; subscribe after Google;
+      lock-screen cron when no phone socket. Installed PWA, iOS 16.4+.
+      Gantree Settings does not mint VAPID yet — `npm run vapid` then
+      leftover `secrets:push` / `wrangler secret put`.
 - [ ] **Custom hostname** — cookies + OAuth redirect; crane URL
       updated; recreate
 - [ ] **Typing action** — crane `kind: "typing"`, not inbound `ack`.

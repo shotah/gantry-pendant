@@ -148,6 +148,7 @@ Walk: [setup.md](setup.md). Gantree
 # Do not mix with Gantree after the yard owns CRANE_BEARERS.
 # cp .env.example .env
 # npm run secret
+# npm run vapid
 # npm run secrets:push:dry
 # npm run secrets:push
 ```

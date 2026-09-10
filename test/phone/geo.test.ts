@@ -89,4 +89,18 @@ describe("readGeo", () => {
     expect(geoHint(true, { ok: false, reason: "denied" })).toBe("GPS omitted (denied or unavailable)");
     expect(geoHint(true, { ok: true, geo: { lat: 1, lon: 2, accuracy_m: 12.4 } })).toBe("pin ±12m this send");
   });
+
+  it("shares one in-flight OS read", async () => {
+    let calls = 0;
+    const api = {
+      getCurrentPosition(success: (p: GeolocationPosition) => void) {
+        calls += 1;
+        success(pos(1, 2, 3));
+      },
+    };
+    const [a, b] = await Promise.all([readGeo(api), readGeo(api)]);
+    expect(calls).toBe(1);
+    expect(a).toEqual(b);
+    expect(a).toEqual({ ok: true, geo: { lat: 1, lon: 2, accuracy_m: 3 } });
+  });
 });

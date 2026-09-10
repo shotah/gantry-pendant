@@ -22,7 +22,39 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Local toasts from the page (not Web Push). Tap focuses the open client.
+// Web Push (VAPID) when the phone socket is gone. Local toasts still come
+// from the page while the thread is open.
+self.addEventListener("push", (event) => {
+  event.waitUntil((async () => {
+    let title = "pendant";
+    let body = "New message";
+    let tag = "pendant";
+    try {
+      const parsed = event.data ? event.data.json() : null;
+      if (parsed && typeof parsed === "object") {
+        if (typeof parsed.title === "string" && parsed.title.trim()) {
+          title = parsed.title;
+        }
+        if (typeof parsed.body === "string" && parsed.body.trim()) {
+          body = parsed.body;
+        }
+        if (typeof parsed.tag === "string" && parsed.tag) {
+          tag = parsed.tag;
+        }
+      }
+    } catch {
+      // unencrypted / empty payload
+    }
+    await self.registration.showNotification(title, {
+      body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      tag,
+    });
+  })());
+});
+
+// Local toasts from the page, or a lock-screen ping. Tap focuses the open client.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   event.waitUntil((async () => {

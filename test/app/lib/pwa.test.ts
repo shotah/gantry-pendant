@@ -14,6 +14,7 @@ describe("pwa", () => {
     const sw = readFileSync("public/sw.js", "utf8");
     expect(swInstallIssues(sw)).toEqual([]);
     expect(sw).toMatch(/notificationclick/);
+    expect(sw).toMatch(/addEventListener\(\s*"push"/);
   });
 
   it("names the gaps Chromium cares about", () => {

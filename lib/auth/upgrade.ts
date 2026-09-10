@@ -6,7 +6,7 @@ export function upgradeOriginOk(originHeader: string | null, urlOrigin: string):
   return originHeader === urlOrigin;
 }
 
-/** Authenticated `/ws/` must not reach `avatarHttp` via a spoofed op. */
+/** Authenticated `/ws/` must not reach avatar / allow / push HTTP via a spoofed op. */
 export function stripUpgradeOp(headers: Headers): void {
   headers.delete("X-Pendant-Op");
 }

@@ -9,4 +9,7 @@ interface Env {
   ALLOWED_SUBS?: string;
   CRANE_BEARERS?: string;
   PENDANT_DEV?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
 }

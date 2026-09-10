@@ -18,6 +18,7 @@ import { browserGeo } from "@/app/lib/geo";
 import { browserBuzzPush } from "@/app/lib/haptic";
 import { browserNet } from "@/app/lib/net";
 import { browserNotifyIncoming } from "@/app/lib/notify";
+import { browserSubscribePush } from "@/app/lib/push";
 import { fileToPhoto } from "@/app/lib/photo";
 import { browserGeoPref, saveGeoPref } from "@/app/lib/prefs";
 import { applyFont, fontFromQuery } from "@/app/lib/font";
@@ -27,7 +28,8 @@ import type { ConfigGap } from "@/lib/auth/mode";
 import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
 import { parseSlug } from "@/lib/mailbox/slug";
 import { buildContext } from "@/lib/phone/context";
-import { GEO_TIMEOUT_MS, GEO_WARM_MS, geoHint } from "@/lib/phone/geo";
+import { GEO_TIMEOUT_MS, GEO_WARM_MS, cachedGeo, geoHint } from "@/lib/phone/geo";
+import { recoverViewport, viewportShellHeight } from "@/lib/phone/viewport";
 import { encodeFrame, type Role, type WireFrame } from "@/lib/mailbox/frame";
 import { clearsTyping, TYPING_TTL_MS } from "@/lib/mailbox/typing";
 import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
@@ -93,6 +95,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [copied, setCopied] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
   const echoTimer = useRef(0);
   const echoCount = useRef(0);
   const wakeRef = useRef<WakeLockSentinel | null>(null);
@@ -218,10 +221,37 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         wakeRef.current = null;
       } else {
         badgeRef.current = browserClearBadge();
+        recoverViewport(window);
       }
     }
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
+  }, [phone]);
+
+  useEffect(() => {
+    if (!phone || typeof window === "undefined" || !window.visualViewport) {
+      return;
+    }
+    const vv = window.visualViewport;
+    function sync() {
+      recoverViewport(window);
+      const node = shellRef.current;
+      const height = viewportShellHeight(vv.height);
+      if (node && height) {
+        node.style.height = height;
+      }
+    }
+    sync();
+    const el = shellRef.current;
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    return () => {
+      vv.removeEventListener("resize", sync);
+      vv.removeEventListener("scroll", sync);
+      if (el) {
+        el.style.height = "";
+      }
+    };
   }, [phone]);
 
   const cranes = me?.cranes ?? [];
@@ -253,6 +283,13 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     phone && cfg?.mode === "oidc" && !cfg.dev && me && !listed,
   );
   const canSocket = Boolean(cfg && roomSlug && listed && (cfg.mode === "spike" ? secret : phone ? me : bearer));
+
+  useEffect(() => {
+    if (!phone || cfg?.mode !== "oidc" || !me || !listed || !roomSlug || needGoogle || mailboxGap || waitingForCrane) {
+      return;
+    }
+    void browserSubscribePush(roomSlug);
+  }, [phone, cfg?.mode, me, listed, roomSlug, needGoogle, mailboxGap, waitingForCrane]);
 
   useEffect(() => {
     if (!phone || cfg?.mode !== "oidc" || cfg.dev || listed || !me) {
@@ -348,12 +385,6 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         }
         connect();
       }, delay);
-    };
-    ws.onerror = () => {
-      if (gen !== connectGen.current || stoppedRef.current) {
-        return;
-      }
-      setStatus("down");
     };
     ws.onmessage = (ev) => {
       if (gen !== connectGen.current || stoppedRef.current) {
@@ -542,11 +573,18 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     setGpsHint(geoHint(true, geo));
   }
 
-  async function phoneContext(wantGeo: boolean, timeoutMs = GEO_TIMEOUT_MS) {
-    const [geo, battery] = await Promise.all([
-      wantGeo ? browserGeo(timeoutMs) : Promise.resolve({ ok: false as const, reason: "unavailable" as const }),
-      browserBattery(),
-    ]);
+  async function phoneContext(wantGeo: boolean, opts?: { timeoutMs?: number; cachedOnly?: boolean }) {
+    const timeoutMs = opts?.timeoutMs ?? GEO_TIMEOUT_MS;
+    let geo: Awaited<ReturnType<typeof browserGeo>>;
+    if (!wantGeo) {
+      geo = { ok: false, reason: "unavailable" };
+    } else if (opts?.cachedOnly) {
+      const hit = cachedGeo();
+      geo = hit ? { ok: true, geo: hit } : { ok: false, reason: "unavailable" };
+    } else {
+      geo = await browserGeo(timeoutMs);
+    }
+    const battery = await browserBattery();
     return {
       geo,
       context: buildContext({
@@ -559,14 +597,6 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
 
   async function sendText(text: string, photo?: string) {
     const wantGeo = phone && gpsOn;
-    const { geo, context } = phone
-      ? await phoneContext(wantGeo)
-      : { geo: { ok: false as const, reason: "unavailable" as const }, context: undefined };
-    if (phone) {
-      setGpsHint(geoHint(wantGeo, geo));
-      badgeRef.current = browserClearBadge();
-      void takeWake();
-    }
     const trimmed = text.trim();
     const waitAck = canSocket && !painting;
     const outbound = Boolean(trimmed || photo);
@@ -576,16 +606,6 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     const id = outbound ? mintFrameId(idSeq.current) : undefined;
     if (id) {
       seenIds.current.add(id);
-    }
-    const frame: ClientFrame = {
-      id,
-      text: trimmed || undefined,
-      kind: phone ? "inbound" : "reply",
-      images: photo ? [{ url: photo }] : undefined,
-      context,
-    };
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      sendClientFrame(wsRef.current, frame);
     }
     if (outbound && id) {
       setMessages((prev) => [
@@ -599,6 +619,29 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           pending: waitAck ? true : undefined,
         },
       ]);
+    }
+    if (phone) {
+      recoverViewport(window);
+    }
+    const { geo, context } = phone
+      ? await phoneContext(wantGeo, { cachedOnly: true })
+      : { geo: { ok: false as const, reason: "unavailable" as const }, context: undefined };
+    if (phone) {
+      if (!wantGeo || geo.ok || !geoWarm.current) {
+        setGpsHint(geoHint(wantGeo, geo));
+      }
+      badgeRef.current = browserClearBadge();
+      void takeWake();
+    }
+    const frame: ClientFrame = {
+      id,
+      text: trimmed || undefined,
+      kind: phone ? "inbound" : "reply",
+      images: photo ? [{ url: photo }] : undefined,
+      context,
+    };
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      sendClientFrame(wsRef.current, frame);
     }
     if (localEcho && !canSocket && !painting && (trimmed || photo)) {
       const n = echoCount.current;
@@ -626,7 +669,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       }
       return;
     }
-    const { geo, context } = await phoneContext(true, GEO_WARM_MS);
+    const { geo, context } = await phoneContext(true, { timeoutMs: GEO_WARM_MS });
     setGpsHint(geoHint(true, geo));
     if (!geo.ok) {
       return;
@@ -789,7 +832,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-canvas pb-[env(safe-area-inset-bottom)]" data-shot={phone ? "phone" : "crane"}>
+    <div ref={shellRef} className="flex h-dvh flex-col overflow-hidden bg-canvas pb-[env(safe-area-inset-bottom)]" data-shot={phone ? "phone" : "crane"}>
       <header className="flex shrink-0 items-center gap-2 border-b border-line bg-panel px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <KitAvatar {...faceProps} size="md" />
@@ -809,7 +852,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         <SettingsMenu>
           <div className="flex flex-col gap-2">
             <InstallApp placement="block" />
-            {phone ? <NotifyEnable /> : null}
+            {phone ? <NotifyEnable onGranted={() => { void browserSubscribePush(roomSlug); }} /> : null}
             {phone && cfg?.mode === "oidc" && cranes.length
               ? (
                   <label className="flex flex-col gap-1 text-xs text-muted">

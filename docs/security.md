@@ -205,6 +205,10 @@ from `ChatID` (Google `sub`).
 - `context.at` / `tz` are phone-supplied hints. Order by DO time.
 - Do not persist chat bodies in Worker KV "for later" unless we have a
   retention story. The crane's `gantry.db` is the mailbox dump.
+- Web Push subscriptions (endpoint + keys) live on the crane's Durable
+  Object, keyed by Google `sub`. Yanking a person from the room list
+  drops them. A 410 from the push service drops that device. Do not log
+  endpoints.
 
 ### Abuse
 

@@ -170,7 +170,7 @@ You cannot run telegram + pendant in the same process.
 | iOS `watchPosition` | killed in the background | we only `getCurrentPosition` on send |
 | HEIC / iPhone photo | canvas JPEG when `createImageBitmap` can decode | otherwise “bad photo” |
 | Photo > ~1.5 MB | compress in-app to the chat cap | still 413 if encode cannot shrink enough |
-| Lock screen ping while app is dead | no Web Push yet | cron only lands if the socket is up; Web Push (VAPID, installed PWA) is later; native APNs/FCM later still |
+| Lock screen ping while app is dead | Web Push if VAPID is set and they enabled notifications (installed PWA; iOS 16.4+ standalone) | Settings → Enable notifications after Google. Missing VAPID → queue only; native APNs/FCM later |
 | Queue while Mini reboots | ≤50 frames, 1 hour TTL, then drop | short note, not `gantry.db` |
 | Rate limit (30 frames / 256 KB per min) | socket stays up, frames return `rate` | looks like “she ignored me” |
 | Session hard 7d (JWT `exp` at mint) | next send closes 4401 | sign in again; yank `sub` takes effect on the next frame |
@@ -263,5 +263,6 @@ Telegram pin.
 - [ ] Kit’s bearer cannot open Ada’s slug
 - [ ] Text + GPS this-send → `[last pin]` is fresh
 - [ ] Cron / spark with the app **open**
+- [ ] Optional: VAPID secrets + Enable notifications → lock-screen when the app is asleep
 - [ ] Android Chrome PWA and iPhone Add to Home Screen
 - [ ] Yard cookie never sent to the Worker

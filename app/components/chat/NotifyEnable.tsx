@@ -10,7 +10,7 @@ import {
   type NotifyPermission,
 } from "@/lib/phone/notify";
 
-export function NotifyEnable() {
+export function NotifyEnable({ onGranted }: { onGranted?: () => void }) {
   const [permission, setPermission] = useState<NotifyPermission>("unsupported");
   const [needHome, setNeedHome] = useState(false);
   const [status, setStatus] = useState("");
@@ -57,6 +57,7 @@ export function NotifyEnable() {
     if (next !== "granted") {
       return;
     }
+    onGranted?.();
     const ok = await browserShowNotify(NOTIFY_TEST);
     setStatus(ok ? "Sent a test ping." : "Granted, but the toast did not appear.");
   }

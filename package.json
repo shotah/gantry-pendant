@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "secret": "node -e \"console.log(crypto.randomBytes(32).toString('base64url'))\"",
+    "vapid": "node scripts/vapid.mjs",
     "secrets:push": "node scripts/push-secrets.mjs",
     "secrets:push:dry": "node scripts/push-secrets.mjs --dry-run",
     "shot": "node scripts/shot.mjs",
@@ -25,6 +26,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@pushforge/builder": "^2.0.5",
     "jose": "^6.1.3",
     "react": "latest",
     "react-dom": "latest",

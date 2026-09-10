@@ -78,8 +78,7 @@ What we do **not** need for a first talk:
 
 - Opening crane ports
 - Tailscale on the phone (Worker path)
-- Web Push / native APNs / FCM — only when the app is dead and you
-  still want a lock-screen ping. Open-app socket is enough to prove it.
+- Native APNs / FCM — Web Push (VAPID) is the lock-screen path
 - App Store / Play Store
 - A second VPS
 
@@ -146,10 +145,10 @@ pings stay stuck on Telegram.
 
 | Already | New | Later, optional |
 | --- | --- | --- |
-| Mini, Docker, cranes, LLM | Vinext app on Workers + Durable Object | Web Push (VAPID); native APNs / FCM if lock-screen matters |
+| Mini, Docker, cranes, LLM | Vinext app on Workers + Durable Object | Native APNs / FCM if the PWA is not enough |
 | GCP project (google-mcp) | New Web OAuth client, openid only | TestFlight / Play sideload |
 | CF account (Tunnel for the yard) | Crane env: mailbox URL + bearer | Mini hub only as a local fallback |
-| Tailscale (console, SSH) | — not required on the phone for chat | |
+| Tailscale (console, SSH) | VAPID keys (lock-screen Web Push) | — |
 
 ## Phone context (GPS first)
 
@@ -199,13 +198,15 @@ updates, no Completer.
 **Shipped on the phone:** GPS on send, in-app toggle, silent pin, clock
 (`at`/`tz`), battery + net when the OS exposes them, photo compress
 (HEIC/PNG → JPEG under the chat cap), screen wake while waiting,
-vibrate + badge on inbound ping, manifest shortcuts (Message / Pin).
+vibrate + badge on inbound ping, manifest shortcuts (Message / Pin),
+Web Push (VAPID) when the phone socket is gone.
 
 **Later:** reverse-geocode is a maps **tool** on the crane, not a client
 field. Captioned photo (paste screenshot, do not send on attach), pin
 chip on the outbound bubble, timestamps, copy/retry, crane-up vs
-`live`, reload-keeps-the-thread, voice / share-target / lock-screen
-push / Expo — [todo.md](todo.md). Motion / "home" labels stay Expo.
+`live`, reload-keeps-the-thread, voice / share-target / Expo —
+[todo.md](todo.md). Motion / "home" labels stay Expo. Native APNs / FCM
+stay later.
 
 **Never on the wire:** SSID / BSSID, Bluetooth neighbors, clipboard,
 contacts dump. Fingerprinting, not chat.

@@ -306,7 +306,10 @@ describe("PhoneShell", () => {
     act(() => {
       ws.open();
     });
-    fireEvent.change(screen.getByPlaceholderText(/Message Kit/), { target: { value: "near me" } });
+    const box = screen.getByPlaceholderText(/Message Kit/);
+    fireEvent.focus(box);
+    expect(await screen.findByTitle("pin ±8m this send")).toBeTruthy();
+    fireEvent.change(box, { target: { value: "near me" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("near me")).toBeTruthy();
     expect(ws.send).toHaveBeenCalled();
@@ -396,6 +399,54 @@ describe("PhoneShell", () => {
     expect(await screen.findByText("hello kit")).toBeTruthy();
     expect(screen.getByText("sending")).toBeTruthy();
     expect(liveSocket().send).not.toHaveBeenCalled();
+  });
+
+  it("sends a second message even when GPS never returns", async () => {
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: {
+        getCurrentPosition() {
+          // hang — a real OS lock with no GPS / a stuck permission
+        },
+      },
+    });
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    vi.useFakeTimers();
+    const box = screen.getByPlaceholderText(/Message Kit/) as HTMLTextAreaElement;
+    fireEvent.focus(box);
+    fireEvent.change(box, { target: { value: "first" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(screen.getByText("first")).toBeTruthy();
+    expect(box.disabled).toBe(false);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(ws.send).toHaveBeenCalled();
+    fireEvent.change(box, { target: { value: "second" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(screen.getByText("second")).toBeTruthy();
+    expect(box.disabled).toBe(false);
+    expect(box.value).toBe("");
+  });
+
+  it("does not lock compose on a socket error while the connection is still open", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    const box = screen.getByPlaceholderText(/Message Kit/) as HTMLTextAreaElement;
+    expect(box.disabled).toBe(false);
+    act(() => {
+      ws.onerror?.(new Event("error"));
+    });
+    expect(screen.getByText("live")).toBeTruthy();
+    expect(box.disabled).toBe(false);
+    fireEvent.change(box, { target: { value: "still here" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("still here")).toBeTruthy();
   });
 
   it("clears pending when an ack for that id arrives", async () => {

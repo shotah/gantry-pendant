@@ -25,16 +25,18 @@ function stubNotification(permission: NotificationPermission, request = vi.fn(as
 
 describe("NotifyEnable", () => {
   it("asks the OS and sends a test ping when granted", async () => {
+    const onGranted = vi.fn();
     const { FakeNotification, constructed, request } = stubNotification("default", vi.fn(async () => {
       FakeNotification.permission = "granted";
       return "granted" as const;
     }));
-    render(<NotifyEnable />);
+    render(<NotifyEnable onGranted={onGranted} />);
     expect(screen.getByRole("button", { name: "Enable notifications" })).toBeTruthy();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Enable notifications" }));
     });
     expect(request).toHaveBeenCalledOnce();
+    expect(onGranted).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Send test ping" })).toBeTruthy();
     expect(screen.getByText("Sent a test ping.")).toBeTruthy();
     expect(constructed).toHaveLength(1);

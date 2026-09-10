@@ -133,6 +133,12 @@ create those. Steps: [deployment.md](deployment.md).
    Leftover, no yard: `npm run secrets:push` from this `.env`. Do not
    mix that with Gantree after the yard owns `CRANE_BEARERS`.
 
+   Lock-screen Web Push is optional and **not** in Gantree Settings
+   yet. `npm run vapid`, then leftover `secrets:push` or
+   `npx wrangler secret put VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`.
+   Without those keys the socket + queue still work; Enable
+   notifications only toasts while the page is alive.
+
    The moment Google is on, `MAILBOX_SECRET` (two-tab spike) is
    rejected. Leave Worker-level Cloudflare Access **off**.
 
@@ -208,6 +214,8 @@ The human does **not** need a Gantree login.
 4. Pick Kit from the crane list. Empty list: “not on any crane yet”
    with their email and `sub` to send the yard admin. Grant location
    if they want `[last pin]` this-send. Denied still sends text.
+   Settings → Enable notifications after install (iPhone: Add to Home
+   Screen first) so cron can lock-screen ping when the app is asleep.
 5. Type. Kit answers when the crane socket is up.
 6. Tap Kit’s face in the header to set the same `avatar.jpg` the yard
    Photo fold uploads (JPEG, 5MB). The Worker stores it; a chat photo
@@ -216,8 +224,9 @@ The human does **not** need a Gantree login.
 If Google works but Kit never answers: they are missing from the crane
 list, or the crane was restarted instead of recreated. If the socket
 401s: not on the room list (or the optional `ALLOWED_SUBS` extra), or
-the session hit its hard 7-day `exp`. Cron / spark only lands while the
-app is open — no lock-screen push yet.
+the session hit its hard 7-day `exp`. Cron / spark can lock-screen ping
+when Web Push is on (VAPID secrets + Enable notifications). Without those
+keys the queue still holds the frame until the app is open.
 
 The car mouth is a sister APK (`repos/gantry-cab`): same Worker,
 `POST /api/auth/token`, then the session JWE on `Authorization`. Android
@@ -258,4 +267,5 @@ crane.
 - [ ] KV `DIRECTORY` bound
 - [ ] Gantree: Build channel pendant, tick humans, recreate (yard mints bearer)
 - [ ] Phone Google sign-in; crane list or “not on any crane yet”
+- [ ] Optional: `npm run vapid` + Worker VAPID secrets; Enable notifications
 - [ ] Yard cookie never sent to the Worker

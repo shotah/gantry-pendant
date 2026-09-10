@@ -22,6 +22,7 @@ const WATCHDOG_SLACK_MS = 2_000;
 type GeoCache = { geo: GeoFix; at: number };
 
 let cache: GeoCache | null = null;
+let inflight: Promise<GeoResult> | null = null;
 
 export function rememberGeo(geo: GeoFix, at = Date.now()): void {
   cache = { geo, at };
@@ -29,6 +30,7 @@ export function rememberGeo(geo: GeoFix, at = Date.now()): void {
 
 export function clearGeoCache(): void {
   cache = null;
+  inflight = null;
 }
 
 export function cachedGeo(now = Date.now(), maxAge = GEO_CACHE_MS): GeoFix | null {
@@ -60,12 +62,15 @@ function failOrCache(reason: "denied" | "unavailable"): GeoResult {
   return { ok: false, reason: "unavailable" };
 }
 
-/** One-shot fix on send. Denied or missing API → omit geo. Never watchPosition. */
+/** One-shot fix. Denied or missing API → omit geo. Never watchPosition. */
 export function readGeo(api: GeoApi | null | undefined, timeoutMs = GEO_TIMEOUT_MS): Promise<GeoResult> {
   if (!api) {
     return Promise.resolve(failOrCache("unavailable"));
   }
-  return new Promise((resolve) => {
+  if (inflight) {
+    return inflight;
+  }
+  inflight = new Promise<GeoResult>((resolve) => {
     let settled = false;
     const timer = setTimeout(() => finish(failOrCache("unavailable")), timeoutMs + WATCHDOG_SLACK_MS);
     function finish(result: GeoResult) {
@@ -91,5 +96,8 @@ export function readGeo(api: GeoApi | null | undefined, timeoutMs = GEO_TIMEOUT_
     } catch {
       finish(failOrCache("unavailable"));
     }
+  }).finally(() => {
+    inflight = null;
   });
+  return inflight;
 }

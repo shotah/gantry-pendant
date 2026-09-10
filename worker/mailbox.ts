@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { directoryApply, directoryRemember } from "../lib/auth/directory";
-import { encodeFaceNotice, packAvatar, AVATAR_STORE_KEY, type StoredAvatar } from "../lib/avatar/store";
+import { encodeFaceNotice, packAvatar, AVATAR_STORE_KEY, displaySlug, type StoredAvatar } from "../lib/avatar/store";
 import {
   ALLOW_STORE_KEY,
   SLUG_STORE_KEY,
@@ -30,6 +30,19 @@ import { parseEmailVerified, parseExpMs, socketMessageAllowed } from "../lib/mai
 import { takeFrame, type DualLimit } from "../lib/mailbox/rate";
 import { cranePublishedDraft, phoneMustNotPublishDraft } from "../lib/mailbox/draft";
 import { cranePublishedTyping, phoneMustNotPublishTyping } from "../lib/mailbox/typing";
+import { fanWebPush } from "../lib/push/fan";
+import { sendWebPush } from "../lib/push/send";
+import {
+  dropPush,
+  parsePushDelete,
+  parsePushPut,
+  prunePushForRoom,
+  PUSH_STORE_PREFIX,
+  pushStoreKey,
+  upsertPush,
+  type StoredPush,
+} from "../lib/push/subscription";
+import { readVapid } from "../lib/push/vapid";
 
 const RATE_KEY = "rate";
 
@@ -54,6 +67,9 @@ export class Mailbox extends DurableObject<Env> {
     }
     if (request.headers.get("X-Pendant-Op") === "allow") {
       return this.allowHttp();
+    }
+    if (request.headers.get("X-Pendant-Op") === "push") {
+      return this.pushHttp(request);
     }
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected websocket", { status: 426 });
@@ -206,6 +222,7 @@ export class Mailbox extends DurableObject<Env> {
       for (const p of peers) {
         p.send(body);
       }
+      await this.notifyOffline(out);
       return;
     }
     if (dest === "crane") {
@@ -315,6 +332,9 @@ export class Mailbox extends DurableObject<Env> {
         p.close(4401, "unauthorized");
       }
     }
+    if (this.enforce()) {
+      await this.prunePush(users);
+    }
   }
 
   private meta(ws: WebSocket): AttachMeta {
@@ -394,6 +414,124 @@ export class Mailbox extends DurableObject<Env> {
     for (const m of items) {
       if (m.to === "phone" && (m.userId ?? "") === uid && m.id <= since) {
         await this.deleteQueued(m);
+      }
+    }
+  }
+
+  private async pushHttp(request: Request): Promise<Response> {
+    const userId = request.headers.get("X-Pendant-Sub")?.trim() ?? "";
+    if (!userId) {
+      return new Response("bad sub", { status: 400 });
+    }
+    const email = request.headers.get("X-Pendant-Email")?.trim() || undefined;
+    const emailVerified = request.headers.get("X-Pendant-EmailVerified") === "1";
+    let raw: unknown;
+    try {
+      raw = await request.json();
+    } catch {
+      return Response.json({ error: "bad frame" }, { status: 400 });
+    }
+    if (request.method === "PUT") {
+      const parsed = parsePushPut(raw);
+      if (!parsed) {
+        return Response.json({ error: "bad frame" }, { status: 400 });
+      }
+      const mine = await this.loadPushFor(userId);
+      const next = upsertPush(mine, {
+        userId,
+        email,
+        emailVerified,
+        subscription: parsed.subscription,
+        at: Date.now(),
+      });
+      await this.writePush(userId, mine, next);
+      return Response.json({ ok: true });
+    }
+    if (request.method === "DELETE") {
+      const parsed = parsePushDelete(raw);
+      if (!parsed) {
+        return Response.json({ error: "bad frame" }, { status: 400 });
+      }
+      const mine = await this.loadPushFor(userId);
+      const next = dropPush(mine, userId, parsed.endpoint);
+      await this.writePush(userId, mine, next);
+      return Response.json({ ok: true });
+    }
+    return new Response("method", { status: 405 });
+  }
+
+  private livePhoneUsers(): Set<string> {
+    const out = new Set<string>();
+    for (const ws of this.ctx.getWebSockets("phone")) {
+      const id = this.meta(ws).userId;
+      if (id) {
+        out.add(id);
+      }
+    }
+    return out;
+  }
+
+  private async notifyOffline(frame: WireFrame): Promise<void> {
+    try {
+      const vapid = readVapid(this.env);
+      if (!vapid) {
+        return;
+      }
+      const stored = await this.loadPushAll();
+      const slug = parseStoredSlug(await this.ctx.storage.get<string>(SLUG_STORE_KEY)) ?? "";
+      const { gone } = await fanWebPush({
+        frame,
+        title: displaySlug(slug),
+        live: this.livePhoneUsers(),
+        stored,
+        send: (subscription, payload) => sendWebPush({
+          vapid,
+          subscription,
+          payload,
+          fetch: globalThis.fetch,
+        }),
+      });
+      for (const row of gone) {
+        await this.ctx.storage.delete(pushStoreKey(row.userId, row.subscription.endpoint));
+      }
+    } catch {
+      // lock-screen is best-effort; the queue still holds the frame
+    }
+  }
+
+  private async loadPushAll(): Promise<StoredPush[]> {
+    const rows = await this.ctx.storage.list<StoredPush>({ prefix: PUSH_STORE_PREFIX });
+    return [...rows.values()];
+  }
+
+  private async loadPushFor(userId: string): Promise<StoredPush[]> {
+    const rows = await this.ctx.storage.list<StoredPush>({ prefix: `${PUSH_STORE_PREFIX}${userId}:` });
+    return [...rows.values()];
+  }
+
+  private async writePush(userId: string, prev: StoredPush[], next: StoredPush[]): Promise<void> {
+    const keep = new Set(next.map((row) => pushStoreKey(row.userId, row.subscription.endpoint)));
+    for (const row of prev) {
+      const key = pushStoreKey(row.userId, row.subscription.endpoint);
+      if (!keep.has(key)) {
+        await this.ctx.storage.delete(key);
+      }
+    }
+    for (const row of next) {
+      if (row.userId === userId) {
+        await this.ctx.storage.put(pushStoreKey(row.userId, row.subscription.endpoint), row);
+      }
+    }
+  }
+
+  private async prunePush(users: RoomUser[]): Promise<void> {
+    const all = await this.loadPushAll();
+    const keep = prunePushForRoom(all, users, this.env.ALLOWED_SUBS);
+    const keepKeys = new Set(keep.map((row) => pushStoreKey(row.userId, row.subscription.endpoint)));
+    for (const row of all) {
+      const key = pushStoreKey(row.userId, row.subscription.endpoint);
+      if (!keepKeys.has(key)) {
+        await this.ctx.storage.delete(key);
       }
     }
   }

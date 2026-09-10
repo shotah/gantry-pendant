@@ -50,6 +50,19 @@ describe("collectSecrets", () => {
     );
   });
 
+  it("collects VAPID keys for leftover lock-screen push", () => {
+    const { secrets } = collectSecrets({
+      VAPID_PUBLIC_KEY: "pub",
+      VAPID_PRIVATE_KEY: "{\"kty\":\"EC\"}",
+      VAPID_SUBJECT: "mailto:ada@example.com",
+    });
+    expect(secrets).toEqual({
+      VAPID_PUBLIC_KEY: "pub",
+      VAPID_PRIVATE_KEY: "{\"kty\":\"EC\"}",
+      VAPID_SUBJECT: "mailto:ada@example.com",
+    });
+  });
+
   it("overlays CRANE_BEARER_* onto an existing CRANE_BEARERS line", () => {
     const { secrets } = collectSecrets({
       CRANE_BEARERS: "kit:old,ada:keep",

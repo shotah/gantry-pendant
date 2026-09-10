@@ -1,4 +1,4 @@
-/** Local OS toasts while the socket is up. Web Push (VAPID) is a later path. */
+/** Local OS toasts while the socket is up. Web Push (VAPID) is the lock-screen path. */
 
 export type NotifyPermission = NotificationPermission | "unsupported";
 
