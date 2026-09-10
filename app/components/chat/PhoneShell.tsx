@@ -30,6 +30,7 @@ import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
 import { parseSlug } from "@/lib/mailbox/slug";
 import { buildContext } from "@/lib/phone/context";
 import { GEO_TIMEOUT_MS, GEO_WARM_MS, cachedGeo, geoHint } from "@/lib/phone/geo";
+import { shouldDropMailboxOnHide, shouldReconnectMailbox } from "@/lib/phone/socketLife";
 import { recoverViewport, viewportShellHeight } from "@/lib/phone/viewport";
 import { encodeFrame, type Role, type WireFrame } from "@/lib/mailbox/frame";
 import { clearsTyping, TYPING_TTL_MS } from "@/lib/mailbox/typing";
@@ -359,6 +360,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     if (stoppedRef.current || typeof window === "undefined" || !canSocket) {
       return;
     }
+    if (shouldDropMailboxOnHide(role, document.visibilityState)) {
+      return;
+    }
     window.clearTimeout(reconnectTimer.current);
     reconnectTimer.current = 0;
     connectGen.current += 1;
@@ -405,6 +409,14 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       void releaseScreenWake(wakeRef.current);
       wakeRef.current = null;
       window.clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = 0;
+      if (!shouldReconnectMailbox({
+        role,
+        visibilityState: document.visibilityState,
+        stopped: stoppedRef.current,
+      })) {
+        return;
+      }
       const delay = backoffRef.current;
       backoffRef.current = Math.min(delay * 2, BACKOFF_MAX);
       reconnectTimer.current = window.setTimeout(() => {
@@ -525,7 +537,19 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     backoffRef.current = BACKOFF_MS;
     connect();
     function onVis() {
-      if (document.visibilityState !== "visible" || stoppedRef.current) {
+      if (stoppedRef.current) {
+        return;
+      }
+      if (shouldDropMailboxOnHide(role, document.visibilityState)) {
+        window.clearTimeout(reconnectTimer.current);
+        reconnectTimer.current = 0;
+        const sock = wsRef.current;
+        if (sock && sock.readyState === WebSocket.OPEN) {
+          sock.close();
+        }
+        return;
+      }
+      if (document.visibilityState !== "visible") {
         return;
       }
       const sock = wsRef.current;
@@ -551,7 +575,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         sock.close();
       }
     };
-  }, [canSocket, connect, painting]);
+  }, [canSocket, connect, painting, role]);
 
   useEffect(() => {
     if (painting || canSocket || !localEcho) {
@@ -883,7 +907,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         <SettingsMenu>
           <div className="flex flex-col gap-2">
             <InstallApp placement="block" />
-            {phone ? <NotifyEnable onGranted={() => { void browserSubscribePush(roomSlug); }} /> : null}
+            {phone ? <NotifyEnable onGranted={() => browserSubscribePush(roomSlug)} /> : null}
             {phone && cfg?.mode === "oidc" && cranes.length
               ? (
                   <label className="flex flex-col gap-1 text-xs text-muted">

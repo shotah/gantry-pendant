@@ -47,6 +47,19 @@ describe("NotifyEnable", () => {
     expect(constructed).toHaveLength(1);
   });
 
+  it("says lock-screen push did not register when subscribe fails", async () => {
+    const { FakeNotification, request } = stubNotification("default", vi.fn(async () => {
+      FakeNotification.permission = "granted";
+      return "granted" as const;
+    }));
+    render(<NotifyEnable onGranted={async () => false} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Enable notifications" }));
+    });
+    expect(request).toHaveBeenCalledOnce();
+    expect(screen.getByText("Granted, but lock-screen push did not register.")).toBeTruthy();
+  });
+
   it("explains a blocked permission", async () => {
     stubNotification("denied");
     render(<NotifyEnable />);

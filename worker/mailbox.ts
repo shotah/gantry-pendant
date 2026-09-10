@@ -552,17 +552,6 @@ export class Mailbox extends DurableObject<Env> {
     return new Response("method", { status: 405 });
   }
 
-  private livePhoneUsers(): Set<string> {
-    const out = new Set<string>();
-    for (const ws of openSockets(this.peers(roleTag("phone")))) {
-      const id = this.meta(ws).userId;
-      if (id) {
-        out.add(id);
-      }
-    }
-    return out;
-  }
-
   private async notifyOffline(frame: WireFrame): Promise<void> {
     try {
       const vapid = readVapid(this.env);
@@ -574,7 +563,6 @@ export class Mailbox extends DurableObject<Env> {
       const { gone } = await fanWebPush({
         frame,
         title: displaySlug(slug),
-        live: this.livePhoneUsers(),
         stored,
         send: (subscription, payload) => sendWebPush({
           vapid,

@@ -18,7 +18,6 @@ export function pushPayload(
 export async function fanWebPush(opts: {
   frame: { kind?: string; text?: string; images?: { url?: string }[]; user_id?: string };
   title: string;
-  live: ReadonlySet<string>;
   stored: readonly StoredPush[];
   send: (subscription: PushSub, payload: NotifyPayload) => Promise<PushSendResult>;
 }): Promise<{ gone: StoredPush[] }> {
@@ -27,7 +26,6 @@ export async function fanWebPush(opts: {
   }
   const want = new Set(webPushUserIds({
     frameUserId: opts.frame.user_id,
-    live: opts.live,
     storedUserIds: opts.stored.map((row) => row.userId),
   }));
   if (want.size === 0) {

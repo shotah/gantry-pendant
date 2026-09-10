@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldWebPush, webPushUserIds } from "@/lib/push/target";
+import { shouldWebPush, webPushUserIds, windowBlocksPushToast } from "@/lib/push/target";
 
 describe("push target", () => {
   it("only wakes lock-screen for crane push and reply", () => {
@@ -10,13 +10,16 @@ describe("push target", () => {
     expect(shouldWebPush("cmds")).toBe(false);
   });
 
-  it("skips a live phone and broadcasts to everyone else", () => {
-    const live = new Set(["ada"]);
-    expect(webPushUserIds({ frameUserId: "ada", live, storedUserIds: ["ada"] })).toEqual([]);
-    expect(webPushUserIds({ frameUserId: "ada", live: new Set(), storedUserIds: ["ada"] })).toEqual(["ada"]);
+  it("targets the frame user or every stored phone", () => {
+    expect(webPushUserIds({ frameUserId: "ada", storedUserIds: ["ada"] })).toEqual(["ada"]);
     expect(webPushUserIds({
-      live,
       storedUserIds: ["ada", "bob", "bob", ""],
-    })).toEqual(["bob"]);
+    })).toEqual(["ada", "bob"]);
+  });
+
+  it("skips the tray when a window is visible", () => {
+    expect(windowBlocksPushToast([{ visibilityState: "visible" }])).toBe(true);
+    expect(windowBlocksPushToast([{ visibilityState: "hidden" }])).toBe(false);
+    expect(windowBlocksPushToast([])).toBe(false);
   });
 });

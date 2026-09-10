@@ -1,4 +1,4 @@
-/** Lock-screen Web Push only for crane push/reply, and only when that phone socket is gone. */
+/** Lock-screen Web Push for crane push/reply. A live socket is not awake. */
 
 export function shouldWebPush(kind?: string): boolean {
   return kind === "push" || kind === "reply";
@@ -6,11 +6,17 @@ export function shouldWebPush(kind?: string): boolean {
 
 export function webPushUserIds(opts: {
   frameUserId?: string;
-  live: ReadonlySet<string>;
   storedUserIds: readonly string[];
 }): string[] {
   const want = opts.frameUserId
     ? [opts.frameUserId]
     : [...new Set(opts.storedUserIds.filter(Boolean))];
-  return want.filter((id) => id && !opts.live.has(id));
+  return want.filter(Boolean);
+}
+
+/** Skip the tray when a controlled window is in front (Chrome silent-push exception). */
+export function windowBlocksPushToast(
+  clients: readonly { visibilityState?: string }[],
+): boolean {
+  return clients.some((c) => c.visibilityState === "visible");
 }

@@ -10,7 +10,11 @@ import {
   type NotifyPermission,
 } from "@/lib/phone/notify";
 
-export function NotifyEnable({ onGranted }: { onGranted?: () => void }) {
+export function NotifyEnable({
+  onGranted,
+}: {
+  onGranted?: () => void | boolean | Promise<void | boolean>;
+}) {
   const [permission, setPermission] = useState<NotifyPermission>("unsupported");
   const [needHome, setNeedHome] = useState(false);
   const [status, setStatus] = useState("");
@@ -57,8 +61,12 @@ export function NotifyEnable({ onGranted }: { onGranted?: () => void }) {
     if (next !== "granted") {
       return;
     }
-    onGranted?.();
+    const subscribed = onGranted ? (await onGranted()) !== false : true;
     const ok = await browserShowNotify(NOTIFY_TEST);
+    if (!subscribed) {
+      setStatus("Granted, but lock-screen push did not register.");
+      return;
+    }
     setStatus(ok ? "Sent a test ping." : "Granted, but the toast did not appear.");
   }
 

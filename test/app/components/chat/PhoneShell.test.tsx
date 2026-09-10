@@ -128,6 +128,7 @@ afterEach(() => {
   Reflect.deleteProperty(navigator, "geolocation");
   Reflect.deleteProperty(navigator, "clipboard");
   Reflect.deleteProperty(document, "hidden");
+  Reflect.deleteProperty(document, "visibilityState");
   FakeSocket.instances = [];
   clearGeoCache();
 });
@@ -388,6 +389,31 @@ describe("PhoneShell", () => {
     expect(FakeSocket.instances).toHaveLength(2);
     act(() => {
       vi.advanceTimersByTime(60_000);
+    });
+    expect(FakeSocket.instances).toHaveLength(2);
+  });
+
+  it("drops the phone socket when hidden and does not reconnect until visible", async () => {
+    const first = await connectSpike();
+    act(() => {
+      first.open();
+    });
+    expect(FakeSocket.instances).toHaveLength(1);
+    vi.useFakeTimers();
+    act(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+      Object.defineProperty(document, "hidden", { configurable: true, value: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(first.readyState).toBe(FakeSocket.CLOSED);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(FakeSocket.instances).toHaveLength(1);
+    act(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+      Object.defineProperty(document, "hidden", { configurable: true, value: false });
+      document.dispatchEvent(new Event("visibilitychange"));
     });
     expect(FakeSocket.instances).toHaveLength(2);
   });

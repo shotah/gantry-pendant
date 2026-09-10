@@ -32,31 +32,32 @@ describe("fan web push", () => {
     });
   });
 
-  it("does not send when the phone socket is live", async () => {
+  it("sends even when the phone socket still looks live", async () => {
     const send = vi.fn(async () => "ok" as const);
+    const ada = row("ada", 1);
     const gone = await fanWebPush({
       frame: { kind: "reply", user_id: "ada", text: "yo" },
       title: "Kit",
-      live: new Set(["ada"]),
-      stored: [row("ada", 1)],
+      stored: [ada],
       send,
     });
-    expect(send).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledOnce();
+    expect(send).toHaveBeenCalledWith(ada.subscription, { title: "Kit", body: "yo", tag: "pendant" });
     expect(gone.gone).toEqual([]);
   });
 
-  it("sends a cron broadcast to offline phones and drops gone endpoints", async () => {
+  it("sends a cron broadcast to stored phones and drops gone endpoints", async () => {
     const send = vi.fn(async (sub) => sub.endpoint.includes("bob") ? "gone" as const : "ok" as const);
     const ada = row("ada", 1);
     const bob = row("bob", 2);
     const result = await fanWebPush({
       frame: { kind: "push", text: "leave by 8" },
       title: "Kit",
-      live: new Set(["ada"]),
       stored: [ada, bob],
       send,
     });
-    expect(send).toHaveBeenCalledOnce();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenCalledWith(ada.subscription, { title: "Kit", body: "leave by 8", tag: "pendant" });
     expect(send).toHaveBeenCalledWith(bob.subscription, { title: "Kit", body: "leave by 8", tag: "pendant" });
     expect(result.gone).toEqual([bob]);
   });
@@ -66,7 +67,6 @@ describe("fan web push", () => {
     await fanWebPush({
       frame: { kind: "cmds" },
       title: "Kit",
-      live: new Set(),
       stored: [row("ada", 1)],
       send,
     });

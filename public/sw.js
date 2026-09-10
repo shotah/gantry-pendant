@@ -22,10 +22,14 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Web Push (VAPID) when the phone socket is gone. Local toasts still come
-// from the page while the thread is open.
+// Web Push (VAPID). Android may keep a mailbox socket OPEN while frozen, so
+// the Worker fans push even then. Skip the tray only if a window is visible.
 self.addEventListener("push", (event) => {
   event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    if (windows.some((c) => c.visibilityState === "visible")) {
+      return;
+    }
     let title = "pendant";
     let body = "New message";
     let tag = "pendant";
