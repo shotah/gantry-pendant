@@ -75,6 +75,14 @@ describe("handshake", () => {
       now,
     });
     expect(viaHeader).toEqual(phone);
+    const craneAsPhone = await handshake({
+      env,
+      slug: "kit",
+      role: "phone",
+      authorization: "Bearer crane-tok",
+      now,
+    });
+    expect(craneAsPhone).toEqual({ ok: false, error: "unauthorized" });
   });
 
   it("binds the crane bearer to the slug", async () => {

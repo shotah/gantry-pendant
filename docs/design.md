@@ -215,7 +215,7 @@ Reuse `internal/here`. Do not invent a second location store. Accuracy
 
 ## Android and iPhone
 
-One web codebase.
+PWA for the pocket. Cab for the car. Same mailbox.
 
 | Path | Android | iPhone | When |
 | --- | --- | --- | --- |

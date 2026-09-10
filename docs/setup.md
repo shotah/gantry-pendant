@@ -55,7 +55,8 @@ Crane .env  (Gantree Build / Pendant fold — this is what ai-gantry reads)
 ```
 
 ```text
-phone Google OIDC  →  session cookie  →  wss …/ws/kit  (role=phone)
+phone Google OIDC  →  session cookie (PWA) or Authorization JWE (cab)
+                   →  wss …/ws/kit  (role=phone)
 crane bearer       →  outbound wss    →  same room     (role=crane)
                    →  allow frame     →  room list on the Durable Object
 ```
@@ -217,6 +218,10 @@ list, or the crane was restarted instead of recreated. If the socket
 401s: not on the room list (or the optional `ALLOWED_SUBS` extra), or
 the session hit its hard 7-day `exp`. Cron / spark only lands while the
 app is open — no lock-screen push yet.
+
+The car mouth is a sister APK (`repos/gantry-cab`): same Worker,
+`POST /api/auth/token`, then the session JWE on `Authorization`. Android
+Auto reads `reply` / `push` aloud. Setup: cab `docs/setup.md`.
 
 A stranger who hits Sign in with Google gets a session and an empty
 crane list. They never join a room.
