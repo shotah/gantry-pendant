@@ -316,12 +316,13 @@ describe("PhoneShell", () => {
     const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as {
       text?: string;
       kind?: string;
-      context?: { geo?: { lat: number; lon: number; accuracy_m?: number } };
+      context?: { geo?: { lat: number; lon: number; accuracy_m?: number }; surface?: string };
     };
     expect(frame.kind).toBe("inbound");
     expect(frame.text).toBe("near me");
     expect(frame.text).not.toContain("[location]");
     expect(frame.context?.geo).toEqual({ lat: 47.6, lon: -122.3, accuracy_m: 8 });
+    expect(frame.context?.surface).toBe("pendant");
     expect(screen.getByRole("button", { name: "attach" }).getAttribute("title")).toBe("pin ±8m this send");
   });
 

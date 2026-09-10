@@ -14,8 +14,10 @@ describe("phone context", () => {
     expect(withGeo.at).toBe("2026-09-04T20:00:00.000Z");
     expect(withGeo.tz).toBe("America/Los_Angeles");
     expect(withGeo.geo).toEqual({ lat: 47.6, lon: -122.3, accuracy_m: 8 });
-    const denied = buildContext({ now, timeZone: "UTC", geo: null });
+    expect(withGeo.surface).toBe("pendant");
+    const denied = buildContext({ now, timeZone: "UTC", geo: null, surface: "android_auto" });
     expect(denied.geo).toBeUndefined();
+    expect(denied.surface).toBe("android_auto");
   });
 
   it("maps a GeolocationPosition-shaped fix", () => {

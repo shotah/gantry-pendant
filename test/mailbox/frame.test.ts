@@ -24,6 +24,7 @@ describe("frame", () => {
         geo: { lat: 47.6, lon: -122.3, accuracy_m: 12, heading: 90, speed_mps: 1, alt_m: 10 },
         battery: { pct: 80, charging: false },
         net: "cellular",
+        surface: "android_auto",
       },
     };
     const got = parseFrame(JSON.stringify(raw));
@@ -39,6 +40,7 @@ describe("frame", () => {
         speed_mps: 1,
         alt_m: 10,
       });
+      expect(got.frame.context?.surface).toBe("android_auto");
       expect(hasGeo(got.frame)).toBe(true);
       expect(isBareGeo(got.frame)).toBe(false);
     }
@@ -47,6 +49,23 @@ describe("frame", () => {
   it("treats geo-only as a silent pin", () => {
     const got = parseFrame(JSON.stringify({ context: { geo: { lat: 1, lon: 2 } } }));
     expect(got.ok && isBareGeo(got.frame)).toBe(true);
+  });
+
+  it("keeps FE surface names and drops the rest", () => {
+    const pendant = parseFrame(JSON.stringify({ context: { surface: "pendant" } }));
+    const android = parseFrame(JSON.stringify({ context: { surface: "android" } }));
+    const auto = parseFrame(JSON.stringify({ context: { surface: "android_auto" } }));
+    expect(pendant.ok && pendant.frame.context?.surface).toBe("pendant");
+    expect(android.ok && android.frame.context?.surface).toBe("android");
+    expect(auto.ok && auto.frame.context?.surface).toBe("android_auto");
+    const oldPhone = parseFrame(JSON.stringify({ context: { surface: "phone" } }));
+    const oldCar = parseFrame(JSON.stringify({ context: { surface: "car" } }));
+    const desktop = parseFrame(JSON.stringify({ context: { surface: "desktop" } }));
+    const dash = parseFrame(JSON.stringify({ context: { surface: "android-auto" } }));
+    expect(oldPhone.ok && oldPhone.frame.context?.surface).toBeUndefined();
+    expect(oldCar.ok && oldCar.frame.context?.surface).toBeUndefined();
+    expect(desktop.ok && desktop.frame.context?.surface).toBeUndefined();
+    expect(dash.ok && dash.frame.context?.surface).toBeUndefined();
   });
 
   it("rejects junk, oversize text, and bad images", () => {

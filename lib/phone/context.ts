@@ -16,11 +16,13 @@ export function buildContext(opts: {
   geo?: GeoFix | null;
   battery?: { pct: number; charging: boolean } | null;
   net?: PhoneContext["net"];
+  surface?: PhoneContext["surface"];
 }): PhoneContext {
   const now = opts.now ?? new Date();
   const ctx: PhoneContext = {
     at: now.toISOString(),
     tz: opts.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+    surface: opts.surface ?? "pendant",
   };
   if (opts.geo) {
     ctx.geo = opts.geo as Geo;
