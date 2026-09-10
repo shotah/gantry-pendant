@@ -4,6 +4,15 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Compose } from "@/app/components/chat/Compose";
 
+function pasteBits(file: File) {
+  return {
+    items: [{ kind: "file", type: file.type, getAsFile: () => file }],
+    files: [file],
+    types: ["Files"],
+    getData: () => "",
+  };
+}
+
 afterEach(() => {
   cleanup();
 });
@@ -27,6 +36,38 @@ describe("Compose", () => {
     const file = new File([new Uint8Array([1])], "a.jpg", { type: "image/jpeg" });
     fireEvent.change(input, { target: { files: [file] } });
     expect(onPhoto).toHaveBeenCalled();
+  });
+
+  it("sends a pasted image through onPhoto", () => {
+    const onPhoto = vi.fn();
+    const file = new File([new Uint8Array([1])], "shot.png", { type: "image/png" });
+    render(<Compose onSend={vi.fn()} onPhoto={onPhoto} />);
+    fireEvent.paste(screen.getByPlaceholderText("Message"), { clipboardData: pasteBits(file) });
+    expect(onPhoto).toHaveBeenCalledWith(file);
+    onPhoto.mockClear();
+    fireEvent.paste(document, { clipboardData: pasteBits(file) });
+    expect(onPhoto).toHaveBeenCalledWith(file);
+  });
+
+  it("does not steal image paste from another field, or when compose is disabled", () => {
+    const onPhoto = vi.fn();
+    const file = new File([new Uint8Array([1])], "shot.png", { type: "image/png" });
+    const { rerender } = render(
+      <div>
+        <input aria-label="other" />
+        <Compose onSend={vi.fn()} onPhoto={onPhoto} />
+      </div>,
+    );
+    fireEvent.paste(screen.getByLabelText("other"), { clipboardData: pasteBits(file) });
+    expect(onPhoto).not.toHaveBeenCalled();
+    rerender(
+      <div>
+        <input aria-label="other" />
+        <Compose onSend={vi.fn()} onPhoto={onPhoto} disabled />
+      </div>,
+    );
+    fireEvent.paste(document, { clipboardData: pasteBits(file) });
+    expect(onPhoto).not.toHaveBeenCalled();
   });
 
   it("lists harness commands from a supplied catalog", () => {

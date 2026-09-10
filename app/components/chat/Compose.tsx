@@ -3,6 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { EmojiButton, EmojiPanel } from "./EmojiPicker";
 import { applyEmoji } from "@/app/lib/emoji";
+import { fileFromClipboard } from "@/app/lib/photo";
 import { matchSlash, slashInsert, slashToken, type SlashCommand } from "@/app/lib/slash";
 
 function ClipIcon() {
@@ -155,6 +156,29 @@ function AttachChip({
   );
 }
 
+function takePhotoPaste(
+  e: ClipboardEvent,
+  onPhoto: ((file: File) => void) | undefined,
+  box: HTMLTextAreaElement | null,
+): void {
+  if (e.defaultPrevented || !onPhoto) {
+    return;
+  }
+  const file = fileFromClipboard(e.clipboardData);
+  if (!file) {
+    return;
+  }
+  const t = e.target;
+  if (t !== box && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)) {
+    return;
+  }
+  if (t instanceof HTMLElement && t !== box && t.isContentEditable) {
+    return;
+  }
+  e.preventDefault();
+  onPhoto(file);
+}
+
 export function Compose({
   disabled,
   placeholder,
@@ -191,6 +215,8 @@ export function Compose({
   const [emojiQuery, setEmojiQuery] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
+  const onPhotoRef = useRef(onPhoto);
+  onPhotoRef.current = onPhoto;
   const caretRef = useRef<number | null>(null);
   const insertAt = useRef(0);
   const composing = useRef(false);
@@ -216,6 +242,18 @@ export function Compose({
       boxRef.current?.focus();
     }
   }, []);
+
+  const canPastePhoto = Boolean(onPhoto) && !disabled;
+  useEffect(() => {
+    if (!canPastePhoto) {
+      return;
+    }
+    function onPaste(e: ClipboardEvent) {
+      takePhotoPaste(e, onPhotoRef.current, boxRef.current);
+    }
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [canPastePhoto]);
 
   function setDraft(next: string, caret: number | null = null) {
     caretRef.current = caret;

@@ -1,11 +1,31 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fileToPhoto } from "@/app/lib/photo";
+import { fileFromClipboard, fileToPhoto } from "@/app/lib/photo";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+describe("fileFromClipboard", () => {
+  it("returns the first image file and ignores empty or non-image pastes", () => {
+    const img = new File([new Uint8Array([1])], "shot.png", { type: "image/png" });
+    const jpeg = new File([new Uint8Array([2])], "a.jpg", { type: "image/jpeg" });
+    const note = new File(["hi"], "a.txt", { type: "text/plain" });
+    expect(fileFromClipboard({
+      items: [
+        { kind: "string", type: "text/plain", getAsFile: () => null },
+        { kind: "file", type: "image/png", getAsFile: () => img },
+      ],
+    })).toBe(img);
+    expect(fileFromClipboard({ files: [note, jpeg] })).toBe(jpeg);
+    expect(fileFromClipboard(null)).toBeNull();
+    expect(fileFromClipboard({ items: [], files: [] })).toBeNull();
+    expect(fileFromClipboard({
+      items: [{ kind: "file", type: "image/png", getAsFile: () => new File([], "empty.png", { type: "image/png" }) }],
+    })).toBeNull();
+  });
 });
 
 describe("fileToPhoto", () => {
