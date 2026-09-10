@@ -393,6 +393,40 @@ describe("PhoneShell", () => {
     expect(FakeSocket.instances).toHaveLength(2);
   });
 
+  it("redials an open phone socket when the thread becomes visible", async () => {
+    const first = await connectSpike();
+    act(() => {
+      first.open();
+    });
+    expect(FakeSocket.instances).toHaveLength(1);
+    act(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(FakeSocket.instances).toHaveLength(2);
+    expect(first.readyState).toBe(FakeSocket.CLOSED);
+  });
+
+  it("closes the phone socket on freeze", async () => {
+    const first = await connectSpike();
+    act(() => {
+      first.open();
+    });
+    act(() => {
+      document.dispatchEvent(new Event("freeze"));
+    });
+    expect(first.readyState).toBe(FakeSocket.CLOSED);
+  });
+
+  it("paints a flushed cron push as a Kit bubble", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "cron-325-1", kind: "push", text: "leave by 8" }));
+    });
+    expect(await screen.findByText("leave by 8")).toBeTruthy();
+    expect(screen.getByText("ping")).toBeTruthy();
+  });
+
   it("drops the phone socket when hidden and does not reconnect until visible", async () => {
     const first = await connectSpike();
     act(() => {

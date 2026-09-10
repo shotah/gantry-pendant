@@ -30,7 +30,11 @@ import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
 import { parseSlug } from "@/lib/mailbox/slug";
 import { buildContext } from "@/lib/phone/context";
 import { GEO_TIMEOUT_MS, GEO_WARM_MS, cachedGeo, geoHint } from "@/lib/phone/geo";
-import { shouldDropMailboxOnHide, shouldReconnectMailbox } from "@/lib/phone/socketLife";
+import {
+  shouldDropMailboxOnHide,
+  shouldReconnectMailbox,
+  shouldRedialMailboxOnVisible,
+} from "@/lib/phone/socketLife";
 import { recoverViewport, viewportShellHeight } from "@/lib/phone/viewport";
 import { encodeFrame, type Role, type WireFrame } from "@/lib/mailbox/frame";
 import { clearsTyping, TYPING_TTL_MS } from "@/lib/mailbox/typing";
@@ -536,17 +540,24 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     stoppedRef.current = false;
     backoffRef.current = BACKOFF_MS;
     connect();
+    function dropPhoneSocket() {
+      window.clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = 0;
+      const sock = wsRef.current;
+      if (sock && sock.readyState === WebSocket.OPEN) {
+        sock.close();
+      }
+    }
     function onVis() {
       if (stoppedRef.current) {
         return;
       }
       if (shouldDropMailboxOnHide(role, document.visibilityState)) {
-        window.clearTimeout(reconnectTimer.current);
-        reconnectTimer.current = 0;
-        const sock = wsRef.current;
-        if (sock && sock.readyState === WebSocket.OPEN) {
-          sock.close();
-        }
+        dropPhoneSocket();
+        return;
+      }
+      if (shouldRedialMailboxOnVisible(role, document.visibilityState)) {
+        connect();
         return;
       }
       if (document.visibilityState !== "visible") {
@@ -558,10 +569,20 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       }
       connect();
     }
+    function onFreeze() {
+      if (stoppedRef.current || role !== "phone") {
+        return;
+      }
+      dropPhoneSocket();
+    }
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pageshow", onVis);
+    document.addEventListener("freeze", onFreeze);
     return () => {
       stoppedRef.current = true;
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pageshow", onVis);
+      document.removeEventListener("freeze", onFreeze);
       window.clearTimeout(reconnectTimer.current);
       reconnectTimer.current = 0;
       connectGen.current += 1;
