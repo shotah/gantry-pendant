@@ -2,7 +2,8 @@ import type { PhotoErr } from "./photo";
 
 /**
  * Mailbox `kind: "error"` frames carry a short wire token in `text` (`rate`, `too large`,
- * `bad frame`). Cab shows the token as a hint; the PWA paints a sentence under the bubble.
+ * `bad frame`). Both mouths switch on the token and paint a sentence under the bubble
+ * (Cab: `mailbox/SendError.kt`).
  */
 export function describeSendError(text: string | undefined): string {
   switch (text?.trim().toLowerCase()) {

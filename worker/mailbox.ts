@@ -14,7 +14,7 @@ import {
 } from "../lib/mailbox/allow";
 import { utf8Bytes } from "../lib/mailbox/caps";
 import { cranePublishedCmds, CMDS_STORE_KEY, parseCommands, phoneMustNotPublishCmds } from "../lib/mailbox/cmds";
-import { encodeFrame, parseFrame, stampOrderOnBody, stampReplayOnBody, stripClientOrder, type Role, type WireFrame } from "../lib/mailbox/frame";
+import { encodeError, encodeFrame, parseFrame, stampOrderOnBody, stampReplayOnBody, stripClientOrder, type Role, type WireFrame } from "../lib/mailbox/frame";
 import {
   cursorStoreKey,
   drainFor,
@@ -138,14 +138,14 @@ export class Mailbox extends DurableObject<Env> {
     }
     const parsed = parseFrame(message, { role: meta.role });
     if (!parsed.ok) {
-      ws.send(encodeFrame({ kind: "error", text: parsed.error }));
+      ws.send(encodeError(parsed.error, parsed.id));
       return;
     }
     const out: WireFrame = stripClientOrder(parsed.frame);
     if (meta.role === "phone") {
       const kind = resolvePhoneKind(out);
       if (!kind) {
-        ws.send(encodeFrame({ kind: "error", text: "bad frame" }));
+        ws.send(encodeError("bad frame", out.id));
         return;
       }
       out.kind = kind;
@@ -164,8 +164,7 @@ export class Mailbox extends DurableObject<Env> {
     if (!skipRate) {
       const limits = await this.take(meta.rateId, parsed.bytes);
       if (!limits) {
-        // `id` is additive so the sender can mark its own bubble; Cab reads `text` only.
-        ws.send(encodeFrame({ kind: "error", text: "rate", id: out.id }));
+        ws.send(encodeError("rate", out.id));
         return;
       }
     }
@@ -175,7 +174,7 @@ export class Mailbox extends DurableObject<Env> {
       || phoneMustNotPublishTyping(meta.role, out.kind)
       || phoneMustNotPublishDraft(meta.role, out.kind)
     ) {
-      ws.send(encodeFrame({ kind: "error", text: "bad frame" }));
+      ws.send(encodeError("bad frame", out.id));
       return;
     }
     if (cranePublishedAllow(meta.role, out.kind)) {

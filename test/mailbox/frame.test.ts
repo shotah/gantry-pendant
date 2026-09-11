@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CONTEXT_JSON_MAX, FRAME_BYTES_MAX, TEXT_MAX } from "@/lib/mailbox/caps";
-import { encodeFrame, hasGeo, isBareGeo, parseFrame, peerOf, stampOrderOnBody, stampReplayOnBody, stripClientOrder, type ParseResult } from "@/lib/mailbox/frame";
+import { encodeError, encodeFrame, hasGeo, isBareGeo, parseFrame, peerOf, stampOrderOnBody, stampReplayOnBody, stripClientOrder, type ParseResult } from "@/lib/mailbox/frame";
 
 function failMsg(r: ParseResult): string {
   return r.ok ? "ok" : r.error;
@@ -205,6 +205,30 @@ describe("frame", () => {
     expect(https.ok).toBe(false);
     const data = parseFrame(JSON.stringify({ images: [{ url: "data:image/jpeg;base64,aa" }] }), { role: "phone" });
     expect(data.ok).toBe(true);
+  });
+
+  it("echoes a valid id on a parse refusal so the mouth can mark that bubble", () => {
+    const fat = parseFrame(JSON.stringify({
+      id: "photo-1",
+      kind: "inbound",
+      images: [{ url: `data:image/jpeg;base64,${"a".repeat(1_500_001)}` }],
+    }), { role: "phone" });
+    expect(failMsg(fat)).toBe("too large");
+    expect(fat.ok ? undefined : fat.id).toBe("photo-1");
+    const two = parseFrame(JSON.stringify({
+      id: "two",
+      images: [{ url: "https://a" }, { url: "https://b" }],
+    }));
+    expect(two).toEqual({ ok: false, error: "too large", id: "two" });
+    const junk = parseFrame("nope");
+    expect(junk.ok || "id" in junk).toBe(false);
+    const huge = parseFrame("x".repeat(FRAME_BYTES_MAX + 1));
+    expect(huge.ok || "id" in huge).toBe(false);
+  });
+
+  it("encodes a refusal without an id key when the sender had none", () => {
+    expect(JSON.parse(encodeError("rate"))).toEqual({ kind: "error", text: "rate" });
+    expect(JSON.parse(encodeError("bad frame", "msg-1"))).toEqual({ kind: "error", text: "bad frame", id: "msg-1" });
   });
 
   it("allows https images from the crane", () => {

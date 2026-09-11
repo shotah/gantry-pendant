@@ -50,8 +50,12 @@ export type ParseOpts = { role?: Role };
 const ID_MAX = 128;
 
 export type ParseOk = { ok: true; frame: WireFrame; bytes: number };
-export type ParseErr = { ok: false; error: string };
+export type ParseErr = { ok: false; error: string; id?: string };
 export type ParseResult = ParseOk | ParseErr;
+
+function refuse(error: string, id?: string): ParseErr {
+  return id ? { ok: false, error, id } : { ok: false, error };
+}
 
 function isFiniteNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
@@ -239,47 +243,47 @@ export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseO
     return { ok: false, error: "bad frame" };
   }
   const o = parsed as Record<string, unknown>;
+  const idField = parseIdField(o.id);
+  if (idField && typeof idField === "object") {
+    return idField;
+  }
   const frame: WireFrame = {};
   if (o.text != null) {
     if (typeof o.text !== "string") {
-      return { ok: false, error: "bad frame" };
+      return refuse("bad frame", idField);
     }
     if (utf8Bytes(o.text) > TEXT_MAX) {
-      return { ok: false, error: "too large" };
+      return refuse("too large", idField);
     }
     frame.text = o.text;
   }
   if (o.kind != null) {
     if (typeof o.kind !== "string" || !KINDS.has(o.kind as FrameKind)) {
-      return { ok: false, error: "bad frame" };
+      return refuse("bad frame", idField);
     }
     frame.kind = o.kind as FrameKind;
   }
   if (o.user_id != null) {
     if (typeof o.user_id !== "string" || o.user_id.length > 128) {
-      return { ok: false, error: "bad frame" };
+      return refuse("bad frame", idField);
     }
     frame.user_id = o.user_id;
   }
   if (o.email != null) {
     if (typeof o.email !== "string" || o.email.length > 254) {
-      return { ok: false, error: "bad frame" };
+      return refuse("bad frame", idField);
     }
     const email = o.email.trim().toLowerCase();
     if (email) {
       frame.email = email;
     }
   }
-  const id = parseIdField(o.id);
-  if (id && typeof id === "object") {
-    return id;
-  }
-  if (id) {
-    frame.id = id;
+  if (idField) {
+    frame.id = idField;
   }
   const since = parseIdField(o.since);
   if (since && typeof since === "object") {
-    return since;
+    return refuse("bad frame", idField);
   }
   if (since) {
     frame.since = since;
@@ -294,7 +298,7 @@ export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseO
   }
   const images = parseImages(o.images, opts?.role);
   if (!Array.isArray(images)) {
-    return images;
+    return refuse(images.error, idField);
   }
   if (images.length) {
     frame.images = images;
@@ -311,7 +315,7 @@ export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseO
   if (o.context != null) {
     const blob = JSON.stringify(o.context);
     if (utf8Bytes(blob) > CONTEXT_JSON_MAX) {
-      return { ok: false, error: "too large" };
+      return refuse("too large", idField);
     }
     const ctx = parseContext(o.context);
     if (ctx) {
@@ -323,6 +327,11 @@ export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseO
 
 export function encodeFrame(frame: WireFrame): string {
   return JSON.stringify(frame);
+}
+
+/** Mailbox refusal. `id` is additive so the sender can mark that bubble. */
+export function encodeError(text: string, id?: string): string {
+  return encodeFrame({ kind: "error", text, id });
 }
 
 export function hasText(frame: WireFrame): boolean {

@@ -44,8 +44,9 @@ before you call it done. A PWA-only paint is not enough.
 
 **Cover:** after a mailbox frame change, read
 `repos/gantry-cab/app/src/main/java/com/gantree/cab/mailbox/Wire.kt` and
-`Mouth.kt`. If Cab would paint wrong or drop a turn, file it there
-(or patch both). Do not wait for an iOS repo to exist before writing
+`Mouth.kt`; for caps, ladder, or photo size, `mailbox/Photo.kt` and
+`mailbox/SendError.kt` too. If Cab would paint wrong or drop a turn,
+file it there (or patch both). Do not wait for an iOS repo to exist before writing
 the contract down.
 
 ---
@@ -77,8 +78,9 @@ Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`):
 ## Photos (what every mouth must do the same)
 
 Source of truth: `lib/mailbox/caps.ts`, `lib/phone/photo.ts`,
-`app/lib/jpegFromFile.ts`. Cab mirrors in `mailbox/Photo.kt`,
-`mailbox/Jpeg.kt`, `mailbox/JpegIo.kt`.
+`app/lib/jpegFromFile.ts`, `lib/phone/sendError.ts`. Cab mirrors in
+`mailbox/Photo.kt`, `mailbox/Jpeg.kt`, `mailbox/JpegIo.kt`,
+`mailbox/SendError.kt`.
 
 **Wire.** One `images: [{ url }]` per frame, `url` a
 `data:image/jpeg;base64,…`. The mailbox measures the **data URL**
@@ -97,8 +99,12 @@ lands" bug on both mouths.
 **Encode ladder** (`jpegFromFile`): draw at the chosen long edge, try
 quality 0.9 → 0.8 → 0.7 → 0.6; if still over budget, edge × 0.75 and
 repeat; floor 320 px, then give up with `too large`. Pass-through only
-for a JPEG already ≤ edge and ≤ budget. Cab today does one encode at
-90 (`JpegIo.kt`); port the ladder.
+for a JPEG already ≤ edge and ≤ budget. Cab runs the same ladder:
+`shrinkSteps` / `shrinkToFit` in `mailbox/Photo.kt` (pure, tested
+against the same 1600 → 1200 / floor-380 cases as
+`test/app/lib/jpegFromFile.test.ts`), driven by `jpegFromUri` in
+`mailbox/JpegIo.kt` with `PHOTO_JPEG_BYTES_MAX` as the budget. Start at
+`min(edge, image)` — never upscale.
 
 **Photo size** (Settings, per device, not on the wire). Long edge:
 
@@ -110,8 +116,11 @@ for a JPEG already ≤ edge and ≤ budget. Cab today does one encode at
 
 Vision tokens track pixel area (~w·h/750), not JPEG bytes — that is why
 this is an edge knob and not a quality knob. PWA stores it at
-`localStorage["pendant.photo"]`; Cab keeps its own pref with the same
-ids and edges so the two mouths agree on what "Medium" means.
+`localStorage["pendant.photo"]`; Cab stores the same id at
+`SharedPreferences("cab")["photo"]` (`CabPrefs.photoSize`) and reads
+the table from `PHOTO_SIZES` in `mailbox/Photo.kt` — same ids, same
+edges, same `Medium · 1024 px` chip text, so the two mouths agree on
+what "Medium" means. Change the table here, change it there.
 
 **Errors.** The mailbox answers a refused frame with
 `{ kind: "error", text, id }` where `text` is a token — `rate`,
@@ -121,6 +130,23 @@ sent", never as a turn from the crane, and do not move the `since`
 cursor from it. PWA strings: `lib/phone/sendError.ts`. Pre-wire
 failures (`bad photo` = decoder, `too large` = ladder bottomed out)
 are local; say so in the mouth.
+
+Cab does the same: `Mouth.fail(id, why)` is `failInThread` (match your
+bubble by `id`, else your newest still `pending`; crane bubbles are
+never marked), `ChatLine.failed` paints red under the bubble, strings
+are copied in `mailbox/SendError.kt` (`describeSendError`,
+`describePhotoError`). `movesCursor(kind)` in `mailbox/Thread.kt`
+keeps `ack` and `error` off the `since` cursor — before that an
+`error` with `id` would have made Cab resume from the refused id on a
+fresh session. A refusal with no matching bubble (a bare pin) falls
+back to the old hint line. Keep the token strings stable; both mouths
+switch on them.
+
+The Worker echoes `id` on every refusal that has one: parse errors after
+JSON.parse (`too large` image, extra image, bad kind), then `rate` and
+the post-parse `bad frame` checks. Junk that never parses (oversize
+whole frame, not JSON) still has no id — mouths fall back to newest
+pending.
 
 ---
 

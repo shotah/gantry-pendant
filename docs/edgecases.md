@@ -176,7 +176,7 @@ You cannot run telegram + pendant in the same process.
 | Lock screen ping while app is dead | Web Push if VAPID is set and they enabled notifications (installed PWA; iOS 16.4+ standalone) | Settings → Enable notifications after Google. Missing VAPID → queue only; native APNs/FCM later |
 | Queue while Mini reboots | ≤50 frames, 1 hour TTL, then drop | unread catch-up only |
 | Transcript on reload | last 80 `inbound` / `reply` / `push` per `sub` | kill the tab, reopen; not `sw.js`. Cab paints the same frames (`replay: true` skips Auto HUN — ship Cab with this mailbox) |
-| Rate limit (30 frames/min; bytes 4 MB burst = two full photo frames, refill 256 KB per min) | socket stays up, frames return `error` `rate` with the refused `id` (additive) | PWA marks that bubble “Not sent — too much too fast”; Cab shows the token as a hint. Burst below one frame was the old photo bug: every camera shot bounced as `rate` forever |
+| Rate limit (30 frames/min; bytes 4 MB burst = two full photo frames, refill 256 KB per min) | socket stays up, frames return `error` `rate` with the refused `id` (additive) | PWA and Cab mark that bubble “Not sent — too much too fast”. Burst below one frame was the old photo bug: every camera shot bounced as `rate` forever |
 | Session hard 7d (JWT `exp` at mint) | next send closes 4401 | sign in again; yank `sub` takes effect on the next frame |
 | Service worker | no chat cache (good) | also no offline compose |
 
