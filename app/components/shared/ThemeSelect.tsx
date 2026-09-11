@@ -17,7 +17,7 @@ function ThemeDot({ canvas, accent, line }: { canvas: string; accent: string; li
   );
 }
 
-export function ThemeSelect() {
+export function ThemeSelect({ onHumanPick }: { onHumanPick?: () => void }) {
   const [id, setId] = useState<ThemeId>(DEFAULT_THEME);
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLSpanElement>(null);
@@ -70,6 +70,7 @@ export function ThemeSelect() {
   }, [open]);
 
   function pick(next: ThemeId) {
+    onHumanPick?.();
     setId(next);
     applyTheme(next);
     setOpen(false);
@@ -82,7 +83,7 @@ export function ThemeSelect() {
         ref={trigger}
         type="button"
         aria-label="color theme"
-        title="color theme"
+        title={current.mood}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
@@ -105,11 +106,12 @@ export function ThemeSelect() {
                   type="button"
                   role="option"
                   aria-selected={t.id === id}
+                  title={t.mood}
                   className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-body hover:bg-track ${t.id === id ? "bg-track" : ""}`}
                   onClick={() => pick(t.id)}
                 >
                   <ThemeDot canvas={t.tokens.canvas} accent={t.tokens.accent} line={t.tokens.line} />
-                  {t.label}
+                  <span className="min-w-0 truncate">{t.label}</span>
                 </button>
               ))}
             </span>

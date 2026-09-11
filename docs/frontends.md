@@ -40,14 +40,17 @@ before you call it done. A PWA-only paint is not enough.
 | Queue / `ack` / `since` / `seq` | Cab parses `seq` / `at`, inserts like `placeInThread`, acks the highest seq. Transcript hydrate is the same frames plus `replay` — see below |
 | Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Do not assume it needs the PWA CSS |
 | Photo caps, encode ladder, `error` tokens | Both mouths encode to the same budget and paint refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
-| PWA-only UI (theme, font, Install) | Cab has its own Compose shell |
+| Face / backdrop blobs and their notices | Cab refetches `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
+| Room theme | Cab follows Kit when `followTheme` is on; GET `/api/theme` on connect — [Theme](#theme-what-every-mouth-must-do-the-same) |
+| PWA-only UI (font, Install) | Cab has its own Compose shell |
 
 **Cover:** after a mailbox frame change, read
 `repos/gantry-cab/app/src/main/java/com/gantree/cab/mailbox/Wire.kt` and
 `Mouth.kt`; for caps, ladder, or photo size, `mailbox/Photo.kt` and
-`mailbox/SendError.kt` too. If Cab would paint wrong or drop a turn,
-file it there (or patch both). Do not wait for an iOS repo to exist before writing
-the contract down.
+`mailbox/SendError.kt`; for face / backdrop / room theme,
+`mailbox/Avatar.kt`, `mailbox/Look.kt`, `mailbox/ThemeApi.kt`. If Cab
+would paint wrong or drop a turn, file it there (or patch both). Do
+not wait for an iOS repo to exist before writing the contract down.
 
 ---
 
@@ -147,6 +150,155 @@ JSON.parse (`too large` image, extra image, bad kind), then `rate` and
 the post-parse `bad frame` checks. Junk that never parses (oversize
 whole frame, not JSON) still has no id — mouths fall back to newest
 pending.
+
+---
+
+## Face, backdrop, and theme (what every mouth must do the same)
+
+Source of truth: `lib/avatar/{jpeg,http,store}.ts`,
+`lib/backdrop/{http,store}.ts`, `lib/theme/{catalog,store}.ts`,
+`lib/auth/slugRoute.ts`, `worker/mailbox.ts` (`blobHttp`, `themeHttp`).
+Who calls the blobs and why: [agent_ui_controls.md](agent_ui_controls.md).
+
+Two JPEG **blobs on the room**, one per crane slug. They are not chat
+turns: `images[]` on a frame is a photo *in the thread*; these are what
+the thread looks like. Every human in the room sees the same face and
+the same wallpaper.
+
+**HTTP.**
+
+| | Face | Backdrop |
+| --- | --- | --- |
+| Route | `GET` / `POST /api/avatar?slug=<slug>` | `GET` / `POST` / `DELETE /api/backdrop?slug=<slug>` |
+| Body (POST) | raw `image/jpeg`, or multipart `file` | same |
+| Cap | `AVATAR_MAX_BYTES` 5 MiB (dropping to 1.5 MB — DO rows are 2 MB) | `BACKDROP_MAX_BYTES` = 1 500 000 |
+| Gate | JPEG magic (`FF D8 FF`), ≥ 32 bytes | same |
+| GET | `image/jpeg`, `X-Pendant-Rev: <rev>`, `Cache-Control: private, max-age=0, must-revalidate`; **404** when none | same; 404 after `DELETE` |
+| Cache bust | `?v=<rev>` | `?v=<rev>` |
+| 400 body | `{ "error": "image too large (max 5MB)" \| "need a JPEG …" \| "file required" }` | `{ "error": "image too large (max 1.5MB)" \| … }` |
+
+Auth is one door for both (`withSlug`): a **listed** phone (PWA cookie
+or Cab `Authorization` JWE), or the **crane bearer** on
+`Authorization: Bearer …` — header only, `?bearer=` is refused for the
+crane. Spike `?secret=` is loopback. Denies are the shared
+`{ "error": "unauthorized" }` 401 / 403, `{ "error": "config" }` 503,
+`{ "error": "bad slug" }` 400. The bearer is bound to one slug, so the
+crane can only repaint its own room.
+
+**Notices.** When a blob changes the Durable Object sends one frame to
+**every** socket in the room (crane included — it ignores frames with
+no `user_id`):
+
+```text
+{ "kind": "face",     "text": "<rev>" }     // legacy shape, keep it
+{ "kind": "backdrop", "rev": <int> }        // rev 0 = cleared; NO text
+{ "kind": "theme",    "theme": "<id>" | null }  // null = cleared; NO text
+```
+
+| Rule | Why |
+| --- | --- |
+| None of these are a `FrameKind`. A phone that sends one gets `error` `bad frame` | They originate on the DO, not the wire |
+| Not queued, no `id` / `seq` / `at`, not in the transcript | A reconnect must not replay "face changed" |
+| Do not move the `since` cursor; do not toast / HUN / haptic / badge | Not a turn |
+| `backdrop` and `theme` have **no `text`** | A mouth that predates them must drop them. Cab `Mouth.ingest` paints any frame with text as a bubble — a rev or theme id in the thread on every old APK. The face notice predates this rule; do not "fix" it |
+| `rev` is a safe integer ≥ 0; junk → ignore the frame | Same bar as `orderSeq` |
+| `theme` is a known catalog id, or JSON `null` to clear; junk → ignore | Catalog: boom, inlay, lamp, noir, ember, tide, bloom |
+
+**Paint.** On `face` → refetch `GET /api/avatar?slug&v=<rev>` and swap
+the header circle (PWA `KitAvatar`, Cab `ui/KitAvatar.kt`). On
+`backdrop` → refetch `GET /api/backdrop?slug&v=<rev>`; 404 or `rev: 0`
+paints **nothing** — the theme canvas is the fallback. Fetch on connect
+too (no `v`) so a fresh session gets the current one without a notice.
+Wallpaper goes **behind the thread only**, cover-fit, dimmed so bubbles
+stay legible (PWA: 60 % opacity over `--canvas`; Cab: `Modifier.alpha(0.6f)`
+behind `ChatScroll`; header and compose stay panel). It is a per-device
+choice to show it: PWA `localStorage["pendant.backdrop"]`, Cab
+`SharedPreferences("cab")["backdrop"]` (`on` default / `off`). Off means
+**no fetch**, not a hidden image. **Not** on Android Auto.
+
+On `theme` → if the human is following Kit, paint that catalog id
+(PWA `paintTheme`, Cab `paintedTheme`). `theme: null` falls back to the
+human's pick. Follow is a per-device pref: PWA
+`localStorage["pendant.followTheme"]`, Cab
+`SharedPreferences("cab")["followTheme"]` (on default / only `"off"`
+keeps yours). A human tapping a theme chip turns follow off and claims
+that id. Fetch `GET /api/theme?slug=` on connect so a fresh session
+sees Kit's mood without waiting for a notice. HTTP 5xx leaves the last
+known room id; `{ "theme": null }` is a real clear.
+
+**Cab.** `faceRev` / `backdropRev` / `roomTheme` on `Mouth` — ingest
+returns `false`, `shouldSpeak` stays false, `movesCursor` excludes
+`face` / `backdrop` / `theme`. `Look.kt` `THEME_IDS` matches
+`lib/theme/catalog.ts` (hexes in `CabPalette.kt`). `ThemeApi` GETs the
+room; `AvatarApi.fetch(..., path="/api/backdrop")` GETs the wallpaper.
+
+---
+
+## Theme (what every mouth must do the same)
+
+Source of truth: `lib/theme/{catalog,store,contrast}.ts`,
+`app/lib/theme.ts`, `app/api/theme/route.ts`, `worker/mailbox.ts`
+(`themeHttp`). Why, and how the agent picks without seeing the screen:
+[agent_ui_controls.md](agent_ui_controls.md).
+
+One **id per room**, from a closed catalog. Not raw hex. Every human
+who follows Kit sees the same mood. The human can unfollow and keep
+their own pick (`pendant.followTheme`, default on) — same shape as
+Backdrop.
+
+**HTTP.**
+
+| | Theme |
+| --- | --- |
+| Route | `GET` / `POST` / `DELETE /api/theme?slug=<slug>` |
+| Auth | same door as the face (`withSlug`) |
+| GET | `{ "theme": "<id>" \| null, "themes": [ { id, label, mood, canvas, accent } ] }` |
+| POST | `{ "theme": "<id>" }` → `{ "ok": true, "theme": "<id>" }` |
+| DELETE | clears the room pick; GET `theme` is `null` |
+| 400 body | `{ "error": "bad theme" }` |
+
+`canvas` and `accent` are the two signature hexes (shop floor + tool
+color). `mood` is one English line. That is how a model that cannot
+see the screen chooses. Do not put hex in the id. Do not accept
+arbitrary colors.
+
+**Notice.** When the room theme changes the Durable Object sends one
+frame to every socket, and **flushes it on phone connect** (after
+`cmds`, like the command catalog):
+
+```text
+{ "kind": "theme", "theme": "noir" }     // set
+{ "kind": "theme", "theme": null }       // cleared; NO text
+```
+
+| Rule | Why |
+| --- | --- |
+| Not a `FrameKind`. A phone that sends one gets `error` `bad frame` | Originates on the DO |
+| Not queued, no `id` / `seq` / `at`, not in the transcript | Reconnect must not replay "mood changed" as a turn |
+| Do not move `since`; do not toast / HUN / haptic / badge | Not a turn |
+| No `text` | Old Cab `Mouth.ingest` would paint the id as a bubble |
+| Unknown `theme` string → ignore | Same bar as `parseTheme` junk |
+
+**Paint.** On a known id, if follow is on, apply that palette (PWA
+`paintTheme` — does **not** overwrite the human's `pendant.theme`).
+Cache the id at `localStorage["pendant.roomTheme"]` so `THEME_BOOT`
+can apply it before the socket is up. On `theme: null`, drop the
+cache and fall back to `pendant.theme`. A human pick in Settings
+writes `pendant.theme` and sets follow **off**. `?theme=` for shots
+does the same.
+
+Catalog today: `boom` `inlay` `lamp` `noir` `ember` `tide` `bloom`.
+Boom / Inlay / Lamp hexes stay shared with gantree. New ids are
+additive; a mouth that does not know `noir` ignores the notice and
+keeps its current palette.
+
+**Cab.** `Look.kt` `THEME_IDS` matches the catalog (hexes in
+`CabPalette.kt`). `Mouth.roomTheme` plus `paintedTheme(follow, room, mine)`
+paints when follow is on. `ThemeApi` GETs `/api/theme?slug=` on connect
+(5xx leaves the last id; JSON `null` clears). Human chip pick writes
+`theme` and sets `followTheme` off.
+`SharedPreferences("cab")["followTheme"]` mirrors `pendant.followTheme`.
+`shouldSpeak` stays false. Auto HUNs do not care.
 
 ---
 

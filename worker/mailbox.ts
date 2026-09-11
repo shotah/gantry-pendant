@@ -1,6 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
 import { directoryApply, directoryRemember } from "../lib/auth/directory";
 import { encodeFaceNotice, packAvatar, AVATAR_STORE_KEY, displaySlug, type StoredAvatar } from "../lib/avatar/store";
+import { BACKDROP_STORE_KEY, encodeBackdropNotice, packBackdrop, type StoredBackdrop } from "../lib/backdrop/store";
+import { encodeThemeNotice, encodeThemeState, parseThemeWrite, THEME_STORE_KEY } from "../lib/theme/store";
+import { knownTheme } from "../lib/theme/catalog";
 import {
   ALLOW_HASH_KEY,
   ALLOW_STORE_KEY,
@@ -70,6 +73,32 @@ import { readVapid } from "../lib/push/vapid";
 
 const RATE_KEY = "rate";
 
+/** One JPEG per slug, served over HTTP and announced on every socket when it changes. */
+type StoredJpeg = StoredAvatar | StoredBackdrop;
+type BlobSpec = {
+  key: string;
+  pack: (bytes: Uint8Array, now: number) => { ok: true; stored: StoredJpeg } | { ok: false; detail: string };
+  notice: (rev: number) => string;
+  saved: string;
+  /** DELETE is allowed only when there is a "cleared" answer (the face has no empty state). */
+  cleared?: string;
+};
+
+const FACE_BLOB: BlobSpec = {
+  key: AVATAR_STORE_KEY,
+  pack: packAvatar,
+  notice: encodeFaceNotice,
+  saved: "saved avatar.jpg",
+};
+
+const BACKDROP_BLOB: BlobSpec = {
+  key: BACKDROP_STORE_KEY,
+  pack: packBackdrop,
+  notice: encodeBackdropNotice,
+  saved: "saved backdrop.jpg",
+  cleared: "cleared backdrop",
+};
+
 export class Mailbox extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -78,7 +107,13 @@ export class Mailbox extends DurableObject<Env> {
 
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("X-Pendant-Op") === "avatar") {
-      return this.avatarHttp(request);
+      return this.blobHttp(request, FACE_BLOB);
+    }
+    if (request.headers.get("X-Pendant-Op") === "backdrop") {
+      return this.blobHttp(request, BACKDROP_BLOB);
+    }
+    if (request.headers.get("X-Pendant-Op") === "theme") {
+      return this.themeHttp(request);
     }
     if (request.headers.get("X-Pendant-Op") === "allow") {
       return this.allowHttp();
@@ -303,9 +338,9 @@ export class Mailbox extends DurableObject<Env> {
     }
   }
 
-  private async avatarHttp(request: Request): Promise<Response> {
+  private async blobHttp(request: Request, blob: BlobSpec): Promise<Response> {
     if (request.method === "GET") {
-      const hit = await this.ctx.storage.get<StoredAvatar>(AVATAR_STORE_KEY);
+      const hit = await this.ctx.storage.get<StoredJpeg>(blob.key);
       if (!hit) {
         return new Response(null, { status: 404 });
       }
@@ -319,16 +354,55 @@ export class Mailbox extends DurableObject<Env> {
     }
     if (request.method === "PUT" || request.method === "POST") {
       const bytes = new Uint8Array(await request.arrayBuffer());
-      const packed = packAvatar(bytes, Date.now());
+      const packed = blob.pack(bytes, Date.now());
       if (!packed.ok) {
         return Response.json({ error: packed.detail }, { status: 400 });
       }
-      await this.ctx.storage.put(AVATAR_STORE_KEY, packed.stored);
-      const notice = encodeFaceNotice(packed.stored.rev);
-      for (const sock of this.ctx.getWebSockets()) {
-        sock.send(notice);
+      await this.ctx.storage.put(blob.key, packed.stored);
+      this.announce(blob.notice(packed.stored.rev));
+      return Response.json({ ok: true, rev: packed.stored.rev, detail: blob.saved });
+    }
+    if (request.method === "DELETE" && blob.cleared) {
+      await this.ctx.storage.delete(blob.key);
+      this.announce(blob.notice(0));
+      return Response.json({ ok: true, rev: 0, detail: blob.cleared });
+    }
+    return new Response("method", { status: 405 });
+  }
+
+  /** Every socket in the room, crane included — it ignores frames with no `user_id`. */
+  private announce(body: string): void {
+    for (const sock of this.ctx.getWebSockets()) {
+      sock.send(body);
+    }
+  }
+
+  private async themeHttp(request: Request): Promise<Response> {
+    if (request.method === "GET") {
+      const stored = await this.ctx.storage.get<string>(THEME_STORE_KEY);
+      return new Response(encodeThemeState(knownTheme(stored)), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (request.method === "PUT" || request.method === "POST") {
+      let raw: unknown;
+      try {
+        raw = await request.json();
+      } catch {
+        return Response.json({ error: "bad theme" }, { status: 400 });
       }
-      return Response.json({ ok: true, rev: packed.stored.rev, detail: "saved avatar.jpg" });
+      const got = parseThemeWrite(raw);
+      if (!got.ok) {
+        return Response.json({ error: got.detail }, { status: 400 });
+      }
+      await this.ctx.storage.put(THEME_STORE_KEY, got.theme);
+      this.announce(encodeThemeNotice(got.theme));
+      return Response.json({ ok: true, theme: got.theme, detail: `theme ${got.theme}` });
+    }
+    if (request.method === "DELETE") {
+      await this.ctx.storage.delete(THEME_STORE_KEY);
+      this.announce(encodeThemeNotice(null));
+      return Response.json({ ok: true, theme: null, detail: "cleared theme" });
     }
     return new Response("method", { status: 405 });
   }
@@ -404,6 +478,10 @@ export class Mailbox extends DurableObject<Env> {
       const cmds = await this.ctx.storage.get<string>(CMDS_STORE_KEY);
       if (cmds) {
         ws.send(cmds);
+      }
+      const storedTheme = knownTheme(await this.ctx.storage.get<string>(THEME_STORE_KEY));
+      if (storedTheme) {
+        ws.send(encodeThemeNotice(storedTheme));
       }
       await this.sendTranscript(ws, userId);
       const items = await this.loadQueue();

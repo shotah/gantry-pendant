@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { GEO_PREF_KEY, geoPrefOn, PHOTO_PREF_KEY, photoSizePref, writeGeoPref, writePhotoSizePref } from "@/lib/phone/prefs";
+import {
+  BACKDROP_PREF_KEY,
+  backdropPrefOn,
+  FOLLOW_THEME_PREF_KEY,
+  followThemePrefOn,
+  GEO_PREF_KEY,
+  geoPrefOn,
+  PHOTO_PREF_KEY,
+  photoSizePref,
+  writeBackdropPref,
+  writeFollowThemePref,
+  writeGeoPref,
+  writePhotoSizePref,
+} from "@/lib/phone/prefs";
 
 function memStorage() {
   const mem = new Map<string, string>();
@@ -37,5 +50,33 @@ describe("geo pref", () => {
     expect(geoPrefOn(storage)).toBe(false);
     writeGeoPref(storage, true);
     expect(geoPrefOn(storage)).toBe(true);
+  });
+});
+
+describe("backdrop pref", () => {
+  it("defaults on (Kit's wallpaper shows) and only off hides it", () => {
+    const { mem, storage } = memStorage();
+    expect(backdropPrefOn(null)).toBe(true);
+    expect(backdropPrefOn(storage)).toBe(true);
+    writeBackdropPref(storage, false);
+    expect(mem.get(BACKDROP_PREF_KEY)).toBe("off");
+    expect(backdropPrefOn(storage)).toBe(false);
+    writeBackdropPref(storage, true);
+    expect(backdropPrefOn(storage)).toBe(true);
+    expect(BACKDROP_PREF_KEY).toBe("pendant.backdrop");
+  });
+});
+
+describe("follow theme pref", () => {
+  it("defaults on (Kit's room theme paints) and only off keeps yours", () => {
+    const { mem, storage } = memStorage();
+    expect(followThemePrefOn(null)).toBe(true);
+    expect(followThemePrefOn(storage)).toBe(true);
+    writeFollowThemePref(storage, false);
+    expect(mem.get(FOLLOW_THEME_PREF_KEY)).toBe("off");
+    expect(followThemePrefOn(storage)).toBe(false);
+    writeFollowThemePref(storage, true);
+    expect(followThemePrefOn(storage)).toBe(true);
+    expect(FOLLOW_THEME_PREF_KEY).toBe("pendant.followTheme");
   });
 });

@@ -115,7 +115,12 @@ beforeEach(() => {
   window.localStorage.removeItem("pendant.geo");
   window.localStorage.removeItem("pendant.font");
   window.localStorage.removeItem("pendant.photo");
+  window.localStorage.removeItem("pendant.backdrop");
+  window.localStorage.removeItem("pendant.followTheme");
+  window.localStorage.removeItem("pendant.roomTheme");
+  window.localStorage.removeItem("pendant.theme");
   document.documentElement.removeAttribute("data-font");
+  document.documentElement.removeAttribute("data-theme");
 });
 
 afterEach(() => {
@@ -127,7 +132,12 @@ afterEach(() => {
   window.localStorage.removeItem("pendant.geo");
   window.localStorage.removeItem("pendant.font");
   window.localStorage.removeItem("pendant.photo");
+  window.localStorage.removeItem("pendant.backdrop");
+  window.localStorage.removeItem("pendant.followTheme");
+  window.localStorage.removeItem("pendant.roomTheme");
+  window.localStorage.removeItem("pendant.theme");
   document.documentElement.removeAttribute("data-font");
+  document.documentElement.removeAttribute("data-theme");
   Reflect.deleteProperty(navigator, "geolocation");
   Reflect.deleteProperty(navigator, "clipboard");
   Reflect.deleteProperty(navigator, "userAgent");
@@ -857,6 +867,127 @@ describe("PhoneShell", () => {
     const kit = screen.getByText("from kit").closest("div[class*='bg-kit']");
     expect(mine).toBeTruthy();
     expect(kit).toBeTruthy();
+  });
+
+  it("refetches Kit's backdrop on the notice without painting a bubble", async () => {
+    const ws = await connectSpike();
+    const fetches: string[] = [];
+    const inner = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input: RequestInfo) => {
+      fetches.push(String(input));
+      return inner(input);
+    });
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "backdrop", rev: 42 }));
+    });
+    await waitFor(() => expect(fetches.some((u) => u.includes("/api/backdrop?slug=kit&v=42"))).toBe(true));
+    expect(screen.getByText(/Nothing yet/)).toBeTruthy();
+    expect(screen.queryByText("42")).toBeNull();
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "backdrop", rev: 0 }));
+    });
+    await waitFor(() => expect(fetches.filter((u) => u.includes("/api/backdrop?slug=kit")).length).toBeGreaterThanOrEqual(2));
+    expect(fetches.at(-1)).toContain("/api/backdrop?slug=kit");
+    expect(fetches.at(-1)).not.toContain("v=");
+  });
+
+  it("keeps the backdrop off the thread when the setting is off", async () => {
+    window.localStorage.setItem("pendant.backdrop", "off");
+    const ws = await connectSpike();
+    const fetches: string[] = [];
+    const inner = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input: RequestInfo) => {
+      fetches.push(String(input));
+      return inner(input);
+    });
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "backdrop", rev: 42 }));
+    });
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    const toggle = screen.getByLabelText("Backdrop") as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+    expect(fetches.some((u) => u.includes("/api/backdrop"))).toBe(false);
+    fireEvent.click(toggle);
+    expect(window.localStorage.getItem("pendant.backdrop")).toBe("on");
+    await waitFor(() => expect(fetches.some((u) => u.includes("/api/backdrop?slug=kit&v=42"))).toBe(true));
+  });
+
+  it("paints Kit's room theme from the notice without a bubble", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "theme", theme: "noir" }));
+    });
+    expect(document.documentElement.getAttribute("data-theme")).toBe("noir");
+    expect(window.localStorage.getItem("pendant.roomTheme")).toBe("noir");
+    expect(window.localStorage.getItem("pendant.theme")).not.toBe("noir");
+    expect(screen.getByText(/Nothing yet/)).toBeTruthy();
+    expect(screen.queryByText("noir")).toBeNull();
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "theme", theme: null }));
+    });
+    expect(document.documentElement.getAttribute("data-theme")).toBe("boom");
+    expect(window.localStorage.getItem("pendant.roomTheme")).toBeNull();
+  });
+
+  it("keeps your pick when Follow Kit's mood is off", async () => {
+    window.localStorage.setItem("pendant.followTheme", "off");
+    window.localStorage.setItem("pendant.theme", "inlay");
+    document.documentElement.setAttribute("data-theme", "inlay");
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    const toggle = screen.getByLabelText("Follow Kit's mood") as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "theme", theme: "noir" }));
+    });
+    expect(document.documentElement.getAttribute("data-theme")).toBe("inlay");
+    expect(window.localStorage.getItem("pendant.roomTheme")).toBe("noir");
+    fireEvent.click(toggle);
+    expect(window.localStorage.getItem("pendant.followTheme")).toBe("on");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("noir");
+  });
+
+  it("picking a theme in settings stops following Kit", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "theme", theme: "noir" }));
+    });
+    expect(document.documentElement.getAttribute("data-theme")).toBe("noir");
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    expect((screen.getByLabelText("Follow Kit's mood") as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "color theme" }));
+    fireEvent.click(screen.getByRole("option", { name: "Ember" }));
+    expect(document.documentElement.getAttribute("data-theme")).toBe("ember");
+    expect(window.localStorage.getItem("pendant.theme")).toBe("ember");
+    expect(window.localStorage.getItem("pendant.followTheme")).toBe("off");
+    expect((screen.getByLabelText("Follow Kit's mood") as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("swallows a junk theme id instead of painting a bubble", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "theme", theme: "hotpink" }));
+    });
+    expect(screen.getByText(/Nothing yet/)).toBeTruthy();
+    expect(document.documentElement.getAttribute("data-theme")).not.toBe("hotpink");
   });
 
   it("does not treat inbound ack as typing", async () => {

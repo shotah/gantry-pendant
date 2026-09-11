@@ -6,7 +6,9 @@ the walks are real on a phone. Pitch: [README.md](../README.md). Why:
 [security.md](security.md). Who talks: [setup.md](setup.md). Other
 mouths: [frontends.md](frontends.md). Misses:
 [edgecases.md](edgecases.md). Typing dots:
-[agent_typing_response_todo.md](agent_typing_response_todo.md). Bugs and
+[agent_typing_response_todo.md](agent_typing_response_todo.md). Face,
+backdrop, and Kit's mood:
+[agent_ui_controls.md](agent_ui_controls.md). Bugs and
 security by phase: [audit_todo.md](audit_todo.md).
 
 A line is done when the **walk** works without a second brain. Scope is

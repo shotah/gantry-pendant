@@ -22,14 +22,26 @@ import { browserNotifyIncoming } from "@/app/lib/notify";
 import { browserSubscribePush } from "@/app/lib/push";
 import { isIos, isStandalone, signInHint } from "@/app/lib/install";
 import { fileToPhoto } from "@/app/lib/photo";
-import { browserGeoPref, browserPhotoSizePref, saveGeoPref, savePhotoSizePref } from "@/app/lib/prefs";
+import {
+  browserBackdropPref,
+  browserFollowThemePref,
+  browserGeoPref,
+  browserPhotoSizePref,
+  saveBackdropPref,
+  saveFollowThemePref,
+  saveGeoPref,
+  savePhotoSizePref,
+} from "@/app/lib/prefs";
 import { applyFont, fontFromQuery } from "@/app/lib/font";
 import { RELEASE } from "@/app/lib/release";
-import { applyTheme, themeFromQuery } from "@/app/lib/theme";
+import { applyTheme, cacheRoomTheme, cachedRoomTheme, paintTheme, parseTheme, THEME_KEY, themeFromQuery } from "@/app/lib/theme";
 import { browserWakeLock, releaseScreenWake, type WakeLockSentinel } from "@/app/lib/wake";
 import { authRetryFromQuery } from "@/lib/auth/bounce";
 import type { ConfigGap } from "@/lib/auth/mode";
 import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
+import { backdropRevFromUnknown } from "@/lib/backdrop/store";
+import { themeIdFromUnknown, isThemeNotice } from "@/lib/theme/store";
+import { Backdrop } from "./Backdrop";
 import { parseSlug } from "@/lib/mailbox/slug";
 import { buildContext } from "@/lib/phone/context";
 import { GEO_TIMEOUT_MS, GEO_WARM_MS, cachedGeo, geoHint } from "@/lib/phone/geo";
@@ -106,6 +118,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [sampleEmoji, setSampleEmoji] = useState(false);
   const [catalog, setCatalog] = useState<SlashCommand[]>([]);
   const [avatarRev, setAvatarRev] = useState(0);
+  const [backdropRev, setBackdropRev] = useState(0);
+  const [backdropOn, setBackdropOn] = useState(true);
+  const [followTheme, setFollowTheme] = useState(true);
   const [faceHint, setFaceHint] = useState("");
   const [sendHint, setSendHint] = useState("");
   const [copied, setCopied] = useState(false);
@@ -132,6 +147,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [typing, setTyping] = useState(false);
   const typingTimer = useRef(0);
   const gpsOnRef = useRef(true);
+  const followThemeRef = useRef(true);
   const geoWarm = useRef(false);
   const phone = role === "phone";
   const painting = Boolean(cfg?.dev && sampleId);
@@ -177,6 +193,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     }
     const theme = themeFromQuery(q.get("theme"));
     if (theme) {
+      saveFollowThemePref(false);
+      followThemeRef.current = false;
+      setFollowTheme(false);
       applyTheme(theme);
     }
     const font = fontFromQuery(q.get("font"));
@@ -269,6 +288,10 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       setGpsHint("GPS off");
     }
     setPhotoSize(browserPhotoSizePref());
+    setBackdropOn(browserBackdropPref());
+    const follow = browserFollowThemePref();
+    followThemeRef.current = follow;
+    setFollowTheme(follow);
     setPrefsReady(true);
   }, [phone]);
 
@@ -493,6 +516,26 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       const face = faceRevFromUnknown(frame);
       if (face) {
         setAvatarRev(face);
+        return;
+      }
+      const backdrop = backdropRevFromUnknown(frame);
+      if (backdrop != null) {
+        setBackdropRev(backdrop);
+        return;
+      }
+      if (isThemeNotice(frame)) {
+        const roomTheme = themeIdFromUnknown(frame);
+        if (roomTheme === "") {
+          cacheRoomTheme(null);
+          if (phone && followThemeRef.current) {
+            paintTheme(parseTheme(window.localStorage.getItem(THEME_KEY)));
+          }
+        } else if (roomTheme) {
+          cacheRoomTheme(roomTheme);
+          if (phone && followThemeRef.current) {
+            paintTheme(roomTheme);
+          }
+        }
         return;
       }
       if (frame.kind === "cmds") {
@@ -839,6 +882,37 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     setPhotoSize(next);
   }
 
+  function toggleBackdrop() {
+    setBackdropOn((on) => {
+      const next = !on;
+      saveBackdropPref(next);
+      return next;
+    });
+  }
+
+  function pickHumanTheme() {
+    saveFollowThemePref(false);
+    followThemeRef.current = false;
+    setFollowTheme(false);
+  }
+
+  function toggleFollowTheme() {
+    setFollowTheme((on) => {
+      const next = !on;
+      saveFollowThemePref(next);
+      followThemeRef.current = next;
+      if (next) {
+        const room = cachedRoomTheme();
+        if (room) {
+          paintTheme(room);
+        }
+      } else {
+        applyTheme(parseTheme(document.documentElement.getAttribute("data-theme")));
+      }
+      return next;
+    });
+  }
+
   async function sendPhoto(file: File) {
     setSendHint("");
     const got = await fileToPhoto(file, { edge: photoEdge(photoSize) });
@@ -878,6 +952,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     editable: canEditFace,
     onRev: setAvatarRev,
     onError: setFaceHint,
+    ...faceAuth,
+  };
+  const backdropProps = {
+    slug: listed ? roomSlug : "",
+    rev: backdropRev,
     ...faceAuth,
   };
 
@@ -949,22 +1028,25 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   } else {
     mouth = (
       <>
-        <div
-          ref={scroller}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]"
-          onScroll={onThreadScroll}
-        >
-          <Thread
-            messages={messages}
-            empty={(
-              <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
-                <KitAvatar {...faceProps} size="lg" editable={false} />
-                <p className="text-chat text-dim">
-                  Nothing yet. Type below — or / for harness commands.
-                </p>
-              </div>
-            )}
-          />
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          {phone && backdropOn ? <Backdrop {...backdropProps} /> : null}
+          <div
+            ref={scroller}
+            className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]"
+            onScroll={onThreadScroll}
+          >
+            <Thread
+              messages={messages}
+              empty={(
+                <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
+                  <KitAvatar {...faceProps} size="lg" editable={false} />
+                  <p className="text-chat text-dim">
+                    Nothing yet. Type below — or / for harness commands.
+                  </p>
+                </div>
+              )}
+            />
+          </div>
         </div>
         <Compose
           key={`${sampleId ?? "live"}:${draft}:${sampleEmoji ? "emoji" : ""}`}
@@ -1080,8 +1162,19 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
               : null}
             <div className="flex flex-col gap-1">
               <span className="text-xs text-muted">Theme</span>
-              <ThemeSelect />
+              <ThemeSelect onHumanPick={phone ? pickHumanTheme : undefined} />
             </div>
+            {phone
+              ? (
+                  <div className="flex flex-col gap-1">
+                    <label className="flex items-center gap-2 text-xs text-muted">
+                      <input type="checkbox" checked={followTheme} onChange={toggleFollowTheme} />
+                      Follow Kit&apos;s mood
+                    </label>
+                    <p className="text-[11px] text-dim">{`When on, ${title} picks the color theme. Off keeps the one you pick.`}</p>
+                  </div>
+                )
+              : null}
             <div className="flex flex-col gap-1">
               <span className="text-xs text-muted">Font size</span>
               <FontSelect />
@@ -1102,6 +1195,17 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                       </select>
                     </label>
                     <p className="text-[11px] text-dim">Smaller sends faster and costs fewer tokens to look at.</p>
+                  </div>
+                )
+              : null}
+            {phone
+              ? (
+                  <div className="flex flex-col gap-1">
+                    <label className="flex items-center gap-2 text-xs text-muted">
+                      <input type="checkbox" checked={backdropOn} onChange={toggleBackdrop} />
+                      Backdrop
+                    </label>
+                    <p className="text-[11px] text-dim">{`${title} can paint a wallpaper behind the thread. Off keeps the theme.`}</p>
                   </div>
                 )
               : null}

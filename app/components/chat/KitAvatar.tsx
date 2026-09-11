@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { uploadAvatarFile } from "@/app/lib/avatar";
+import { useBlobUrl } from "@/app/lib/blobUrl";
 import { avatarRequestPath } from "@/lib/avatar/http";
 import { displaySlug } from "@/lib/avatar/store";
 
@@ -32,48 +33,10 @@ export function KitAvatar({
   onRev?: (rev: number) => void;
   onError?: (msg: string) => void;
 }) {
-  const [src, setSrc] = useState(FALLBACK);
+  const src = useBlobUrl(slug ? avatarRequestPath({ slug, rev, secret, bearer }) : null, FALLBACK);
   const fileRef = useRef<HTMLInputElement>(null);
   const dim = DIM[size];
   const name = displaySlug(slug);
-
-  useEffect(() => {
-    if (!slug) {
-      setSrc(FALLBACK);
-      return;
-    }
-    let dead = false;
-    let obj = "";
-    const path = avatarRequestPath({ slug, rev, secret, bearer });
-    void (async () => {
-      try {
-        const res = await fetch(path, { credentials: "include" });
-        if (!res.ok) {
-          if (!dead) {
-            setSrc(FALLBACK);
-          }
-          return;
-        }
-        const blob = await res.blob();
-        obj = URL.createObjectURL(blob);
-        if (!dead) {
-          setSrc(obj);
-        } else {
-          URL.revokeObjectURL(obj);
-        }
-      } catch {
-        if (!dead) {
-          setSrc(FALLBACK);
-        }
-      }
-    })();
-    return () => {
-      dead = true;
-      if (obj) {
-        URL.revokeObjectURL(obj);
-      }
-    };
-  }, [slug, rev, secret, bearer]);
 
   const img = (
     <img src={src} alt="" className={`${dim} shrink-0 rounded-full object-cover bg-track`} />

@@ -210,6 +210,15 @@ from `ChatID` (Google `sub`).
 - Kit's face (`POST /api/avatar`) may be written by a listed phone or
   the crane bearer. Family mouth: Ada changing Kit's photo is fine.
   Cap is 5 MB JPEG; check `Content-Length` before buffering.
+- Kit's backdrop (`POST` / `DELETE /api/backdrop`) is the same door and
+  the same writers. Cap is 1.5 MB JPEG (a Durable Object row is 2 MB);
+  same `Content-Length` check. The crane bearer is header-only and bound
+  to its slug, so an agent can only repaint its own room. Blob writes
+  have no rate limit yet — [agent_ui_controls.md](agent_ui_controls.md).
+- Kit's theme (`POST` / `DELETE /api/theme`) is the same door. Body is
+  a catalog id (`boom` / `inlay` / `lamp` / `noir` / `ember` / `tide` /
+  `bloom`), never raw hex. The human can unfollow (`pendant.followTheme`)
+  and keep their own palette.
 - Web Push subscriptions (endpoint + keys) live on the crane's Durable
   Object, keyed by Google `sub`. Yanking a person from the room list
   drops them. A 410 from the push service drops that device. Do not log
