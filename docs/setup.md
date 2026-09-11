@@ -208,9 +208,13 @@ The human does **not** need a Gantree login.
 1. Admin has already put them on Kit’s list and recreated.
 2. Open the pendant origin (HTTPS, or `http://127.0.0.1:3000` on a
    laptop). Chrome: **Install** in the address bar (desktop) or the
-   menu (Android). iPhone Safari: Share → Add to Home Screen. Vinext
+   menu (Android). iPhone: stay in Safari until step 3 is done. Vinext
    serves the web app manifest at `/manifest.webmanifest`.
-3. Sign in with Google.
+3. Sign in with Google. iPhone: **now** Share → Add to Home Screen; iOS
+   16.7+ copies the Safari session into the app. Signing in from the
+   Home Screen app also works, but iOS hands Google's callback to the
+   in-app browser and the app both — the loser lands on `/?auth=retry`
+   with a hint, never a 401.
 4. Pick Kit from the crane list. Empty list: “not on any crane yet”
    with their email and `sub` to send the yard admin. Grant location
    if they want `[last pin]` this-send. Denied still sends text.

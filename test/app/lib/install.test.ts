@@ -5,6 +5,7 @@ import {
   isIos,
   isStandalone,
   listenInstallPrompt,
+  signInHint,
   writeInstallHint,
 } from "@/app/lib/install";
 
@@ -40,6 +41,21 @@ describe("install", () => {
     target.dispatchEvent(new Event("appinstalled"));
     expect(onChange).toHaveBeenLastCalledWith(null);
     stop();
+  });
+
+  it("tells iPhone Safari to sign in before Add to Home Screen", () => {
+    expect(signInHint({ ios: true, standalone: false, retry: false }))
+      .toBe("Sign in here first, then Share → Add to Home Screen. The app keeps the sign-in.");
+    expect(signInHint({ ios: false, standalone: false, retry: false })).toBe("");
+    expect(signInHint({ ios: true, standalone: true, retry: false })).toBe("");
+  });
+
+  it("explains a bounced Google round-trip, with the Safari route on an iPhone app", () => {
+    expect(signInHint({ ios: false, standalone: false, retry: true })).toBe("Google didn't finish. Try again.");
+    expect(signInHint({ ios: true, standalone: false, retry: true })).toBe("Google didn't finish. Try again.");
+    expect(signInHint({ ios: true, standalone: true, retry: true })).toBe(
+      "Google didn't finish. Try again, or open pendant in Safari, sign in there, then Add to Home Screen again.",
+    );
   });
 
   it("defaults the header hint on and only treats off as dismissed", () => {

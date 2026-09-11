@@ -24,7 +24,8 @@ function CloseIcon() {
   );
 }
 
-export function InstallApp({ placement }: { placement: "header" | "block" }) {
+/** `signInFirst`: iOS copies Safari's session into a new Home Screen app, so order matters there. */
+export function InstallApp({ placement, signInFirst = false }: { placement: "header" | "block"; signInFirst?: boolean }) {
   const [choice, setChoice] = useState<InstallChoice | null>(null);
   const [standalone, setStandalone] = useState(false);
   const [ios, setIos] = useState(false);
@@ -85,7 +86,9 @@ export function InstallApp({ placement }: { placement: "header" | "block" }) {
   return (
     <p className="text-xs text-dim">
       {ios
-        ? "Share → Add to Home Screen"
+        ? signInFirst
+          ? "Sign in first, then Share → Add to Home Screen"
+          : "Share → Add to Home Screen"
         : "Chrome menu → Cast, save and share → Install pendant"}
     </p>
   );

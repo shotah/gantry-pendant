@@ -36,6 +36,8 @@ export type WireFrame = {
   user_id?: string;
   email?: string;
   id?: string;
+  seq?: number;
+  at?: number;
   since?: string;
   commands?: SlashCommand[];
   users?: RoomUser[];
@@ -158,6 +160,54 @@ function parseIdField(raw: unknown): string | ParseErr | undefined {
   return raw.length ? raw : undefined;
 }
 
+/** Mailbox sequence; 1-based. Ignore junk so an old client cannot poison a frame. */
+export function orderSeq(raw: unknown): number | undefined {
+  if (typeof raw !== "number" || !Number.isSafeInteger(raw) || raw < 1) {
+    return undefined;
+  }
+  return raw;
+}
+
+/** Epoch ms when the mailbox accepted the frame. */
+export function orderAt(raw: unknown): number | undefined {
+  if (typeof raw !== "number" || !Number.isSafeInteger(raw) || raw < 0) {
+    return undefined;
+  }
+  return raw;
+}
+
+/** Drop client-supplied order so only the mailbox stamps seq/at. */
+export function stripClientOrder(frame: WireFrame): WireFrame {
+  const next = { ...frame };
+  delete next.seq;
+  delete next.at;
+  return next;
+}
+
+/** Put queue seq/at on a stored body so catch-up paints in mailbox order. */
+export function stampOrderOnBody(body: string, meta: { seq?: number; at?: number }): string {
+  const seq = orderSeq(meta.seq);
+  const at = orderAt(meta.at);
+  if (seq == null && at == null) {
+    return body;
+  }
+  const parsed = parseFrame(body);
+  if (!parsed.ok) {
+    return body;
+  }
+  const frame = { ...parsed.frame };
+  let changed = false;
+  if (seq != null && frame.seq !== seq) {
+    frame.seq = seq;
+    changed = true;
+  }
+  if (at != null && frame.at !== at) {
+    frame.at = at;
+    changed = true;
+  }
+  return changed ? encodeFrame(frame) : body;
+}
+
 const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds", "allow", "typing", "draft"]);
 
 /** Parse a mailbox frame. Never logs the body. */
@@ -221,6 +271,14 @@ export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseO
   }
   if (since) {
     frame.since = since;
+  }
+  const seq = orderSeq(o.seq);
+  if (seq != null) {
+    frame.seq = seq;
+  }
+  const at = orderAt(o.at);
+  if (at != null) {
+    frame.at = at;
   }
   const images = parseImages(o.images, opts?.role);
   if (!Array.isArray(images)) {

@@ -164,6 +164,8 @@ You cannot run telegram + pendant in the same process.
 | Gotcha | What happens | Cover |
 | --- | --- | --- |
 | iPhone “Add to Home Screen” | installable; background is still weak | confirm on-device (P5 walk still open); needs `apple-touch-icon` PNG |
+| iPhone Google from the Home Screen app | iOS loads the callback in the in-app browser **and** the app; the loser has no state cookie or a spent code | callback 302s to `/?auth=retry` (no 401 for humans); shell hints Safari sign-in → Add to Home Screen (iOS 16.7+ copies the session) |
+| iPhone status bar over the header | `black-translucent` + `viewport-fit=cover` draws the shell under the clock | shell and login pad `env(safe-area-inset-top)` |
 | Android / desktop Chrome Install | needs HTTPS (`workers.dev` is; loopback counts) plus 192×192 and 512×512 **PNG** icons | Vinext `app/manifest.ts` → `/manifest.webmanifest`; SVG-only fails Chromium’s rule |
 | Chrome Install never appears | already installed, or no click + 30s on the page (engagement heuristic) | DevTools → Application → Manifest still shows Install |
 | GPS denied / HTTP / no gesture / toggle off | message still sends; no `context.geo` | expected; do not block send |

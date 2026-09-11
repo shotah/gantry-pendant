@@ -9,7 +9,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
   window.localStorage.removeItem("pendant.install");
   Reflect.deleteProperty(window, "matchMedia");
+  Reflect.deleteProperty(navigator, "userAgent");
 });
+
+function stubIphone() {
+  Object.defineProperty(navigator, "userAgent", {
+    configurable: true,
+    value: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1",
+  });
+}
 
 function firePrompt(prompt: () => Promise<unknown>) {
   const ev = new Event("beforeinstallprompt", { cancelable: true, bubbles: true });
@@ -24,6 +32,19 @@ describe("InstallApp", () => {
     render(<InstallApp placement="block" />);
     expect(screen.getByText(/Cast, save and share/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Install app" })).toBeNull();
+  });
+
+  it("puts sign-in before Add to Home Screen on an iPhone that still needs Google", () => {
+    stubIphone();
+    render(<InstallApp placement="block" signInFirst />);
+    expect(screen.getByText("Sign in first, then Share → Add to Home Screen")).toBeTruthy();
+    expect(screen.queryByText(/Cast, save and share/)).toBeNull();
+  });
+
+  it("keeps the plain Share hint once the iPhone is signed in", () => {
+    stubIphone();
+    render(<InstallApp placement="block" />);
+    expect(screen.getByText("Share → Add to Home Screen")).toBeTruthy();
   });
 
   it("prompts from the header once Chrome offers install", async () => {

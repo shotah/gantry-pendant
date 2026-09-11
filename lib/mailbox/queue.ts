@@ -103,8 +103,15 @@ function destOf(item: Queued): string {
   return destKey(item.to, item.userId);
 }
 
+export function compareQueued(a: Pick<Queued, "seq" | "at" | "id">, b: Pick<Queued, "seq" | "at" | "id">): number {
+  if (a.seq != null && b.seq != null && a.seq !== b.seq) {
+    return a.seq - b.seq;
+  }
+  return a.at - b.at || a.id.localeCompare(b.id);
+}
+
 function older(a: Queued, b: Queued): boolean {
-  return a.at < b.at || (a.at === b.at && a.id < b.id);
+  return compareQueued(a, b) < 0;
 }
 
 function bytesOf(items: Queued[]): number {
@@ -143,7 +150,7 @@ export function queuedFromList(rows: Iterable<[string, Queued]>): Queued[] {
   for (const [, value] of rows) {
     items.push(value);
   }
-  items.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
+  items.sort(compareQueued);
   return items;
 }
 
@@ -198,7 +205,7 @@ export function peekFor(
   const sinceSeq = opts.sinceSeq ?? seqForSince(live, opts.since);
   return live.filter((m) => (
     matchesFlush(m, to, opts.userId) && afterCursor(m, { since: opts.since, sinceSeq })
-  ));
+  )).sort(compareQueued);
 }
 
 export function drainFor(
@@ -209,7 +216,7 @@ export function drainFor(
   userId?: string,
 ): { kept: Queued[]; take: Queued[] } {
   const live = pruneQueue(items, now, ttlMs);
-  const take = live.filter((m) => matchesFlush(m, to, userId));
+  const take = live.filter((m) => matchesFlush(m, to, userId)).sort(compareQueued);
   const kept = live.filter((m) => !matchesFlush(m, to, userId));
   return { kept, take };
 }

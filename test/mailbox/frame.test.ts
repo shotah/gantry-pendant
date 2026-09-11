@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CONTEXT_JSON_MAX, FRAME_BYTES_MAX, TEXT_MAX } from "@/lib/mailbox/caps";
-import { encodeFrame, hasGeo, isBareGeo, parseFrame, peerOf, type ParseResult } from "@/lib/mailbox/frame";
+import { encodeFrame, hasGeo, isBareGeo, parseFrame, peerOf, stampOrderOnBody, stripClientOrder, type ParseResult } from "@/lib/mailbox/frame";
 
 function failMsg(r: ParseResult): string {
   return r.ok ? "ok" : r.error;
@@ -135,6 +135,22 @@ describe("frame", () => {
       email: "Ada@Example.com",
     }));
     expect(stamped.ok && stamped.frame.email).toBe("ada@example.com");
+  });
+
+  it("keeps mailbox seq and at and ignores junk order", () => {
+    const got = parseFrame(JSON.stringify({ text: "hi", id: "m1", seq: 3, at: 1_700_000_000_000 }));
+    expect(got.ok && got.frame.seq).toBe(3);
+    expect(got.ok && got.frame.at).toBe(1_700_000_000_000);
+    const junk = parseFrame(JSON.stringify({ text: "hi", seq: 0, at: -1 }));
+    expect(junk.ok).toBe(true);
+    if (junk.ok) {
+      expect(junk.frame.seq).toBeUndefined();
+      expect(junk.frame.at).toBeUndefined();
+    }
+    expect(stampOrderOnBody('{"text":"hi","id":"m1"}', { seq: 4, at: 9 })).toBe(
+      encodeFrame({ text: "hi", id: "m1", seq: 4, at: 9 }),
+    );
+    expect(stripClientOrder({ text: "hi", seq: 9, at: 1 })).toEqual({ text: "hi" });
   });
 
   it("parses and encodes a short frame id", () => {

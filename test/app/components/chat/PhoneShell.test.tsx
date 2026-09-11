@@ -127,6 +127,8 @@ afterEach(() => {
   document.documentElement.removeAttribute("data-font");
   Reflect.deleteProperty(navigator, "geolocation");
   Reflect.deleteProperty(navigator, "clipboard");
+  Reflect.deleteProperty(navigator, "userAgent");
+  Reflect.deleteProperty(navigator, "standalone");
   Reflect.deleteProperty(document, "hidden");
   Reflect.deleteProperty(document, "visibilityState");
   FakeSocket.instances = [];
@@ -152,11 +154,16 @@ describe("PhoneShell", () => {
     const shell = container.querySelector("[data-shot=phone]");
     expect(shell).toBeTruthy();
     const shellClass = shell?.className.split(/\s+/) ?? [];
-    expect(shellClass).toEqual(expect.arrayContaining(["h-dvh", "overflow-hidden"]));
+    expect(shellClass).toEqual(expect.arrayContaining([
+      "h-dvh",
+      "overflow-hidden",
+      "pt-[env(safe-area-inset-top)]",
+      "pb-[env(safe-area-inset-bottom)]",
+    ]));
     expect(shellClass).not.toContain("min-h-dvh");
     const thread = shell?.querySelector(".overflow-y-auto");
     expect(thread?.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(["min-h-0", "flex-1", "overflow-y-auto"]),
+      expect.arrayContaining(["min-h-0", "flex-1", "overflow-y-auto", "[overflow-anchor:none]"]),
     );
   });
 
@@ -175,6 +182,40 @@ describe("PhoneShell", () => {
     expect(await screen.findByText("Sign in with Google to talk.")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Continue with Google" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Change Kit's photo" })).toBeNull();
+    expect(screen.queryByText(/Add to Home Screen/)).toBeNull();
+    expect(screen.queryByText(/Google didn't finish/)).toBeNull();
+  });
+
+  it("tells iPhone Safari to sign in before Add to Home Screen", async () => {
+    Object.defineProperty(navigator, "userAgent", {
+      configurable: true,
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1",
+    });
+    stubOidc(null);
+    render(<PhoneShell />);
+    expect(await screen.findByRole("link", { name: "Continue with Google" })).toBeTruthy();
+    expect(screen.getByText(/Sign in here first, then Share → Add to Home Screen/)).toBeTruthy();
+  });
+
+  it("explains a bounced Google round-trip from ?auth=retry", async () => {
+    window.history.replaceState({}, "", "/?auth=retry");
+    stubOidc(null);
+    render(<PhoneShell />);
+    expect(await screen.findByRole("link", { name: "Continue with Google" })).toBeTruthy();
+    expect(screen.getByText("Google didn't finish. Try again.")).toBeTruthy();
+  });
+
+  it("points a bounced iPhone Home Screen app back through Safari", async () => {
+    window.history.replaceState({}, "", "/?auth=retry");
+    Object.defineProperty(navigator, "userAgent", {
+      configurable: true,
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148",
+    });
+    Object.defineProperty(navigator, "standalone", { configurable: true, value: true });
+    stubOidc(null);
+    render(<PhoneShell />);
+    expect(await screen.findByRole("link", { name: "Continue with Google" })).toBeTruthy();
+    expect(screen.getByText(/open pendant in Safari, sign in there, then Add to Home Screen again/)).toBeTruthy();
   });
 
   it("says a crane is missing instead of offering Google", async () => {
@@ -416,6 +457,106 @@ describe("PhoneShell", () => {
       document.dispatchEvent(new Event("freeze"));
     });
     expect(first.readyState).toBe(FakeSocket.CLOSED);
+  });
+
+  it("paints catch-up by seq even when frames arrive out of order", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({
+        id: "b",
+        kind: "reply",
+        text: "second",
+        seq: 2,
+        at: 20,
+      }));
+      ws.deliver(JSON.stringify({
+        id: "a",
+        kind: "reply",
+        text: "first",
+        seq: 1,
+        at: 10,
+      }));
+    });
+    const items = screen.getAllByRole("listitem");
+    expect(items.map((el) => el.textContent)).toEqual(["first", "second"]);
+  });
+
+  it("keeps a draft last while catch-up slots in above it", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "⏳ spinning up" }));
+      ws.deliver(JSON.stringify({
+        id: "late",
+        kind: "inbound",
+        text: "I already sent this",
+        seq: 1,
+        at: 10,
+      }));
+    });
+    const items = screen.getAllByRole("listitem");
+    expect(items.map((el) => el.textContent)).toEqual(["I already sent this", "⏳ spinning up"]);
+  });
+
+  it("acks the highest seq after out-of-order catch-up", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "b", kind: "reply", text: "second", seq: 2, at: 20 }));
+      ws.deliver(JSON.stringify({ id: "a", kind: "reply", text: "first", seq: 1, at: 10 }));
+    });
+    act(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    const next = liveSocket();
+    act(() => {
+      next.open();
+    });
+    expect(next.send).toHaveBeenCalledWith(JSON.stringify({ kind: "ack", since: "2" }));
+  });
+
+  it("does not yank the thread to the bottom after you scroll up", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    const thread = document.querySelector(".overflow-y-auto") as HTMLDivElement;
+    Object.defineProperty(thread, "scrollHeight", { configurable: true, get: () => 1000 });
+    Object.defineProperty(thread, "clientHeight", { configurable: true, get: () => 200 });
+    Object.defineProperty(thread, "scrollTop", { configurable: true, writable: true, value: 0 });
+    fireEvent.scroll(thread);
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "⏳ spinning up" }));
+    });
+    expect(thread.scrollTop).toBe(0);
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "⏳ spinning up\nMaking Calls" }));
+    });
+    expect(thread.scrollTop).toBe(0);
+  });
+
+  it("stays pinned to the bottom while a draft grows", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    const thread = document.querySelector(".overflow-y-auto") as HTMLDivElement;
+    Object.defineProperty(thread, "scrollHeight", { configurable: true, get: () => 1000 });
+    Object.defineProperty(thread, "clientHeight", { configurable: true, get: () => 200 });
+    Object.defineProperty(thread, "scrollTop", { configurable: true, writable: true, value: 800 });
+    fireEvent.scroll(thread);
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "⏳ spinning up" }));
+    });
+    expect(thread.scrollTop).toBe(1000);
   });
 
   it("paints a flushed cron push as a Kit bubble", async () => {

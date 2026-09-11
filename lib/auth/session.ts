@@ -45,7 +45,7 @@ export async function readSession(
   now = Date.now(),
 ): Promise<SessionClaims | null> {
   try {
-    const { payload } = await jwtDecrypt(token, key(secret));
+    const { payload } = await jwtDecrypt(token, key(secret), { currentDate: new Date(now) });
     return claimsFrom(payload, now);
   } catch {
     return null;

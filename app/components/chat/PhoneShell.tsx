@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FontSelect } from "../shared/FontSelect";
 import { ThemeSelect } from "../shared/ThemeSelect";
 import type { SlashCommand } from "@/app/lib/slash";
@@ -12,7 +12,7 @@ import { NotifyEnable } from "./NotifyEnable";
 import { SettingsMenu } from "./SettingsMenu";
 import { bubbleFrom, Thread, type ChatBubble } from "./Thread";
 import { mailboxUrl, parseIncoming } from "@/app/lib/socket";
-import { capThread, rememberSeen } from "@/app/lib/thread";
+import { ackSince, advanceCursor, capThread, placeInThread, rememberSeen } from "@/app/lib/thread";
 import { browserBattery } from "@/app/lib/battery";
 import { browserBumpBadge, browserClearBadge } from "@/app/lib/badge";
 import { browserGeo } from "@/app/lib/geo";
@@ -20,11 +20,13 @@ import { browserBuzzPush } from "@/app/lib/haptic";
 import { browserNet } from "@/app/lib/net";
 import { browserNotifyIncoming } from "@/app/lib/notify";
 import { browserSubscribePush } from "@/app/lib/push";
+import { isIos, isStandalone, signInHint } from "@/app/lib/install";
 import { fileToPhoto } from "@/app/lib/photo";
 import { browserGeoPref, saveGeoPref } from "@/app/lib/prefs";
 import { applyFont, fontFromQuery } from "@/app/lib/font";
 import { applyTheme, themeFromQuery } from "@/app/lib/theme";
 import { browserWakeLock, releaseScreenWake, type WakeLockSentinel } from "@/app/lib/wake";
+import { authRetryFromQuery } from "@/lib/auth/bounce";
 import type { ConfigGap } from "@/lib/auth/mode";
 import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
 import { parseSlug } from "@/lib/mailbox/slug";
@@ -35,8 +37,9 @@ import {
   shouldReconnectMailbox,
   shouldRedialMailboxOnVisible,
 } from "@/lib/phone/socketLife";
+import { isPinnedToBottom, pinToBottom } from "@/lib/phone/threadScroll";
 import { recoverViewport, viewportShellHeight } from "@/lib/phone/viewport";
-import { encodeFrame, type Role, type WireFrame } from "@/lib/mailbox/frame";
+import { encodeFrame, orderAt, orderSeq, type Role, type WireFrame } from "@/lib/mailbox/frame";
 import { clearsTyping, TYPING_TTL_MS } from "@/lib/mailbox/typing";
 import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
 
@@ -102,6 +105,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [faceHint, setFaceHint] = useState("");
   const [copied, setCopied] = useState(false);
   const [meWait, setMeWait] = useState(false);
+  const [googleHint, setGoogleHint] = useState("");
   const wsRef = useRef<WebSocket | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -116,8 +120,10 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const backoffRef = useRef(BACKOFF_MS);
   const reconnectTimer = useRef(0);
   const lastSeenId = useRef<string | undefined>(undefined);
+  const lastSeenSeq = useRef(0);
   const seenIds = useRef(new Set<string>());
   const idSeq = useRef(0);
+  const pinned = useRef(true);
   const [typing, setTyping] = useState(false);
   const typingTimer = useRef(0);
   const gpsOnRef = useRef(true);
@@ -125,6 +131,28 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const phone = role === "phone";
   const painting = Boolean(cfg?.dev && sampleId);
   const localEcho = Boolean(cfg?.dev && !sampleId && phone);
+
+  function rememberCursor(id?: string, seq?: number) {
+    const next = advanceCursor({ id: lastSeenId.current, seq: lastSeenSeq.current }, { id, seq });
+    lastSeenId.current = next.id;
+    lastSeenSeq.current = next.seq;
+  }
+
+  const stickThread = useCallback(() => {
+    const node = scroller.current;
+    if (!node || !pinned.current) {
+      return;
+    }
+    pinToBottom(node);
+  }, []);
+
+  function onThreadScroll() {
+    const node = scroller.current;
+    if (!node) {
+      return;
+    }
+    pinned.current = isPinnedToBottom(node);
+  }
 
   function setMessages(update: ChatBubble[] | ((prev: ChatBubble[]) => ChatBubble[])) {
     if (typeof update === "function") {
@@ -150,6 +178,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     if (font) {
       applyFont(font);
     }
+    setGoogleHint(signInHint({
+      ios: isIos(navigator),
+      standalone: isStandalone(window, navigator),
+      retry: authRetryFromQuery(q),
+    }));
   }, []);
 
   useEffect(() => {
@@ -197,9 +230,22 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     }
   }, [cfg?.dev, sampleId, role]);
 
-  useEffect(() => {
-    scroller.current?.scrollTo?.({ top: scroller.current.scrollHeight });
-  }, [messages]);
+  useLayoutEffect(() => {
+    stickThread();
+    const node = scroller.current;
+    if (!node || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const inner = node.firstElementChild;
+    if (!inner) {
+      return;
+    }
+    const ro = new ResizeObserver(() => {
+      stickThread();
+    });
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [messages, stickThread]);
 
   useEffect(() => {
     setAvatarRev(0);
@@ -396,7 +442,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       }
       backoffRef.current = BACKOFF_MS;
       setStatus("up");
-      const since = lastSeenId.current;
+      const since = ackSince({ id: lastSeenId.current, seq: lastSeenSeq.current });
       if (since) {
         sendClientFrame(ws, { kind: "ack", since });
       }
@@ -468,16 +514,14 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           if (!text.trim()) {
             return rest;
           }
-          return [
-            ...rest,
-            {
-              id: DRAFT_BUBBLE_ID,
-              from: "kit",
-              text,
-              kind: "draft",
-              at: Date.now(),
-            },
-          ];
+          const prevDraft = prev.find((m) => m.id === DRAFT_BUBBLE_ID);
+          return placeInThread(rest, {
+            id: DRAFT_BUBBLE_ID,
+            from: "kit",
+            text,
+            kind: "draft",
+            at: prevDraft?.at ?? Date.now(),
+          });
         });
         return;
       }
@@ -487,6 +531,8 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         typingTimer.current = 0;
       }
       const id = clientFrameId(frame);
+      const seq = orderSeq(frame.seq);
+      const at = orderAt(frame.at);
       if (frame.kind === "ack") {
         if (id) {
           setMessages((prev) => prev.map((m) => (
@@ -496,8 +542,20 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         return;
       }
       if (id) {
-        lastSeenId.current = id;
+        rememberCursor(id, seq);
         if (seenIds.current.has(id)) {
+          setMessages((prev) => {
+            const hit = prev.find((m) => m.id === id);
+            if (!hit) {
+              return prev;
+            }
+            const nextSeq = seq ?? hit.seq;
+            const nextAt = at ?? hit.at;
+            if (nextSeq === hit.seq && nextAt === hit.at) {
+              return prev;
+            }
+            return placeInThread(prev, { ...hit, seq: nextSeq, at: nextAt });
+          });
           return;
         }
         rememberSeen(seenIds.current, id);
@@ -506,17 +564,15 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         const rest = frame.kind === "reply"
           ? prev.filter((m) => m.id !== DRAFT_BUBBLE_ID)
           : prev;
-        return [
-          ...rest,
-          {
-            id: id ?? `${Date.now()}-${rest.length}`,
-            from: bubbleFrom(phone, frame.kind),
-            text: frame.text ?? "",
-            kind: frame.kind,
-            at: Date.now(),
-            photo: frame.images?.[0]?.url,
-          },
-        ];
+        return placeInThread(rest, {
+          id: id ?? `${Date.now()}-${rest.length}`,
+          from: bubbleFrom(phone, frame.kind),
+          text: frame.text ?? "",
+          kind: frame.kind,
+          at: at ?? Date.now(),
+          seq,
+          photo: frame.images?.[0]?.url,
+        });
       });
       if (phone) {
         void releaseScreenWake(wakeRef.current);
@@ -681,17 +737,15 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       rememberSeen(seenIds.current, id);
     }
     if (outbound && id) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id,
-          from: phone ? "you" : "kit",
-          text: trimmed,
-          at: Date.now(),
-          photo,
-          pending: waitAck ? true : undefined,
-        },
-      ]);
+      pinned.current = true;
+      setMessages((prev) => placeInThread(prev, {
+        id,
+        from: phone ? "you" : "kit",
+        text: trimmed,
+        at: Date.now(),
+        photo,
+        pending: waitAck ? true : undefined,
+      }));
     }
     if (phone) {
       recoverViewport(window);
@@ -721,15 +775,12 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       echoCount.current += 1;
       window.clearTimeout(echoTimer.current);
       echoTimer.current = window.setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `${Date.now()}-echo`,
-            from: "kit",
-            text: nextMockReply(n),
-            at: Date.now(),
-          },
-        ]);
+        setMessages((prev) => placeInThread(prev, {
+          id: `${Date.now()}-echo`,
+          from: "kit",
+          text: nextMockReply(n),
+          at: Date.now(),
+        }));
         void dropWake();
       }, 400);
     }
@@ -818,6 +869,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         <a className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark" href="/api/auth/google">
           Continue with Google
         </a>
+        {googleHint
+          ? <p className="max-w-xs text-xs text-dim">{googleHint}</p>
+          : null}
       </main>
     );
   } else if (mailboxGap && cfg?.gap) {
@@ -874,7 +928,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   } else {
     mouth = (
       <>
-        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div
+          ref={scroller}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]"
+          onScroll={onThreadScroll}
+        >
           <Thread
             messages={messages}
             empty={(
@@ -908,7 +966,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   }
 
   return (
-    <div ref={shellRef} className="flex h-dvh flex-col overflow-hidden bg-canvas pb-[env(safe-area-inset-bottom)]" data-shot={phone ? "phone" : "crane"}>
+    <div ref={shellRef} className="flex h-dvh flex-col overflow-hidden bg-canvas pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]" data-shot={phone ? "phone" : "crane"}>
       <header className="flex shrink-0 items-center gap-2 border-b border-line bg-panel px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <KitAvatar {...faceProps} size="md" />
@@ -927,7 +985,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         <InstallApp placement="header" />
         <SettingsMenu>
           <div className="flex flex-col gap-2">
-            <InstallApp placement="block" />
+            <InstallApp placement="block" signInFirst={needGoogle} />
             {phone ? <NotifyEnable onGranted={() => browserSubscribePush(roomSlug)} /> : null}
             {phone && cfg?.mode === "oidc" && cranes.length
               ? (

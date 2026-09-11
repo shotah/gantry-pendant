@@ -145,6 +145,11 @@ describe("queue", () => {
       ["q:phone:a", msg({ id: "a", at: 1 })],
     ]);
     expect(queuedFromList(rows).map((m) => m.id)).toEqual(["a", "b"]);
+    const inverted = new Map<string, Queued>([
+      ["q:phone:b", msg({ id: "b", seq: 2, at: 1 })],
+      ["q:phone:a", msg({ id: "a", seq: 1, at: 9 })],
+    ]);
+    expect(queuedFromList(inverted).map((m) => m.id)).toEqual(["a", "b"]);
     expect(matchesFlush(msg({ to: "phone", userId: "ada" }), "phone", "ada")).toBe(true);
     expect(matchesFlush(msg({ to: "phone", userId: "bob" }), "phone", "ada")).toBe(false);
   });
@@ -171,6 +176,11 @@ describe("queue", () => {
     expect(peekFor(items, "phone", 10, { userId: "ada", since: uuid }).map((m) => m.id)).toEqual(["m-reply"]);
     expect(peekFor(items, "phone", 10, { userId: "ada", sinceSeq: 1 }).map((m) => m.id)).toEqual(["m-reply"]);
     expect(seqForSince(items, uuid)).toBe(1);
+    const scrambled = [
+      msg({ id: "b", userId: "ada", seq: 2, at: 1 }),
+      msg({ id: "a", userId: "ada", seq: 1, at: 9 }),
+    ];
+    expect(peekFor(scrambled, "phone", 10, { userId: "ada" }).map((m) => m.id)).toEqual(["a", "b"]);
     expect(seqForSince(items, "2")).toBe(2);
     expect(mergeCursor(0, 3)).toBe(3);
     expect(mergeCursor(5, 2)).toBe(5);

@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { AUTH_RETRY_LOCATION } from "@/lib/auth/bounce";
 import { unauthorized, tooMany } from "@/lib/auth/deny";
 import { decodeOAuthBind, exchangeCode, verifyIdToken } from "@/lib/auth/google";
 import { limitAuthIp, limitAuthSub } from "@/lib/auth/limit";
@@ -6,16 +7,28 @@ import { clearCookie, mintSession, parseCookie, sessionCookie, STATE_COOKIE } fr
 
 export const dynamic = "force-dynamic";
 
+/** No session minted. iOS delivers this callback twice; the loser goes home, not to a 401. */
+function bounce(secure: boolean): Response {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: AUTH_RETRY_LOCATION,
+      "Set-Cookie": clearCookie(STATE_COOKIE, secure),
+    },
+  });
+}
+
 export async function GET(req: Request) {
   if (!limitAuthIp(req)) {
     return tooMany();
   }
   const url = new URL(req.url);
+  const secure = url.origin.startsWith("https:");
   const code = url.searchParams.get("code") ?? "";
   const state = url.searchParams.get("state") ?? "";
   const bind = decodeOAuthBind(parseCookie(req.headers.get("Cookie"), STATE_COOKIE));
   if (!code || !state || !bind || state !== bind.state) {
-    return unauthorized();
+    return bounce(secure);
   }
   const clientId = env.GOOGLE_CLIENT_ID?.trim() ?? "";
   const clientSecret = env.GOOGLE_CLIENT_SECRET?.trim() ?? "";
@@ -31,11 +44,11 @@ export async function GET(req: Request) {
     codeVerifier: bind.verifier,
   });
   if ("error" in exchanged) {
-    return unauthorized();
+    return bounce(secure);
   }
   const identity = await verifyIdToken(exchanged.idToken, clientId, bind.nonce);
   if (!identity) {
-    return unauthorized();
+    return bounce(secure);
   }
   if (!limitAuthSub(identity.sub)) {
     return tooMany();
@@ -45,7 +58,6 @@ export async function GET(req: Request) {
     email: identity.email,
     emailVerified: identity.emailVerified,
   });
-  const secure = url.origin.startsWith("https:");
   const headers = new Headers({ Location: "/" });
   headers.append("Set-Cookie", sessionCookie(token, secure));
   headers.append("Set-Cookie", clearCookie(STATE_COOKIE, secure));

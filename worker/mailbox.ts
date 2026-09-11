@@ -14,7 +14,7 @@ import {
 } from "../lib/mailbox/allow";
 import { utf8Bytes } from "../lib/mailbox/caps";
 import { cranePublishedCmds, CMDS_STORE_KEY, parseCommands, phoneMustNotPublishCmds } from "../lib/mailbox/cmds";
-import { encodeFrame, parseFrame, type Role, type WireFrame } from "../lib/mailbox/frame";
+import { encodeFrame, parseFrame, stampOrderOnBody, stripClientOrder, type Role, type WireFrame } from "../lib/mailbox/frame";
 import {
   cursorStoreKey,
   drainFor,
@@ -30,6 +30,7 @@ import {
   queueStoreKey,
   QUEUE_STORE_PREFIX,
   seqForSince,
+  shouldQueue,
   type Queued,
 } from "../lib/mailbox/queue";
 import { persistInboundForPhone, persistRole, resolvePhoneKind, routeTag } from "../lib/mailbox/route";
@@ -133,7 +134,7 @@ export class Mailbox extends DurableObject<Env> {
       ws.send(encodeFrame({ kind: "error", text: parsed.error }));
       return;
     }
-    const out: WireFrame = { ...parsed.frame };
+    const out: WireFrame = stripClientOrder(parsed.frame);
     if (meta.role === "phone") {
       const kind = resolvePhoneKind(out);
       if (!kind) {
@@ -226,6 +227,10 @@ export class Mailbox extends DurableObject<Env> {
       }
       return;
     }
+    if (shouldQueue(out.kind)) {
+      out.seq = await this.nextSeq();
+      out.at = now;
+    }
     const body = encodeFrame(out);
     const tag = routeTag(meta.role, out);
     const peers = tag ? openSockets(this.peers(tag)) : [];
@@ -236,6 +241,7 @@ export class Mailbox extends DurableObject<Env> {
         to: "phone",
         body,
         at: now,
+        seq: out.seq,
         userId: out.user_id ?? "",
         kind: out.kind,
         bytes: utf8Bytes(body),
@@ -258,6 +264,7 @@ export class Mailbox extends DurableObject<Env> {
           to: "crane",
           body,
           at: now,
+          seq: out.seq,
           userId: out.user_id,
           kind: out.kind,
           bytes: utf8Bytes(body),
@@ -269,6 +276,7 @@ export class Mailbox extends DurableObject<Env> {
           to: "phone",
           body,
           at: now,
+          seq: out.seq,
           userId: out.user_id ?? "",
           kind: out.kind,
           bytes: utf8Bytes(body),
@@ -407,13 +415,13 @@ export class Mailbox extends DurableObject<Env> {
         sinceSeq: cursor || undefined,
       });
       for (const m of take) {
-        ws.send(m.body);
+        ws.send(stampOrderOnBody(m.body, { seq: m.seq, at: m.at }));
       }
       return;
     }
     const { take } = drainFor(items, "crane", Date.now());
     for (const m of take) {
-      ws.send(m.body);
+      ws.send(stampOrderOnBody(m.body, { seq: m.seq, at: m.at }));
       await this.deleteQueued(m);
     }
   }

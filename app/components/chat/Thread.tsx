@@ -9,6 +9,7 @@ export type ChatBubble = {
   text: string;
   kind?: string;
   at: number;
+  seq?: number;
   photo?: string;
   pending?: boolean;
 };
