@@ -201,11 +201,12 @@ from `ChatID` (Google `sub`).
   crane → phone (Telegram-style hosted URLs). Phone-supplied `https://`
   would be SSRF from the crane.
 - GPS is **sensitive**. Do not `console.log` lat/lon. Do not put geo
-  in CF logpush. Queue on the DO is short-lived; `here.Pin` stays
-  in-memory on the crane (process restart clears, as today).
+  in CF logpush. The unread queue on the DO is short-lived. A capped
+  transcript (`t:<sub>`, 80 bubbles) keeps the same frame bodies for
+  reload; evict old. `here.Pin` stays in-memory on the crane.
 - `context.at` / `tz` are phone-supplied hints. Order by DO time.
-- Do not persist chat bodies in Worker KV "for later" unless we have a
-  retention story. The crane's `gantry.db` is the mailbox dump.
+- Do not persist chat bodies in Worker KV. The crane's `gantry.db` is
+  the agent dump; the DO transcript is the phone thread.
 - Kit's face (`POST /api/avatar`) may be written by a listed phone or
   the crane bearer. Family mouth: Ada changing Kit's photo is fine.
   Cap is 5 MB JPEG; check `Content-Length` before buffering.

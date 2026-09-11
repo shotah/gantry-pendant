@@ -47,11 +47,12 @@ export function browserNotifyIncoming(opts: {
   title: string;
   text?: string;
   photo?: boolean;
+  replay?: boolean;
 }): void {
   if (typeof document === "undefined") {
     return;
   }
-  if (!shouldNotify(document.hidden, opts.kind, notifyPermission())) {
+  if (!shouldNotify(document.hidden, opts.kind, notifyPermission(), opts.replay === true)) {
     return;
   }
   void browserShowNotify({

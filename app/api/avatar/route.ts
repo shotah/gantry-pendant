@@ -4,6 +4,7 @@ import { configError, forbidden, unauthorized } from "@/lib/auth/deny";
 import { acceptJpeg } from "@/lib/avatar/jpeg";
 import { readAvatarUpload } from "@/lib/avatar/http";
 import { fetchRoomUsers } from "@/lib/mailbox/allow";
+import { mailboxStub } from "@/lib/mailbox/location";
 import { parseSlug } from "@/lib/mailbox/slug";
 import { devEnabled, hostFromRequest } from "@/lib/dev/mode";
 
@@ -50,10 +51,7 @@ async function authorize(req: Request, slug: string): Promise<Response | null> {
 }
 
 function stubFor(slug: string): DurableObjectStub | null {
-  if (!env.MAILBOX) {
-    return null;
-  }
-  return env.MAILBOX.get(env.MAILBOX.idFromName(slug));
+  return mailboxStub(env, slug);
 }
 
 async function withSlug(req: Request, next: (slug: string, stub: DurableObjectStub) => Promise<Response>): Promise<Response> {

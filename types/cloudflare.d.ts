@@ -22,7 +22,7 @@ interface KVNamespace {
 
 interface DurableObjectNamespace {
   idFromName(name: string): DurableObjectId;
-  get(id: DurableObjectId): DurableObjectStub;
+  get(id: DurableObjectId, options?: { locationHint?: string }): DurableObjectStub;
 }
 
 type DurableObjectId = { readonly __durableObjectId: unique symbol };

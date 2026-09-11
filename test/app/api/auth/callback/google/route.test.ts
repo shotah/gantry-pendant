@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/auth/callback/google/route";
 import { AUTH_RETRY_LOCATION } from "@/lib/auth/bounce";
 import { encodeOAuthBind } from "@/lib/auth/google";
-import { resetAuthLimits } from "@/lib/auth/limit";
+import { AUTH_RATE_PER_MIN, resetAuthLimits } from "@/lib/auth/limit";
 import { SESSION_COOKIE, STATE_COOKIE } from "@/lib/auth/session";
 
 vi.mock("cloudflare:workers", () => ({
@@ -63,7 +63,7 @@ describe("google callback route", () => {
 
   it("still rate-limits with a 429, not a bounce", async () => {
     let res: Response | undefined;
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < AUTH_RATE_PER_MIN + 1; i++) {
       res = await GET(new Request(`${CALLBACK}?code=c&state=st`, {
         headers: { "CF-Connecting-IP": "203.0.113.9" },
       }));

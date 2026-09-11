@@ -65,8 +65,9 @@ export function shouldNotify(
   hidden: boolean,
   kind: string | undefined,
   permission: NotifyPermission,
+  replay = false,
 ): boolean {
-  return permission === "granted" && hidden && (kind === "push" || kind === "reply");
+  return !replay && permission === "granted" && hidden && (kind === "push" || kind === "reply");
 }
 
 export function notifyBody(text: string | undefined, photo?: boolean): string {

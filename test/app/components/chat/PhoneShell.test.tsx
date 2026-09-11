@@ -487,6 +487,33 @@ describe("PhoneShell", () => {
     expect(items.map((el) => el.textContent)).toEqual(["first", "second"]);
   });
 
+  it("paints transcript replay frames on connect", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({
+        id: "old-in",
+        kind: "inbound",
+        text: "last hatch",
+        seq: 1,
+        at: 10,
+        replay: true,
+      }));
+      ws.deliver(JSON.stringify({
+        id: "old-out",
+        kind: "reply",
+        text: "latched",
+        seq: 2,
+        at: 20,
+        replay: true,
+      }));
+    });
+    const items = screen.getAllByRole("listitem");
+    expect(items.map((el) => el.textContent)).toEqual(["last hatch", "latched"]);
+  });
+
   it("keeps a draft last while catch-up slots in above it", async () => {
     const ws = await connectSpike();
     act(() => {

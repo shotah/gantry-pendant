@@ -1,7 +1,7 @@
 import { takeTokens, type Bucket } from "../mailbox/rate";
 
-/** Cheap login /me buckets. Same 429 body for every miss. */
-export const AUTH_RATE_PER_MIN = 20;
+/** Cheap login /me buckets. Two waiting-room phones at 3 s polls share one NAT IP. */
+export const AUTH_RATE_PER_MIN = 40;
 export const AUTH_LIMIT_IDLE_MS = 60_000;
 
 export const authLimitStore = new Map<string, Bucket>();

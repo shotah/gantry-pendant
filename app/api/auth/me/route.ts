@@ -4,6 +4,7 @@ import { admittedCranes } from "@/lib/auth/directory";
 import { limitAuthRequest } from "@/lib/auth/limit";
 import { readSessionFromRequest } from "@/lib/auth/session";
 import { fetchRoomUsers } from "@/lib/mailbox/allow";
+import { mailboxStub } from "@/lib/mailbox/location";
 import { parseSlug } from "@/lib/mailbox/slug";
 import { DEV_USER } from "@/lib/dev/samples";
 import { devEnabled, hostFromRequest } from "@/lib/dev/mode";
@@ -39,10 +40,11 @@ export async function GET(req: Request) {
     },
     extraSubs: env.ALLOWED_SUBS,
     rooms: async (slug) => {
-      if (!env.MAILBOX) {
+      const stub = mailboxStub(env, slug);
+      if (!stub) {
         return [];
       }
-      return fetchRoomUsers(env.MAILBOX.get(env.MAILBOX.idFromName(slug)));
+      return fetchRoomUsers(stub);
     },
   });
   return Response.json({

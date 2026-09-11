@@ -3,6 +3,7 @@ import { handshake, handshakePhone, rateId, roleFromQuery, stampEmail, stampUser
 import { resolveAuthMode } from "../lib/auth/mode";
 import { stampMailboxHeaders, upgradeOriginOk } from "../lib/auth/upgrade";
 import { fetchRoomUsers } from "../lib/mailbox/allow";
+import { mailboxStub } from "../lib/mailbox/location";
 import { slugFromPath } from "../lib/mailbox/slug";
 import { Mailbox } from "./mailbox";
 
@@ -48,8 +49,8 @@ async function mailboxUpgrade(request: Request, env: Env): Promise<Response> {
     ? await handshakePhone({
         ...handshakeIn,
         loadRoom: async () => {
-          const stub = env.MAILBOX.get(env.MAILBOX.idFromName(slug));
-          return fetchRoomUsers(stub);
+          const stub = mailboxStub(env, slug);
+          return stub ? fetchRoomUsers(stub) : [];
         },
       })
     : await handshake({ ...handshakeIn, role });
@@ -71,7 +72,10 @@ async function mailboxUpgrade(request: Request, env: Env): Promise<Response> {
     emailVerified: auth.principal.kind === "phone" && auth.principal.emailVerified,
     exp: auth.principal.kind === "phone" ? auth.principal.exp : undefined,
   });
-  const stub = env.MAILBOX.get(env.MAILBOX.idFromName(slug));
+  const stub = mailboxStub(env, slug);
+  if (!stub) {
+    return new Response("not found", { status: 404 });
+  }
   return stub.fetch(new Request(request, { headers }));
 }
 

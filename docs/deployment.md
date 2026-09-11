@@ -27,6 +27,7 @@ token, and they are not the production secret store.
 | CI **code** deploy to Workers | GitHub **secrets** `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` |
 | KV namespace id | GitHub **variable** `DIRECTORY_KV_ID` (not a secret; 32 hex) |
 | Google / session / crane bearers | Gantree Settings → Pendant (yard sqlite). Leftover: `npm run secrets:push` |
+| Optional `LOCATION_HINT` | Wrangler **var** (not a secret): `wnam` / `enam` / `weur` / … First `MAILBOX.get()` pins the Durable Object near the Mini |
 
 Wrangler may offer to paste the KV id into `wrangler.jsonc`. Decline, or
 revert — leave `directory-local` in git. CI injects the real id from the

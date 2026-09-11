@@ -174,7 +174,8 @@ You cannot run telegram + pendant in the same process.
 | HEIC / iPhone photo | canvas JPEG when `createImageBitmap` can decode | otherwise “bad photo” |
 | Photo > ~1.5 MB | compress in-app to the chat cap | still 413 if encode cannot shrink enough |
 | Lock screen ping while app is dead | Web Push if VAPID is set and they enabled notifications (installed PWA; iOS 16.4+ standalone) | Settings → Enable notifications after Google. Missing VAPID → queue only; native APNs/FCM later |
-| Queue while Mini reboots | ≤50 frames, 1 hour TTL, then drop | short note, not `gantry.db` |
+| Queue while Mini reboots | ≤50 frames, 1 hour TTL, then drop | unread catch-up only |
+| Transcript on reload | last 80 `inbound` / `reply` / `push` per `sub` | kill the tab, reopen; not `sw.js`. Cab paints the same frames (`replay: true` skips Auto HUN — ship Cab with this mailbox) |
 | Rate limit (30 frames / 256 KB per min) | socket stays up, frames return `rate` | looks like “she ignored me” |
 | Session hard 7d (JWT `exp` at mint) | next send closes 4401 | sign in again; yank `sub` takes effect on the next frame |
 | Service worker | no chat cache (good) | also no offline compose |

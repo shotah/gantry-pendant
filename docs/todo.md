@@ -165,9 +165,13 @@ SQLite queue stays unread-only catch-up. This is a short persisted
 transcript for this `sub`. Cap it. Evict old. Do **not** cache chat in
 `sw.js`. Architecture already allowed later HTTP for history/media.
 
-- [ ] **Reload keeps the thread** — hydrate bubbles for this `user_id`
-      on connect. Not a second session store on the crane. Queue
-      (`QUEUE_*`, 1h) is not the transcript.
+- [x] **Reload keeps the thread** — hydrate bubbles for this `user_id`
+      on connect (`t:<sub>`, 80, `replay: true`). Not a second session
+      store on the crane. Queue (`QUEUE_*`, 1h) is not the transcript.
+      Cab: ship the APK that skips Auto HUN on `replay` (`Wire.kt` /
+      `shouldSpeak`). Old Cab still paints.
+- [x] Waiting-room `/me` poll 3 s (429 backoff). Auth bucket 40/min.
+- [x] Optional `LOCATION_HINT` wrangler var on `MAILBOX.get`
 
 **Walk (presence):** yank the crane. Header stays `live` (phone socket)
 but shows she is gone / inbound is queued. Bring the crane back:
@@ -233,8 +237,9 @@ dump on the wire.
 Same Durable Object. Do not fork the mailbox. [frontends.md](frontends.md).
 
 - **gantry-cab** is the Android + Auto app. Wire changes (`seq` / `at`,
-  new `kind`, auth) need a look at `Wire.kt` / `Mouth.kt` there.
-  Cab still appends arrival order; sorting by seq is a Cab follow-up.
+  `replay`, new `kind`, auth) need a look at `Wire.kt` / `Mouth.kt`
+  there. Cab inserts by seq like the PWA (`mailbox/Thread.kt`).
+  Transcript hydrate: ship Cab so Auto skips `replay` HUNs.
 - **iOS native** is later. Same room. Sign in with Apple is a mailbox
   auth change, not a second Worker.
 - Expo / bookmark-is-not-enough: Background GPS, APNs, TestFlight —

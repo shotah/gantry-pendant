@@ -32,4 +32,6 @@
       "new_sqlite_classes": ["Mailbox"]
     }
   ]
+  // Optional wrangler var (not a secret): LOCATION_HINT=wnam|enam|weur|eeur|apac|…
+  // First MAILBOX.get() pins the Durable Object. Set near the Mini.
 }

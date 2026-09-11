@@ -117,6 +117,9 @@ The room is **per crane slug**. Sessions are **per human** (`sub`).
   seq (a numeric string). The DO peeks by seq. The bubble is
   **pending** until the DO acks — local echo is not "sent".
   Other mouths: [frontends.md](frontends.md).
+- **Transcript** is a second store (`t:<sub>`, last 80 bubbles, 8 MiB).
+  Reload hydrates `inbound` / `reply` / `push` with `replay: true`.
+  Ack does not delete it. Queue stays unread-only (1 h).
 - Queue is one storage row per frame (`q:<id>`), keyed by
   `(to, userId)`. Do not queue `pin`. Cap count and bytes; evict oldest
   **non-reply** first. Hibernated ping/pong
@@ -190,11 +193,11 @@ browser reaches the board. Chat does not use it.
 ## Android / iPhone in this picture
 
 The architecture does not care about stores. The client is a WebSocket
-(and later HTTP for history/media) consumer of the Worker. That later
-path is the **transcript** on reload, not the unread queue, and not
-`sw.js` — [todo.md](todo.md#mouth-ui). Location uses the browser
-Geolocation API on send. The car mouth is **gantry-cab** (native
-Android Auto), not Expo wrapping this UI.
+consumer of the Worker. Transcript hydrates on connect — not the unread
+queue, and not `sw.js` — [todo.md](todo.md#mouth-ui). Later HTTP can
+still serve media. Location uses the browser Geolocation API on send.
+The car mouth is **gantry-cab** (native Android Auto), not Expo wrapping
+this UI.
 
 Vinext is Next-shaped on Vite: `app/manifest.ts` is a metadata route
 (`/manifest.webmanifest`, `application/manifest+json`). Icons and

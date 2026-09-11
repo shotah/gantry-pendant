@@ -41,6 +41,8 @@ export type WireFrame = {
   since?: string;
   commands?: SlashCommand[];
   users?: RoomUser[];
+  /** Hydrate-only. Unread queue flush must not set this. Clients must not send it. */
+  replay?: boolean;
 };
 
 export type ParseOpts = { role?: Role };
@@ -181,6 +183,7 @@ export function stripClientOrder(frame: WireFrame): WireFrame {
   const next = { ...frame };
   delete next.seq;
   delete next.at;
+  delete next.replay;
   return next;
 }
 
@@ -206,6 +209,15 @@ export function stampOrderOnBody(body: string, meta: { seq?: number; at?: number
     changed = true;
   }
   return changed ? encodeFrame(frame) : body;
+}
+
+/** Mark a stored body as transcript hydrate so mouths skip toast / haptic / Auto HUN. */
+export function stampReplayOnBody(body: string): string {
+  const parsed = parseFrame(body);
+  if (!parsed.ok || parsed.frame.replay === true) {
+    return body;
+  }
+  return encodeFrame({ ...parsed.frame, replay: true });
 }
 
 const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds", "allow", "typing", "draft"]);
@@ -292,6 +304,9 @@ export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseO
   }
   if (o.kind === "allow") {
     frame.users = parseAllowUsers(o.users);
+  }
+  if (o.replay === true) {
+    frame.replay = true;
   }
   if (o.context != null) {
     const blob = JSON.stringify(o.context);

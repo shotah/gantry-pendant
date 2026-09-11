@@ -60,7 +60,7 @@ export function persistRole(from: Role, kind?: FrameKind, userId?: string): Role
   return undefined;
 }
 
-/** Your inbound also lands on the phone queue so a refresh can replay it next to Kit. */
+/** Your inbound also lands on the phone queue (unread) and the transcript (reload). */
 export function persistInboundForPhone(from: Role, kind?: FrameKind): boolean {
   return from === "phone" && kind === "inbound";
 }

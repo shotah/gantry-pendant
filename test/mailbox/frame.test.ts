@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CONTEXT_JSON_MAX, FRAME_BYTES_MAX, TEXT_MAX } from "@/lib/mailbox/caps";
-import { encodeFrame, hasGeo, isBareGeo, parseFrame, peerOf, stampOrderOnBody, stripClientOrder, type ParseResult } from "@/lib/mailbox/frame";
+import { encodeFrame, hasGeo, isBareGeo, parseFrame, peerOf, stampOrderOnBody, stampReplayOnBody, stripClientOrder, type ParseResult } from "@/lib/mailbox/frame";
 
 function failMsg(r: ParseResult): string {
   return r.ok ? "ok" : r.error;
@@ -150,7 +150,13 @@ describe("frame", () => {
     expect(stampOrderOnBody('{"text":"hi","id":"m1"}', { seq: 4, at: 9 })).toBe(
       encodeFrame({ text: "hi", id: "m1", seq: 4, at: 9 }),
     );
-    expect(stripClientOrder({ text: "hi", seq: 9, at: 1 })).toEqual({ text: "hi" });
+    expect(stripClientOrder({ text: "hi", seq: 9, at: 1, replay: true })).toEqual({ text: "hi" });
+    expect(parseFrame(JSON.stringify({ text: "hi", replay: true })).ok).toBe(true);
+    const replay = parseFrame(JSON.stringify({ text: "hi", kind: "reply", replay: true }));
+    expect(replay.ok && replay.frame.replay).toBe(true);
+    expect(stampReplayOnBody('{"text":"hi","kind":"reply"}')).toBe(
+      encodeFrame({ text: "hi", kind: "reply", replay: true }),
+    );
   });
 
   it("parses and encodes a short frame id", () => {

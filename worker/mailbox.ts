@@ -14,7 +14,7 @@ import {
 } from "../lib/mailbox/allow";
 import { utf8Bytes } from "../lib/mailbox/caps";
 import { cranePublishedCmds, CMDS_STORE_KEY, parseCommands, phoneMustNotPublishCmds } from "../lib/mailbox/cmds";
-import { encodeFrame, parseFrame, stampOrderOnBody, stripClientOrder, type Role, type WireFrame } from "../lib/mailbox/frame";
+import { encodeFrame, parseFrame, stampOrderOnBody, stampReplayOnBody, stripClientOrder, type Role, type WireFrame } from "../lib/mailbox/frame";
 import {
   cursorStoreKey,
   drainFor,
@@ -33,6 +33,13 @@ import {
   shouldQueue,
   type Queued,
 } from "../lib/mailbox/queue";
+import {
+  appendTranscript,
+  asTranscript,
+  hydrateTranscript,
+  shouldTranscript,
+  transcriptStoreKey,
+} from "../lib/mailbox/transcript";
 import { persistInboundForPhone, persistRole, resolvePhoneKind, routeTag } from "../lib/mailbox/route";
 import { parseEmailVerified, parseExpMs, socketMessageAllowed } from "../lib/mailbox/socketAuth";
 import { pruneDualLimits, takeFrame, type DualLimit } from "../lib/mailbox/rate";
@@ -235,17 +242,18 @@ export class Mailbox extends DurableObject<Env> {
     const tag = routeTag(meta.role, out);
     const peers = tag ? openSockets(this.peers(tag)) : [];
     const dest = persistRole(meta.role, out.kind, out.user_id);
+    const phoneRow = (): Queued => ({
+      id: out.id || newQueueId(),
+      to: "phone",
+      body,
+      at: now,
+      seq: out.seq,
+      userId: out.user_id ?? "",
+      kind: out.kind,
+      bytes: utf8Bytes(body),
+    });
     if (dest === "phone") {
-      await this.putQueued({
-        id: out.id,
-        to: "phone",
-        body,
-        at: now,
-        seq: out.seq,
-        userId: out.user_id ?? "",
-        kind: out.kind,
-        bytes: utf8Bytes(body),
-      });
+      await this.rememberPhone(phoneRow());
       for (const p of peers) {
         p.send(body);
       }
@@ -271,16 +279,7 @@ export class Mailbox extends DurableObject<Env> {
         });
       }
       if (persistInboundForPhone(meta.role, out.kind)) {
-        await this.putQueued({
-          id: out.id,
-          to: "phone",
-          body,
-          at: now,
-          seq: out.seq,
-          userId: out.user_id ?? "",
-          kind: out.kind,
-          bytes: utf8Bytes(body),
-        });
+        await this.rememberPhone(phoneRow());
       }
       if (meta.role === "phone" && out.kind === "inbound") {
         ws.send(encodeFrame({ kind: "ack", id: out.id }));
@@ -406,9 +405,8 @@ export class Mailbox extends DurableObject<Env> {
       if (cmds) {
         ws.send(cmds);
       }
-    }
-    const items = await this.loadQueue();
-    if (role === "phone") {
+      await this.sendTranscript(ws, userId);
+      const items = await this.loadQueue();
       const cursor = userId ? await this.phoneCursor(userId) : 0;
       const take = peekFor(items, "phone", Date.now(), {
         userId,
@@ -419,10 +417,37 @@ export class Mailbox extends DurableObject<Env> {
       }
       return;
     }
+    const items = await this.loadQueue();
     const { take } = drainFor(items, "crane", Date.now());
     for (const m of take) {
       ws.send(stampOrderOnBody(m.body, { seq: m.seq, at: m.at }));
       await this.deleteQueued(m);
+    }
+  }
+
+  private async rememberPhone(msg: Queued): Promise<void> {
+    await this.putQueued(msg);
+    await this.putTranscript(msg);
+  }
+
+  private async putTranscript(msg: Queued): Promise<void> {
+    if (!shouldTranscript(msg.kind)) {
+      return;
+    }
+    const key = transcriptStoreKey(msg.userId);
+    const cur = asTranscript(await this.ctx.storage.get(key));
+    const next = appendTranscript(cur, msg);
+    await this.ctx.storage.put(key, next);
+  }
+
+  private async sendTranscript(ws: WebSocket, userId?: string): Promise<void> {
+    const personal = userId
+      ? asTranscript(await this.ctx.storage.get(transcriptStoreKey(userId)))
+      : [];
+    const broadcasts = asTranscript(await this.ctx.storage.get(transcriptStoreKey("")));
+    for (const m of hydrateTranscript(personal, broadcasts)) {
+      const ordered = stampOrderOnBody(m.body, { seq: m.seq, at: m.at });
+      ws.send(stampReplayOnBody(ordered));
     }
   }
 

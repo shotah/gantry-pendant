@@ -9,6 +9,9 @@ export const QUEUE_MAX = 50;
 /** Total queued bytes per destination key `(to, userId||"")`. */
 export const QUEUE_BYTES_MAX = 8 * 1024 * 1024;
 export const QUEUE_TTL_MS = 60 * 60 * 1000;
+/** Last N phone bubbles per `sub`. Matches Cab `THREAD_MAX`. Queue TTL is not this. */
+export const TRANSCRIPT_MAX = 80;
+export const TRANSCRIPT_BYTES_MAX = QUEUE_BYTES_MAX;
 export const RATE_FRAMES_PER_MIN = 30;
 export const RATE_BYTES_PER_MIN = 256_000;
 

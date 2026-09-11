@@ -5,6 +5,7 @@ import { limitAuthRequest } from "@/lib/auth/limit";
 import { readSessionFromRequest } from "@/lib/auth/session";
 import { fetchRoomUsers } from "@/lib/mailbox/allow";
 import { headerSaysTooLarge } from "@/lib/mailbox/caps";
+import { mailboxStub } from "@/lib/mailbox/location";
 import { parseSlug } from "@/lib/mailbox/slug";
 import { parsePushDelete, parsePushPut } from "@/lib/push/subscription";
 import { readVapid } from "@/lib/push/vapid";
@@ -26,10 +27,7 @@ function envOf(e: Env) {
 }
 
 function stubFor(slug: string): DurableObjectStub | null {
-  if (!env.MAILBOX) {
-    return null;
-  }
-  return env.MAILBOX.get(env.MAILBOX.idFromName(slug));
+  return mailboxStub(env, slug);
 }
 
 export async function GET(req: Request) {

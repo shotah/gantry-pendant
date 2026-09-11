@@ -37,7 +37,7 @@ before you call it done. A PWA-only paint is not enough.
 | Additive JSON (`seq`, `at`, extra `context`) | Old clients must keep working. Cab `parseFrame` drops unknown keys — that is the bar |
 | New required field, new `kind`, or a required header | Cab (and later iOS) must ship in lockstep, or the mailbox must tolerate the old client |
 | Auth (`/api/auth/*`, session JWE, 4401) | Cab POSTs the ID token and stores the JWE. Spike query creds are PWA loopback only |
-| Queue / `ack` / `since` / `seq` | Cab still acks `since: <last id>` and appends arrival order. See below |
+| Queue / `ack` / `since` / `seq` | Cab parses `seq` / `at`, inserts like `placeInThread`, acks the highest seq. Transcript hydrate is the same frames plus `replay` — see below |
 | Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Do not assume it needs the PWA CSS |
 | PWA-only UI (theme, font, Install) | Cab has its own Compose shell |
 
@@ -55,19 +55,21 @@ The Durable Object stamps `seq` (monotonic) and `at` (mailbox
 epoch ms) on queued frames. The PWA inserts by `seq`, then `at`, and
 reconnect-acks the **highest seq**. Drafts stay last.
 
-Cab:
+Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`):
 
-- **Does not break.** Extra keys are ignored. Live WebSocket order is
-  still enough for a connected phone.
-- **Does not sort.** `Mouth.ingest` appends. Catch-up after a send
-  can land out of order, same bug the PWA had.
-- **Acks the last id, not the highest seq.** `MailboxClient` overwrites
-  `lastSeenId` on every new id. Fine while frames arrive in order.
-
-Follow-up on the Cab checkout (not this tree): parse `seq` / `at`,
-insert like `placeInThread`, ack `since` as that seq (numeric string
-already works on the Worker). Do not have Cab *send* `seq` / `at` —
-the mailbox strips client order.
+- Parses `seq` / `at`. Junk (`0`, negatives, strings) is dropped, same
+  as `orderSeq` / `orderAt` here.
+- Inserts with `placeInThread` (seq, then `at`, then id). Drafts stay
+  last. Catch-up can arrive out of order.
+- Reconnect-acks the **highest seq** (`since` is a numeric string).
+  Falls back to last id when no seq has been seen yet.
+- Does not *send* `seq` / `at` — `encodeFrame` omits them. The mailbox
+  strips client order.
+- **Transcript hydrate** replays existing `inbound` / `reply` / `push`
+  with additive `replay: true`. Paint is the same `ingest` / `placeInThread`
+  path. Cab `THREAD_MAX` is 80 (mailbox hydrates 80). **Ship Cab with
+  this mailbox** so Auto HUNs skip `replay` (`shouldSpeak(kind, replay)`).
+  An old APK still paints and still toasts every hydrate frame.
 
 ---
 

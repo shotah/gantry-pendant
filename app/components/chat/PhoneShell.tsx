@@ -54,7 +54,7 @@ type Me = { sub: string; email?: string; cranes?: string[] } | null;
 
 const BACKOFF_MS = 1000;
 const BACKOFF_MAX = 30_000;
-const ME_POLL_MS = 10_000;
+const ME_POLL_MS = 3_000;
 const ME_POLL_MAX = 60_000;
 const DRAFT_BUBBLE_ID = "__draft__";
 
@@ -578,14 +578,16 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       if (phone) {
         void releaseScreenWake(wakeRef.current);
         wakeRef.current = null;
-        browserBuzzPush(frame.kind);
-        badgeRef.current = browserBumpBadge(badgeRef.current, frame.kind);
-        browserNotifyIncoming({
-          kind: frame.kind,
-          title: displaySlug(roomSlug),
-          text: frame.text,
-          photo: Boolean(frame.images?.[0]?.url),
-        });
+        if (frame.replay !== true) {
+          browserBuzzPush(frame.kind);
+          badgeRef.current = browserBumpBadge(badgeRef.current, frame.kind);
+          browserNotifyIncoming({
+            kind: frame.kind,
+            title: displaySlug(roomSlug),
+            text: frame.text,
+            photo: Boolean(frame.images?.[0]?.url),
+          });
+        }
       }
     };
   }, [bearer, canSocket, cfg?.mode, phone, role, roomSlug, secret]);
