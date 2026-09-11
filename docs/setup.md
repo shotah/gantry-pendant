@@ -2,7 +2,8 @@
 
 Admin flow, user flow, and the paste that actually connects them.
 Gotchas: [edgecases.md](edgecases.md). Auth: [security.md](security.md).
-Shape: [architecture.md](architecture.md). What it looks like:
+Shape: [architecture.md](architecture.md). Other mouths (Cab, later
+iOS): [frontends.md](frontends.md). What it looks like:
 [screens.md](screens.md). What's left: [todo.md](todo.md).
 
 This is **not** “add a field on the Gantree person and they can chat.”

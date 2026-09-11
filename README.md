@@ -55,6 +55,7 @@ Every screen, Lamp, extra-large type, crane stand-in:
 | [docs/screens.md](docs/screens.md) | What the mouth looks like (phone shots) |
 | [docs/setup.md](docs/setup.md) | Admin / user / connect — what you paste where |
 | [docs/edgecases.md](docs/edgecases.md) | Gotchas across pendant + gantree + ai-gantry |
+| [docs/frontends.md](docs/frontends.md) | Other mouths — Cab (Android + Auto), later iOS |
 | [docs/design.md](docs/design.md) | Why this shape, Worker vs Mini, phone context |
 | [docs/architecture.md](docs/architecture.md) | How the three pieces talk |
 | [docs/security.md](docs/security.md) | Two principals, Google OIDC vs Access vs MCP |

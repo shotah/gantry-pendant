@@ -1,0 +1,21 @@
+---
+description: Mailbox wire changes must consider gantry-cab and future native mouths, not only the PWA.
+alwaysApply: true
+---
+
+# Other mouths
+
+This Worker is the mailbox. The handheld PWA in `app/` is one client.
+[gantry-cab](https://github.com/shotah/gantry-cab) is the Android + Auto
+app (`repos/gantry-cab`). iOS native is later — same Durable Object, no
+second Worker.
+
+Walk: [docs/frontends.md](docs/frontends.md).
+
+If you change **frames, auth, queue, `ack`/`since`/`seq`, or thread
+order**, say what Cab does with it. Additive JSON is fine (Cab drops
+unknown keys). A new required field or `kind` needs a Cab change or
+mailbox tolerance for the old client. Do not send `seq` / `at` from
+a phone — the mailbox stamps those.
+
+PWA-only paint (theme, font, Install) does not need Cab. Wire does.

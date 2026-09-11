@@ -1,8 +1,9 @@
 # Edge cases and gotchas
 
-Things that bite after deploy, across **gantry-pendant**, **gantree**, and
-**ai-gantry**. How they fail, and how to cover them. Who talks:
-[setup.md](setup.md). How it got to workers.dev:
+Things that bite after deploy, across **gantry-pendant**, **gantree**,
+**ai-gantry**, and **gantry-cab**. How they fail, and how to cover them.
+Who talks: [setup.md](setup.md). Other mouths:
+[frontends.md](frontends.md). How it got to workers.dev:
 [deployment.md](deployment.md). Shape:
 [architecture.md](architecture.md). Auth:
 [security.md](security.md). What's left: [todo.md](todo.md).
@@ -189,6 +190,7 @@ and `net` attach on send when the OS exposes them; the prompt stays stingy.
 | --- | --- | --- |
 | “Sent” with the socket down | local echo is not delivered | bubble stays **pending** until the DO acks; reconnect + `since` redelivers |
 | Two devices, one human | replies route by `user_id` / `sub` | both of Ada’s phones see Ada’s replies; Bob does not |
+| Cab vs PWA after a wire change | Cab ignores unknown JSON; it may still paint arrival order | [frontends.md](frontends.md) — walk `Wire.kt` / `Mouth.kt` |
 | iOS PWA background drop | socket dies | reconnect on visible (`visibilitychange` / `onclose`); redeliver |
 | `context.at` untrusted | phone clock can lie | order by DO time; `at` is a hint |
 | Long turn, no streaming | whole replies; looks idle | no typing indicator yet (thinking-ack is later) |

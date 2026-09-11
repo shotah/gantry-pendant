@@ -3,7 +3,8 @@
 What's left. The mouth talks in code; Telegram stays production until
 the walks are real on a phone. Pitch: [README.md](../README.md). Why:
 [design.md](design.md). Wire: [architecture.md](architecture.md). Authn:
-[security.md](security.md). Who talks: [setup.md](setup.md). Misses:
+[security.md](security.md). Who talks: [setup.md](setup.md). Other
+mouths: [frontends.md](frontends.md). Misses:
 [edgecases.md](edgecases.md). Typing dots:
 [agent_typing_response_todo.md](agent_typing_response_todo.md). Bugs and
 security by phase: [audit_todo.md](audit_todo.md).
@@ -227,14 +228,17 @@ dump on the wire.
 - [ ] One non-image file on the channel under the chat cap (sibling of
       `Images`, not a second mailbox)
 
-### Expo (when a bookmark is not enough)
+### Sister mouths (not this checkout)
 
-Same Durable Object. New client. Do not fork the mailbox. Android Auto
-is **gantry-cab**, not this.
+Same Durable Object. Do not fork the mailbox. [frontends.md](frontends.md).
 
-- Background GPS / geofence, motion, reliable iOS lock-screen (APNs),
-  Sign in with Apple only if a store/TestFlight build exists
-- Sideload APK / TestFlight — **no** store listing required
+- **gantry-cab** is the Android + Auto app. Wire changes (`seq` / `at`,
+  new `kind`, auth) need a look at `Wire.kt` / `Mouth.kt` there.
+  Cab still appends arrival order; sorting by seq is a Cab follow-up.
+- **iOS native** is later. Same room. Sign in with Apple is a mailbox
+  auth change, not a second Worker.
+- Expo / bookmark-is-not-enough: Background GPS, APNs, TestFlight —
+  **no** store listing required. Do not start this to “catch up” Cab.
 
 Hostname-based Cloudflare Access on the **document** origin only is
 optional after a custom hostname. Never "Protect this Worker".

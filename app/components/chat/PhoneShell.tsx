@@ -24,6 +24,7 @@ import { isIos, isStandalone, signInHint } from "@/app/lib/install";
 import { fileToPhoto } from "@/app/lib/photo";
 import { browserGeoPref, saveGeoPref } from "@/app/lib/prefs";
 import { applyFont, fontFromQuery } from "@/app/lib/font";
+import { RELEASE } from "@/app/lib/release";
 import { applyTheme, themeFromQuery } from "@/app/lib/theme";
 import { browserWakeLock, releaseScreenWake, type WakeLockSentinel } from "@/app/lib/wake";
 import { authRetryFromQuery } from "@/lib/auth/bounce";
@@ -1087,6 +1088,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                   </div>
                 )
               : null}
+            <p className="border-t border-line pt-2 text-[11px] text-faint" title="Pendant version">
+              {RELEASE}
+            </p>
           </div>
         </SettingsMenu>
       </header>

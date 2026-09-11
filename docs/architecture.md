@@ -2,7 +2,8 @@
 
 How a phone we own talks to a crane without a listen port on the harness.
 Contract and walk: [design.md](design.md). Authn:
-[security.md](security.md). Pitch: [root readme](../README.md).
+[security.md](security.md). Mouths besides this PWA:
+[frontends.md](frontends.md). Pitch: [root readme](../README.md).
 
 Harness-side channel interface (nested checkout, **dev only**):
 `repos/ai-gantry/internal/channel/channel.go`.
@@ -37,9 +38,9 @@ Object is that hub on our Cloudflare account.
 ## Target
 
 ```text
-[ phone browser / PWA  — Vinext app ]
+[ phone PWA  |  gantry-cab APK  |  later: iOS ]
         |
-        |  HTTPS + cookie after Google OIDC
+        |  HTTPS + cookie (PWA) or Authorization JWE (Cab)
         |  wss to same origin
         v
 [ Vinext on Cloudflare Workers ]
@@ -53,8 +54,9 @@ Object is that hub on our Cloudflare account.
   persona + LLM + MCP + gantry.db
 ```
 
-The Vinext app is the front door (chat UI + Google login). The Durable
-Object is the room. Phone and crane both **connect in**. Hibernation
+The Vinext app is one front door (chat UI + Google login). Cab is
+another. The Durable Object is the room. Phone and crane both
+**connect in**. Hibernation
 keeps the sockets without billing idle CPU. A short SQLite queue on
 the DO holds messages while the other side is gone (Mini reboot, app
 backgrounded). Kit's face is a JPEG blob on that same DO (`GET/POST
@@ -82,6 +84,9 @@ gantry-pendant/            this checkout — Vinext app + DO mailbox
   lib/dev/                 loopback mock + canned scenes
   assets/docs/             phone shots (`npm run shot`)
 
+gantry-cab/                Android + Auto mouth — same mailbox, own repo
+                           (nested `repos/gantry-cab`)
+
 ai-gantry/                 harness — internal/channel/ sibling
   internal/channel/        Channel, Pusher, Message, Outbound
     telegram/
@@ -106,10 +111,12 @@ The room is **per crane slug**. Sessions are **per human** (`sub`).
 - Phone frames go to the crane socket. Crane `reply` requires
   `user_id` and fans to `getWebSockets(sub)`. Crane `push` with no
   `user_id` broadcasts to every phone in the room.
-- Every frame gets an `id`. Phone-bound frames persist per `sub` until
-  `ack` or TTL. On reconnect the phone sends `since: <last id>` and
-  the DO redelivers. The bubble is **pending** until the DO acks —
-  local echo is not "sent".
+- Every queued frame gets an `id`, a mailbox `seq`, and `at`.
+  Phone-bound frames persist per `sub` until `ack` or TTL. On
+  reconnect the phone sends `since` as the last id **or** the highest
+  seq (a numeric string). The DO peeks by seq. The bubble is
+  **pending** until the DO acks — local echo is not "sent".
+  Other mouths: [frontends.md](frontends.md).
 - Queue is one storage row per frame (`q:<id>`), keyed by
   `(to, userId)`. Do not queue `pin`. Cap count and bytes; evict oldest
   **non-reply** first. Hibernated ping/pong

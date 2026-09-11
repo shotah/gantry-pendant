@@ -3,6 +3,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PhoneShell } from "@/app/components/chat/PhoneShell";
+import { RELEASE } from "@/app/lib/release";
 import { DEV_USER, MOCK_REPLIES, SAMPLE_LINES } from "@/lib/dev/samples";
 import { TYPING_TTL_MS } from "@/lib/mailbox/typing";
 import { clearGeoCache } from "@/lib/phone/geo";
@@ -259,8 +260,10 @@ describe("PhoneShell", () => {
     expect(screen.queryByRole("button", { name: "color theme" })).toBeNull();
     expect(screen.queryByRole("radiogroup", { name: "Font size" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Open crane stand-in" })).toBeNull();
+    expect(screen.queryByText(RELEASE)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "settings" }));
     expect(screen.getByRole("dialog", { name: "Settings" })).toBeTruthy();
+    expect(screen.getByText(RELEASE)).toBeTruthy();
     expect(screen.getByText(/Cast, save and share/)).toBeTruthy();
     expect(screen.getByLabelText("Agent name")).toBeTruthy();
     expect((screen.getByLabelText("Agent name") as HTMLInputElement).value).toBe("kit");
