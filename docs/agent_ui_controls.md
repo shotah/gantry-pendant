@@ -334,10 +334,10 @@ Worker + PWA + contract. Done here unless unchecked.
 
 ## Knock-out — image-generation-mcp (later)
 
-- [ ] `photo_edit` accepts `source_path` (same root rule) so
+- [x] `photo_edit` accepts `source_path` (same root rule) so
       `pendant__avatar_get` → `image__photo_edit` → `pendant__avatar_update`
-      is a real "put a hat on my current face" chain. Today `photo_edit`
-      is base64-only and the host truncates.
+      is a real "put a hat on my current face" chain. `source_image` remains
+      for hosts that keep bytes.
 
 ## Knock-out — gantry-cab
 
