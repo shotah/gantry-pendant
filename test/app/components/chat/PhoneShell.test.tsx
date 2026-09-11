@@ -114,6 +114,7 @@ beforeEach(() => {
   window.history.replaceState({}, "", "/");
   window.localStorage.removeItem("pendant.geo");
   window.localStorage.removeItem("pendant.font");
+  window.localStorage.removeItem("pendant.photo");
   document.documentElement.removeAttribute("data-font");
 });
 
@@ -125,6 +126,7 @@ afterEach(() => {
   window.history.replaceState({}, "", "/");
   window.localStorage.removeItem("pendant.geo");
   window.localStorage.removeItem("pendant.font");
+  window.localStorage.removeItem("pendant.photo");
   document.documentElement.removeAttribute("data-font");
   Reflect.deleteProperty(navigator, "geolocation");
   Reflect.deleteProperty(navigator, "clipboard");
@@ -696,6 +698,119 @@ describe("PhoneShell", () => {
     });
     expect(screen.getByText("hello kit")).toBeTruthy();
     expect(screen.queryByText("sending")).toBeNull();
+  });
+
+  it("marks your bubble Not sent when the mailbox refuses it by id, instead of painting a Kit bubble", async () => {
+    vi.spyOn(crypto, "randomUUID").mockReturnValue("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Message Kit/), { target: { value: "hello kit" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("hello kit")).toBeTruthy();
+    expect(screen.getByText("sending")).toBeTruthy();
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "error", text: "rate", id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee" }));
+    });
+    expect(screen.getByRole("alert").textContent).toBe("Not sent — too much too fast. Wait a minute, then try again.");
+    expect(screen.queryByText("sending")).toBeNull();
+    expect(screen.queryByText("rate")).toBeNull();
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getByText("hello kit").closest("div[class*='bg-you']")).toBeTruthy();
+    act(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    const next = liveSocket();
+    act(() => {
+      next.open();
+    });
+    expect(next.send).not.toHaveBeenCalledWith(expect.stringContaining("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"));
+  });
+
+  it("marks the newest pending bubble when an old mailbox sends an error without an id", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    const box = screen.getByPlaceholderText(/Message Kit/);
+    fireEvent.change(box, { target: { value: "first" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("first")).toBeTruthy();
+    fireEvent.change(box, { target: { value: "second" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("second")).toBeTruthy();
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "error", text: "too large" }));
+    });
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toBe("Not sent — too big for the room.");
+    expect(alert.closest("li")?.textContent).toContain("second");
+    expect(screen.getByText("first").closest("li")?.textContent).toContain("sending");
+  });
+
+  it("encodes photos at the long edge picked in Settings → Photo size and remembers it", async () => {
+    vi.stubGlobal("createImageBitmap", async () => ({ width: 4032, height: 3024, close() {} }));
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    const widths: number[] = [];
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (this: HTMLCanvasElement, cb) {
+      widths.push(this.width);
+      cb(new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: "image/jpeg" }));
+    });
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    const picker = screen.getByLabelText("Photo size") as HTMLSelectElement;
+    expect(picker.value).toBe("medium");
+    expect([...picker.options].map((o) => o.textContent)).toEqual(["Full · 1600 px", "Medium · 1024 px", "Small · 640 px"]);
+    fireEvent.change(picker, { target: { value: "small" } });
+    expect(picker.value).toBe("small");
+    expect(localStorage.getItem("pendant.photo")).toBe("small");
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    const input = document.querySelector("form input[type=file]") as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File([new Uint8Array([1])], "IMG_0002.jpg", { type: "image/jpeg" })] } });
+    await waitFor(() => {
+      expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("data:image/jpeg;base64,"));
+    });
+    expect(widths).toEqual([640]);
+    expect(document.querySelector("li img[src^='data:image/jpeg;base64,']")).toBeTruthy();
+    expect(screen.getByText("sending")).toBeTruthy();
+  });
+
+  it("reads Settings → Photo size back from storage on load", async () => {
+    window.localStorage.setItem("pendant.photo", "full");
+    stubAuth(true);
+    render(<PhoneShell />);
+    expect(await screen.findByText("live")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    expect((screen.getByLabelText("Photo size") as HTMLSelectElement).value).toBe("full");
+  });
+
+  it("says why a photo could not be prepared instead of hiding it in a tooltip", async () => {
+    vi.stubGlobal("createImageBitmap", async () => {
+      throw new Error("nope");
+    });
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    // Compose's picker, not the avatar's in the header.
+    const input = document.querySelector("form input[type=file]") as HTMLInputElement;
+    expect(input).toBeTruthy();
+    const file = new File([new Uint8Array([1, 2, 3])], "IMG_0001.heic", { type: "image/heic" });
+    fireEvent.change(input, { target: { files: [file] } });
+    expect((await screen.findByRole("alert")).textContent).toBe("Photo not sent — couldn't read that image.");
+    expect(ws.send).not.toHaveBeenCalledWith(expect.stringContaining("images"));
+    expect(screen.getByText(/Nothing yet/)).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText(/Message Kit/), { target: { value: "text instead" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("text instead")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("toasts a hidden reply when notifications are granted", async () => {

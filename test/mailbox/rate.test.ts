@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RATE_BYTES_PER_MIN, RATE_FRAMES_PER_MIN } from "@/lib/mailbox/caps";
+import { FRAME_BYTES_MAX, RATE_BYTES_BURST, RATE_BYTES_PER_MIN, RATE_FRAMES_PER_MIN } from "@/lib/mailbox/caps";
 import { principalKey, pruneDualLimits, takeFrame, takeTokens } from "@/lib/mailbox/rate";
 
 describe("rate", () => {
@@ -26,9 +26,23 @@ describe("rate", () => {
       limits = takeFrame(limits.limits, 0, 1);
     }
     expect(limits.ok).toBe(false);
-    const fat = takeFrame(undefined, 0, RATE_BYTES_PER_MIN + 1);
+    const fat = takeFrame(undefined, 0, RATE_BYTES_BURST + 1);
     expect(fat.ok).toBe(false);
     expect(principalKey("sub", "abc")).toBe("sub:abc");
+  });
+
+  it("lets two full photo frames through back to back, then refills at the sustained rate", () => {
+    expect(RATE_BYTES_BURST).toBeGreaterThanOrEqual(2 * FRAME_BYTES_MAX);
+    let limits = takeFrame(undefined, 0, FRAME_BYTES_MAX);
+    expect(limits.ok).toBe(true);
+    limits = takeFrame(limits.limits, 0, FRAME_BYTES_MAX);
+    expect(limits.ok).toBe(true);
+    const third = takeFrame(limits.limits, 0, FRAME_BYTES_MAX);
+    expect(third.ok).toBe(false);
+    const text = takeFrame(third.limits, 1_000, 200);
+    expect(text.ok).toBe(true);
+    const laterPhoto = takeFrame(text.limits, 60_000 * Math.ceil(FRAME_BYTES_MAX / RATE_BYTES_PER_MIN), FRAME_BYTES_MAX);
+    expect(laterPhoto.ok).toBe(true);
   });
 
   it("drops idle dual-limit rows", () => {

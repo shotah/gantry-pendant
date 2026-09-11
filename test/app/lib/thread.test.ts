@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { ackSince, advanceCursor, capThread, placeInThread, rememberSeen, type ThreadOrder } from "@/app/lib/thread";
+import {
+  ackSince,
+  advanceCursor,
+  capThread,
+  failInThread,
+  placeInThread,
+  rememberSeen,
+  type ThreadOrder,
+} from "@/app/lib/thread";
 
 describe("thread caps", () => {
   it("keeps the newest messages", () => {
@@ -24,6 +32,26 @@ describe("thread caps", () => {
       { id: "missed", at: 40, seq: 4 },
     );
     expect(pending.map((m) => m.id)).toEqual(["missed", "mine"]);
+  });
+
+  it("marks the rejected bubble failed by id, else the newest pending one of yours", () => {
+    type Bubble = ThreadOrder & { from: "you" | "kit"; pending?: boolean; failed?: string };
+    const thread: Bubble[] = [
+      { id: "old", at: 1, from: "you", pending: true },
+      { id: "kit", at: 2, from: "kit" },
+      { id: "new", at: 3, from: "you", pending: true },
+      { id: "done", at: 4, from: "you" },
+    ];
+    const byId = failInThread(thread, "old", "Not sent.");
+    expect(byId.find((m) => m.id === "old")).toEqual({ id: "old", at: 1, from: "you", failed: "Not sent.", pending: false });
+    expect(byId.find((m) => m.id === "new")?.pending).toBe(true);
+    const newest = failInThread(thread, undefined, "Not sent.");
+    expect(newest.find((m) => m.id === "new")).toMatchObject({ failed: "Not sent.", pending: false });
+    expect(newest.find((m) => m.id === "old")?.pending).toBe(true);
+    const unknownId = failInThread(thread, "nope", "Not sent.");
+    expect(unknownId.find((m) => m.id === "new")).toMatchObject({ failed: "Not sent.", pending: false });
+    const settled: Bubble[] = [{ id: "done", at: 4, from: "you" }, { id: "kit", at: 5, from: "kit" }];
+    expect(failInThread(settled, undefined, "Not sent.")).toBe(settled);
   });
 
   it("acks the highest seq, not the last arrival", () => {

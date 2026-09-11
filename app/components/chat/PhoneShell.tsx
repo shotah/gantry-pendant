@@ -12,7 +12,7 @@ import { NotifyEnable } from "./NotifyEnable";
 import { SettingsMenu } from "./SettingsMenu";
 import { bubbleFrom, Thread, type ChatBubble } from "./Thread";
 import { mailboxUrl, parseIncoming } from "@/app/lib/socket";
-import { ackSince, advanceCursor, capThread, placeInThread, rememberSeen } from "@/app/lib/thread";
+import { ackSince, advanceCursor, capThread, failInThread, placeInThread, rememberSeen } from "@/app/lib/thread";
 import { browserBattery } from "@/app/lib/battery";
 import { browserBumpBadge, browserClearBadge } from "@/app/lib/badge";
 import { browserGeo } from "@/app/lib/geo";
@@ -22,7 +22,7 @@ import { browserNotifyIncoming } from "@/app/lib/notify";
 import { browserSubscribePush } from "@/app/lib/push";
 import { isIos, isStandalone, signInHint } from "@/app/lib/install";
 import { fileToPhoto } from "@/app/lib/photo";
-import { browserGeoPref, saveGeoPref } from "@/app/lib/prefs";
+import { browserGeoPref, browserPhotoSizePref, saveGeoPref, savePhotoSizePref } from "@/app/lib/prefs";
 import { applyFont, fontFromQuery } from "@/app/lib/font";
 import { RELEASE } from "@/app/lib/release";
 import { applyTheme, themeFromQuery } from "@/app/lib/theme";
@@ -33,6 +33,8 @@ import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
 import { parseSlug } from "@/lib/mailbox/slug";
 import { buildContext } from "@/lib/phone/context";
 import { GEO_TIMEOUT_MS, GEO_WARM_MS, cachedGeo, geoHint } from "@/lib/phone/geo";
+import { DEFAULT_PHOTO_SIZE, PHOTO_SIZES, parsePhotoSize, photoEdge, type PhotoSizeId } from "@/lib/phone/photo";
+import { describePhotoError, describeSendError } from "@/lib/phone/sendError";
 import {
   shouldDropMailboxOnHide,
   shouldReconnectMailbox,
@@ -97,6 +99,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [status, setStatus] = useState<"idle" | "up" | "down">("idle");
   const [gpsHint, setGpsHint] = useState("GPS attaches on send if the OS allows it.");
   const [gpsOn, setGpsOn] = useState(true);
+  const [photoSize, setPhotoSize] = useState<PhotoSizeId>(DEFAULT_PHOTO_SIZE);
   const [prefsReady, setPrefsReady] = useState(false);
   const [messages, setMessagesRaw] = useState<ChatBubble[]>([]);
   const [draft, setDraft] = useState("");
@@ -104,6 +107,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [catalog, setCatalog] = useState<SlashCommand[]>([]);
   const [avatarRev, setAvatarRev] = useState(0);
   const [faceHint, setFaceHint] = useState("");
+  const [sendHint, setSendHint] = useState("");
   const [copied, setCopied] = useState(false);
   const [meWait, setMeWait] = useState(false);
   const [googleHint, setGoogleHint] = useState("");
@@ -264,6 +268,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     if (!on) {
       setGpsHint("GPS off");
     }
+    setPhotoSize(browserPhotoSizePref());
     setPrefsReady(true);
   }, [phone]);
 
@@ -542,6 +547,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         }
         return;
       }
+      if (frame.kind === "error") {
+        // Refusal, not a turn: mark our bubble and never paint it as Kit or move the cursor.
+        setMessages((prev) => failInThread(prev, id, describeSendError(frame.text)));
+        return;
+      }
       if (id) {
         rememberCursor(id, seq);
         if (seenIds.current.has(id)) {
@@ -740,6 +750,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       rememberSeen(seenIds.current, id);
     }
     if (outbound && id) {
+      setSendHint("");
       pinned.current = true;
       setMessages((prev) => placeInThread(prev, {
         id,
@@ -822,10 +833,17 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     });
   }
 
+  function pickPhotoSize(raw: string) {
+    const next = parsePhotoSize(raw);
+    savePhotoSizePref(next);
+    setPhotoSize(next);
+  }
+
   async function sendPhoto(file: File) {
-    const got = await fileToPhoto(file);
+    setSendHint("");
+    const got = await fileToPhoto(file, { edge: photoEdge(photoSize) });
     if (!got.ok) {
-      setGpsHint(got.error);
+      setSendHint(describePhotoError(got.error));
       return;
     }
     await sendText("", got.url);
@@ -1068,6 +1086,25 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
               <span className="text-xs text-muted">Font size</span>
               <FontSelect />
             </div>
+            {phone
+              ? (
+                  <div className="flex flex-col gap-1">
+                    <label className="flex flex-col gap-1 text-xs text-muted">
+                      Photo size
+                      <select
+                        className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+                        value={photoSize}
+                        onChange={(e) => pickPhotoSize(e.target.value)}
+                      >
+                        {PHOTO_SIZES.map((s) => (
+                          <option key={s.id} value={s.id}>{`${s.label} · ${s.edge} px`}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <p className="text-[11px] text-dim">Smaller sends faster and costs fewer tokens to look at.</p>
+                  </div>
+                )
+              : null}
             {(cfg?.dev || (cfg?.google && phone))
               ? (
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2">
@@ -1098,6 +1135,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       </header>
       {faceHint
         ? <p className="shrink-0 border-b border-line px-3 py-1 text-[11px] text-danger">{faceHint}</p>
+        : null}
+      {sendHint
+        ? <p role="alert" className="shrink-0 border-b border-line px-3 py-1 text-[11px] text-danger">{sendHint}</p>
         : null}
       {mouth}
     </div>

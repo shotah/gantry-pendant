@@ -1,4 +1,4 @@
-import { RATE_BYTES_PER_MIN, RATE_FRAMES_PER_MIN } from "./caps";
+import { RATE_BYTES_BURST, RATE_BYTES_PER_MIN, RATE_FRAMES_PER_MIN } from "./caps";
 
 export type Bucket = { tokens: number; updated: number };
 
@@ -36,7 +36,7 @@ export function takeFrame(
   });
   const byte = takeTokens(limits?.bytes, now, bytes, {
     rate: RATE_BYTES_PER_MIN,
-    burst: RATE_BYTES_PER_MIN,
+    burst: RATE_BYTES_BURST,
   });
   const next = { frames: frames.bucket, bytes: byte.bucket };
   return { ok: frames.ok && byte.ok, limits: next };

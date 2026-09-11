@@ -61,6 +61,24 @@ export function placeInThread<T extends ThreadOrder>(messages: T[], bubble: T): 
   return next;
 }
 
+type Sendable = { id: string; from: "you" | "kit"; pending?: boolean; failed?: string };
+
+/**
+ * A mailbox `error` names the frame it refused when it can (`id`); older mailboxes and
+ * parse failures cannot, so fall back to your newest bubble still marked `sending`.
+ * Returns the same array when nothing was pending, so React skips the paint.
+ */
+export function failInThread<T extends Sendable>(messages: T[], id: string | undefined, why: string): T[] {
+  const byId = id ? messages.findIndex((m) => m.id === id && m.from === "you") : -1;
+  const at = byId >= 0
+    ? byId
+    : messages.reduce((last, m, i) => (m.from === "you" && m.pending ? i : last), -1);
+  if (at < 0) {
+    return messages;
+  }
+  return messages.map((m, i) => (i === at ? { ...m, pending: false, failed: why } : m));
+}
+
 export function advanceCursor(current: ThreadCursor, next: { id?: string; seq?: number }): ThreadCursor {
   if (next.seq != null && next.seq >= current.seq) {
     return { id: next.id ?? current.id, seq: next.seq };

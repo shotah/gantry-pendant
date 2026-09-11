@@ -1,5 +1,4 @@
-import { IMAGE_BYTES_MAX } from "@/lib/mailbox/caps";
-import { CHAT_PHOTO_EDGE, photoDataUrl, type PhotoResult } from "@/lib/phone/photo";
+import { CHAT_PHOTO_EDGE, PHOTO_JPEG_BYTES_MAX, photoDataUrl, type PhotoResult } from "@/lib/phone/photo";
 import { jpegFromFile } from "./jpegFromFile";
 
 export type ClipboardBits = {
@@ -39,12 +38,13 @@ export function fileFromClipboard(data: ClipboardBits | null | undefined): File 
   return null;
 }
 
-export async function fileToPhoto(file: File): Promise<PhotoResult> {
+/** `edge` is the long side from Settings → Photo size; defaults to the Full cap. */
+export async function fileToPhoto(file: File, opts: { edge?: number } = {}): Promise<PhotoResult> {
   if (file.size <= 0) {
     return { ok: false, error: "bad photo" };
   }
   try {
-    const blob = await jpegFromFile(file, { edge: CHAT_PHOTO_EDGE, maxBytes: IMAGE_BYTES_MAX });
+    const blob = await jpegFromFile(file, { edge: opts.edge ?? CHAT_PHOTO_EDGE, maxBytes: PHOTO_JPEG_BYTES_MAX });
     const buf = new Uint8Array(await blob.arrayBuffer());
     return photoDataUrl({ mime: "image/jpeg", bytes: buf });
   } catch (e) {

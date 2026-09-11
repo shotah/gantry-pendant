@@ -324,7 +324,8 @@ Calendar items. None of these block a release.
 - [ ] **DO storage audit** monthly: queue rows, `rate` map size, push
       rows per `sub`. The alarm sweep above makes this a glance.
 - [ ] **Policy revisits** with real usage: 7 d session, `QUEUE_TTL_MS`
-      1 h vs "reload keeps the thread", 30 frames / 256 KB per minute.
+      1 h vs "reload keeps the thread", 30 frames/min, bytes 4 MB burst
+      (`RATE_BYTES_BURST`, two photo frames) refilling 256 KB/min.
 - [ ] **Stolen-phone runbook** end to end once a quarter: lock, Google
       sign-out, yank `sub`, rotate bearer, confirm 4401.
 

@@ -172,11 +172,11 @@ You cannot run telegram + pendant in the same process.
 | GPS denied / HTTP / no gesture / toggle off | message still sends; no `context.geo` | expected; do not block send |
 | iOS `watchPosition` | killed in the background | we only `getCurrentPosition` on send |
 | HEIC / iPhone photo | canvas JPEG when `createImageBitmap` can decode | otherwise “bad photo” |
-| Photo > ~1.5 MB | compress in-app to the chat cap | still 413 if encode cannot shrink enough |
+| Camera photo (2–8 MB) | in-app JPEG ladder: long edge from Settings → Photo size (Full 1600 / **Medium 1024** / Small 640, `pendant.photo`) at q 0.9 → 0.6, then edge × 0.75 down to 320 px, until the **base64 data URL** fits `IMAGE_BYTES_MAX` (raw budget `PHOTO_JPEG_BYTES_MAX`) | “Photo not sent — still too big after shrinking” strip only if the ladder bottoms out; “couldn't read that image” when the decoder fails (HEIC on an older browser) |
 | Lock screen ping while app is dead | Web Push if VAPID is set and they enabled notifications (installed PWA; iOS 16.4+ standalone) | Settings → Enable notifications after Google. Missing VAPID → queue only; native APNs/FCM later |
 | Queue while Mini reboots | ≤50 frames, 1 hour TTL, then drop | unread catch-up only |
 | Transcript on reload | last 80 `inbound` / `reply` / `push` per `sub` | kill the tab, reopen; not `sw.js`. Cab paints the same frames (`replay: true` skips Auto HUN — ship Cab with this mailbox) |
-| Rate limit (30 frames / 256 KB per min) | socket stays up, frames return `rate` | looks like “she ignored me” |
+| Rate limit (30 frames/min; bytes 4 MB burst = two full photo frames, refill 256 KB per min) | socket stays up, frames return `error` `rate` with the refused `id` (additive) | PWA marks that bubble “Not sent — too much too fast”; Cab shows the token as a hint. Burst below one frame was the old photo bug: every camera shot bounced as `rate` forever |
 | Session hard 7d (JWT `exp` at mint) | next send closes 4401 | sign in again; yank `sub` takes effect on the next frame |
 | Service worker | no chat cache (good) | also no offline compose |
 

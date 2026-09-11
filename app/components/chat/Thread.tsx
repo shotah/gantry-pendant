@@ -12,6 +12,8 @@ export type ChatBubble = {
   seq?: number;
   photo?: string;
   pending?: boolean;
+  /** Mailbox refused it; sentence from `describeSendError`. */
+  failed?: string;
 };
 
 /** Flushed inbound is your mouth; everything else follows the viewer role. */
@@ -56,9 +58,11 @@ export function Thread({ messages, empty }: { messages: ChatBubble[]; empty?: Re
                     </div>
                   )
                 : null}
-              {mine && m.pending
-                ? <p className="mt-1 text-[0.7em] text-dim">sending</p>
-                : null}
+              {mine && m.failed
+                ? <p role="alert" className="mt-1 text-[0.7em] text-danger">{m.failed}</p>
+                : mine && m.pending
+                  ? <p className="mt-1 text-[0.7em] text-dim">sending</p>
+                  : null}
             </div>
           </li>
         );

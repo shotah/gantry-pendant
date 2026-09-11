@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fileFromClipboard, fileToPhoto } from "@/app/lib/photo";
+import { IMAGE_BYTES_MAX, utf8Bytes } from "@/lib/mailbox/caps";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -58,6 +59,42 @@ describe("fileToPhoto", () => {
     if (got.ok) {
       expect(got.url.startsWith("data:image/jpeg;base64,")).toBe(true);
     }
+  });
+
+  it("shrinks a camera shot until the data URL fits the wire", async () => {
+    vi.stubGlobal("createImageBitmap", async () => ({ width: 4032, height: 3024, close() {} }));
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    let encodes = 0;
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (this: HTMLCanvasElement, cb, _type, quality) {
+      encodes += 1;
+      // First pass lands well over the budget; anything after fits.
+      const size = encodes === 1 ? 3_000_000 : Math.round(this.width * Number(quality) * 100);
+      cb(new Blob([new Uint8Array(size)], { type: "image/jpeg" }));
+    });
+    const file = new File([new Uint8Array([1, 2, 3])], "IMG_0001.jpg", { type: "image/jpeg" });
+    const got = await fileToPhoto(file);
+    expect(got.ok).toBe(true);
+    expect(encodes).toBe(2);
+    if (got.ok) {
+      expect(utf8Bytes(got.url)).toBeLessThanOrEqual(IMAGE_BYTES_MAX);
+    }
+  });
+
+  it("draws at the long edge Settings asked for", async () => {
+    vi.stubGlobal("createImageBitmap", async () => ({ width: 4032, height: 3024, close() {} }));
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    const dims: [number, number][] = [];
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (this: HTMLCanvasElement, cb) {
+      dims.push([this.width, this.height]);
+      cb(new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: "image/jpeg" }));
+    });
+    const file = new File([new Uint8Array([1, 2, 3])], "IMG_0001.jpg", { type: "image/jpeg" });
+    expect((await fileToPhoto(file, { edge: 640 })).ok).toBe(true);
+    expect(dims).toEqual([[640, 480]]);
   });
 
   it("maps an oversized encode to too large", async () => {

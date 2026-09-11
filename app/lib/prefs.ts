@@ -1,4 +1,5 @@
-import { geoPrefOn, writeGeoPref } from "@/lib/phone/prefs";
+import type { PhotoSizeId } from "@/lib/phone/photo";
+import { geoPrefOn, photoSizePref, writeGeoPref, writePhotoSizePref } from "@/lib/phone/prefs";
 
 export function browserGeoPref(): boolean {
   if (typeof window === "undefined") {
@@ -12,4 +13,18 @@ export function saveGeoPref(on: boolean): void {
     return;
   }
   writeGeoPref(window.localStorage, on);
+}
+
+export function browserPhotoSizePref(): PhotoSizeId {
+  if (typeof window === "undefined") {
+    return photoSizePref(null);
+  }
+  return photoSizePref(window.localStorage);
+}
+
+export function savePhotoSizePref(id: PhotoSizeId): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  writePhotoSizePref(window.localStorage, id);
 }

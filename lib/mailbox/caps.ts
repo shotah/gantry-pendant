@@ -13,7 +13,10 @@ export const QUEUE_TTL_MS = 60 * 60 * 1000;
 export const TRANSCRIPT_MAX = 80;
 export const TRANSCRIPT_BYTES_MAX = QUEUE_BYTES_MAX;
 export const RATE_FRAMES_PER_MIN = 30;
+/** Sustained refill. Text is a few hundred bytes; this only bites on photo sprees. */
 export const RATE_BYTES_PER_MIN = 256_000;
+/** Bucket depth. Must hold a full photo frame or no legal photo ever passes; two so a pair sends. */
+export const RATE_BYTES_BURST = 2 * FRAME_BYTES_MAX;
 
 export function utf8Bytes(s: string): number {
   return new TextEncoder().encode(s).byteLength;

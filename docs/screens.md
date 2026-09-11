@@ -63,7 +63,7 @@ pendant glyph until a JPEG is saved on the Durable Object.
 | `down` | `/?sample=down` | Other side gone. Compose locked. |
 | `thread-day` | `/?sample=thread&theme=lamp` | Lamp theme. Boom / Inlay / Lamp live in the picker. |
 | `thread-xl` | `/?sample=thread&font=xl` | Extra-large chat type. Small is the default. |
-| `settings` | `/?sample=empty` | Cog open — theme, font size, Install. |
+| `settings` | `/?sample=empty` | Cog open — theme, font size, photo size, Install. |
 | `crane` | `/crane?sample=crane` | Loopback stand-in for the harness (`PENDANT_DEV`). |
 
 ---

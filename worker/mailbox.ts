@@ -164,7 +164,8 @@ export class Mailbox extends DurableObject<Env> {
     if (!skipRate) {
       const limits = await this.take(meta.rateId, parsed.bytes);
       if (!limits) {
-        ws.send(encodeFrame({ kind: "error", text: "rate" }));
+        // `id` is additive so the sender can mark its own bubble; Cab reads `text` only.
+        ws.send(encodeFrame({ kind: "error", text: "rate", id: out.id }));
         return;
       }
     }

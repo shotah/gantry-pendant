@@ -39,6 +39,7 @@ before you call it done. A PWA-only paint is not enough.
 | Auth (`/api/auth/*`, session JWE, 4401) | Cab POSTs the ID token and stores the JWE. Spike query creds are PWA loopback only |
 | Queue / `ack` / `since` / `seq` | Cab parses `seq` / `at`, inserts like `placeInThread`, acks the highest seq. Transcript hydrate is the same frames plus `replay` — see below |
 | Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Do not assume it needs the PWA CSS |
+| Photo caps, encode ladder, `error` tokens | Both mouths encode to the same budget and paint refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
 | PWA-only UI (theme, font, Install) | Cab has its own Compose shell |
 
 **Cover:** after a mailbox frame change, read
@@ -70,6 +71,56 @@ Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`):
   path. Cab `THREAD_MAX` is 80 (mailbox hydrates 80). **Ship Cab with
   this mailbox** so Auto HUNs skip `replay` (`shouldSpeak(kind, replay)`).
   An old APK still paints and still toasts every hydrate frame.
+
+---
+
+## Photos (what every mouth must do the same)
+
+Source of truth: `lib/mailbox/caps.ts`, `lib/phone/photo.ts`,
+`app/lib/jpegFromFile.ts`. Cab mirrors in `mailbox/Photo.kt`,
+`mailbox/Jpeg.kt`, `mailbox/JpegIo.kt`.
+
+**Wire.** One `images: [{ url }]` per frame, `url` a
+`data:image/jpeg;base64,…`. The mailbox measures the **data URL**
+(`utf8Bytes(url) ≤ IMAGE_BYTES_MAX` = 1 500 000) and the whole frame
+(`≤ FRAME_BYTES_MAX` = 2 000 000). Base64 is 4/3 of the bytes, so the
+**raw JPEG budget is `PHOTO_JPEG_BYTES_MAX`** = `floor((1 500 000 − 32) / 4) × 3`
+= 1 124 976. Encoding to 1.5 MB raw passes a client check and fails on
+the wire as `too large`.
+
+**Rate.** Byte bucket is `RATE_BYTES_BURST` = 2 × `FRAME_BYTES_MAX`
+deep (two full photos back to back), refilling `RATE_BYTES_PER_MIN`
+= 256 KB/min; frames 30/min. Before this the burst was 256 KB and every
+camera shot bounced as `rate` forever — that was the "photo never
+lands" bug on both mouths.
+
+**Encode ladder** (`jpegFromFile`): draw at the chosen long edge, try
+quality 0.9 → 0.8 → 0.7 → 0.6; if still over budget, edge × 0.75 and
+repeat; floor 320 px, then give up with `too large`. Pass-through only
+for a JPEG already ≤ edge and ≤ budget. Cab today does one encode at
+90 (`JpegIo.kt`); port the ladder.
+
+**Photo size** (Settings, per device, not on the wire). Long edge:
+
+| Id | Edge | Why |
+| --- | --- | --- |
+| `full` | 1600 | old cap; models clamp near 1 MP so this mostly buys bytes |
+| `medium` | 1024 | **default**; reads receipts and signs |
+| `small` | 640 | "is this a plant" |
+
+Vision tokens track pixel area (~w·h/750), not JPEG bytes — that is why
+this is an edge knob and not a quality knob. PWA stores it at
+`localStorage["pendant.photo"]`; Cab keeps its own pref with the same
+ids and edges so the two mouths agree on what "Medium" means.
+
+**Errors.** The mailbox answers a refused frame with
+`{ kind: "error", text, id }` where `text` is a token — `rate`,
+`too large`, `bad frame` — and `id` (additive) is the refused frame's
+id when the frame parsed. Paint it on **your own bubble** as "not
+sent", never as a turn from the crane, and do not move the `since`
+cursor from it. PWA strings: `lib/phone/sendError.ts`. Pre-wire
+failures (`bad photo` = decoder, `too large` = ladder bottomed out)
+are local; say so in the mouth.
 
 ---
 
