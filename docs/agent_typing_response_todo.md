@@ -18,7 +18,7 @@ which checkout you touch.
 
 ## Fit gates
 
-Same as [todo.md](todo.md#fit-gates), plus:
+Same as [design.md](design.md#principles), plus:
 
 1. **The crane emits it.** The phone never infers "he's thinking"
    from an inbound ack. If Handle has not started, there is no typing.

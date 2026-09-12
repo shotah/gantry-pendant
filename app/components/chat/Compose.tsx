@@ -25,6 +25,7 @@ function AttachChip({
   gpsOn,
   gpsHint,
   disabled,
+  onCamera,
   onPhoto,
   onCommands,
   onToggle,
@@ -33,6 +34,7 @@ function AttachChip({
   gpsOn: boolean;
   gpsHint?: string;
   disabled?: boolean;
+  onCamera?: () => void;
   onPhoto?: () => void;
   onCommands?: () => void;
   onToggle?: () => void;
@@ -94,6 +96,18 @@ function AttachChip({
               aria-label="Attach"
               className="absolute bottom-full left-0 z-20 mb-1 w-52 rounded-xl border border-line bg-panel p-1.5 shadow-lg"
             >
+              {onCamera
+                ? (
+                    <button
+                      type="button"
+                      className="w-full rounded-lg px-2 py-1.5 text-left text-xs text-body hover:bg-track disabled:opacity-40"
+                      disabled={disabled}
+                      onClick={() => pick(onCamera)}
+                    >
+                      Camera
+                    </button>
+                  )
+                : null}
               {onPhoto
                 ? (
                     <button
@@ -184,6 +198,8 @@ export function Compose({
   placeholder,
   onSend,
   onPhoto,
+  photo,
+  onPhotoClear,
   onPin,
   gpsHint,
   gpsOn = true,
@@ -196,8 +212,13 @@ export function Compose({
 }: {
   disabled?: boolean;
   placeholder?: string;
+  /** Text only; the staged `photo` rides along on the same turn from the owner. */
   onSend: (text: string) => void;
+  /** Stage a pick, shot, or paste on the draft. Nothing goes on the wire until Send. */
   onPhoto?: (file: File) => void;
+  /** Encoded data URL sitting on the draft; Send is live with no text while it is set. */
+  photo?: string | null;
+  onPhotoClear?: () => void;
   onPin?: () => void;
   gpsHint?: string;
   gpsOn?: boolean;
@@ -214,6 +235,7 @@ export function Compose({
   const [emojiOpen, setEmojiOpen] = useState(initialEmoji);
   const [emojiQuery, setEmojiQuery] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const onPhotoRef = useRef(onPhoto);
   onPhotoRef.current = onPhoto;
@@ -295,7 +317,7 @@ export function Compose({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const t = applyEmoji(text, text.length, "send").text.trim();
-    if (!t || disabled) {
+    if ((!t && !photo) || disabled) {
       return;
     }
     onSend(t);
@@ -327,23 +349,37 @@ export function Compose({
     setDismissed(true);
   }
 
+  /** Gallery pick and camera shot land on the same ladder and the same caps. */
+  function takeFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) {
+      onPhoto?.(f);
+    }
+    e.target.value = "";
+  }
+
   return (
     <form onSubmit={submit} className="relative shrink-0 border-t border-line bg-panel p-3">
       {onPhoto
         ? (
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) {
-                  onPhoto(f);
-                }
-                e.target.value = "";
-              }}
-            />
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                className="hidden"
+                onChange={takeFile}
+              />
+              {/* `capture` opens the rear camera on a phone; a desktop browser ignores it and shows the picker. */}
+              <input
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={takeFile}
+              />
+            </>
           )
         : null}
       {emojiOpen
@@ -394,6 +430,22 @@ export function Compose({
             </div>
           )
         : null}
+      {photo
+        ? (
+            <div className="mb-2 flex items-center gap-2">
+              <img src={photo} alt="Photo to send" className="h-14 w-14 shrink-0 rounded-lg border border-line object-cover" />
+              <p className="min-w-0 flex-1 text-xs text-dim">Goes with your next message.</p>
+              <button
+                type="button"
+                aria-label="Remove photo"
+                className="shrink-0 rounded-lg border border-line px-2 py-1 text-xs text-muted hover:bg-track"
+                onClick={onPhotoClear}
+              >
+                Remove
+              </button>
+            </div>
+          )
+        : null}
       <div className="flex items-stretch gap-2">
         <div className="flex min-h-11 min-w-0 flex-1 items-stretch rounded-xl border border-edge bg-canvas">
           <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 py-0.5 pl-0.5">
@@ -408,6 +460,7 @@ export function Compose({
                     gpsOn={Boolean(onGpsToggle || onPin) && gpsOn}
                     gpsHint={gpsHint}
                     disabled={disabled}
+                    onCamera={onPhoto ? () => cameraRef.current?.click() : undefined}
                     onPhoto={onPhoto ? () => fileRef.current?.click() : undefined}
                     onCommands={commands ? toggleCommands : undefined}
                     onToggle={onGpsToggle}
@@ -469,7 +522,7 @@ export function Compose({
         </div>
         <button
           type="submit"
-          disabled={disabled || !text.trim()}
+          disabled={disabled || (!text.trim() && !photo)}
           className="flex shrink-0 items-center justify-center self-stretch rounded-xl border border-accent-line bg-accent-soft px-3 text-sm text-mark disabled:opacity-40"
         >
           Send

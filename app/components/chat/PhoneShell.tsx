@@ -127,6 +127,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [prefsReady, setPrefsReady] = useState(false);
   const [messages, setMessagesRaw] = useState<ChatBubble[]>([]);
   const [draft, setDraft] = useState("");
+  const [stagedPhoto, setStagedPhoto] = useState<string | null>(null);
   const [sampleEmoji, setSampleEmoji] = useState(false);
   const [catalog, setCatalog] = useState<SlashCommand[]>([]);
   const [avatarRev, setAvatarRev] = useState(0);
@@ -399,12 +400,13 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     if (!prev || prev === roomSlug) {
       return;
     }
-    // A different room: its bubbles, cursor, and dedup set are not this one's.
+    // A different room: its bubbles, cursor, dedup set, and staged photo are not this one's.
     seenIds.current.clear();
     lastSeenId.current = undefined;
     lastSeenSeq.current = 0;
     lastSaved.current = [];
     setMessagesRaw([]);
+    setStagedPhoto(null);
   }, [roomSlug]);
 
   useEffect(() => {
@@ -865,6 +867,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     }
     if (outbound && id) {
       setSendHint("");
+      setStagedPhoto(null);
       pinned.current = true;
       setMessages((prev) => placeInThread(prev, {
         id,
@@ -984,14 +987,18 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     });
   }
 
-  async function sendPhoto(file: File) {
+  /**
+   * Encode now, send later: the ladder runs while the caption is typed, a bad
+   * file is refused on the spot, and Send carries caption + photo as one turn.
+   */
+  async function stagePhoto(file: File) {
     setSendHint("");
     const got = await fileToPhoto(file, { edge: photoEdge(photoSize) });
     if (!got.ok) {
       setSendHint(describePhotoError(got.error));
       return;
     }
-    await sendText("", got.url);
+    setStagedPhoto(got.url);
   }
 
   async function copyIdentity() {
@@ -1130,8 +1137,10 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           catalog={catalog}
           initialText={draft}
           initialEmoji={sampleEmoji}
-          onSend={(t) => void sendText(t)}
-          onPhoto={phone ? (f) => void sendPhoto(f) : undefined}
+          onSend={(t) => void sendText(t, stagedPhoto ?? undefined)}
+          onPhoto={phone ? (f) => void stagePhoto(f) : undefined}
+          photo={phone ? stagedPhoto : undefined}
+          onPhotoClear={phone ? () => setStagedPhoto(null) : undefined}
           onPin={phone ? () => void sendPin() : undefined}
           onEngage={phone ? () => void warmGps() : undefined}
         />

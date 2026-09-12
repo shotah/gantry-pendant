@@ -1,276 +1,143 @@
 # gantry-pendant — todo
 
-What's left. The mouth talks in code; Telegram stays production until
-the walks are real on a phone. Pitch: [README.md](../README.md). Why:
-[design.md](design.md). Wire: [architecture.md](architecture.md). Authn:
-[security.md](security.md). Who talks: [setup.md](setup.md). Other
-mouths: [frontends.md](frontends.md). Misses:
-[edgecases.md](edgecases.md). Typing dots:
-[agent_typing_response_todo.md](agent_typing_response_todo.md). Face,
-backdrop, and Kit's mood:
-[agent_ui_controls.md](agent_ui_controls.md). Bugs and
-security by phase: [audit_todo.md](audit_todo.md).
+Open work. A line is done when the **walk** works. Scope is which
+checkout you touch. Telegram stays production until the phone walks
+are real.
 
-A line is done when the **walk** works without a second brain. Scope is
-which checkout you touch.
-
----
+Pitch: [README.md](../README.md). Why: [design.md](design.md). Wire:
+[architecture.md](architecture.md). Who talks: [setup.md](setup.md).
+Other mouths: [frontends.md](frontends.md). Misses:
+[edgecases.md](edgecases.md). Sibling phones:
+[sibling_phones.md](sibling_phones.md). Typing:
+[agent_typing_response_todo.md](agent_typing_response_todo.md). Face /
+mood: [agent_ui_controls.md](agent_ui_controls.md). Bugs / security:
+[audit_todo.md](audit_todo.md).
 
 ## Fit gates
 
-If a task fails a gate, it is later or it belongs in another repo.
-
-1. **Zero inbound on the crane.** The channel dials the Worker.
-2. **Console never sits in a chat turn.** No Gantree HTTP for messages.
-3. **Allowlist, no pairing.** Empty list is a config error. Human id is
-   Google `sub`. Crane id is a bearer bound to the slug.
-4. **One channel loop.** Sibling of `telegram/` / `discord/` / `slack/` /
-   `stdio/`. No second agent.
-5. **Vinext on Workers.** Same `app/` muscle as Gantree, not Node, not
-   Gantree's `app/` deployed twice.
-6. **Wire generous, prompt stingy.** GPS on the frame → `here.Set`.
-   Not `[location]` in `Message.Text`.
-7. **MCP OAuth is not login.** New Web client, `openid email profile`.
-8. **Not the yard's phone layout.** Pretty Gantree CSS is a parallel
-   track in gantree.
+Same eight as [design.md](design.md#principles). Fail a gate → later
+or another repo.
 
 ---
 
-## Next — prove it
+## Prove it
 
-Code for the mouth is in. These walks are still the second brain.
-
-### Deploy + Google
-
-**Walk:** [deployment.md](deployment.md), then sign in on the deployed
-origin; two tabs are not enough.
+Two laptop tabs do not close these. Walk:
+[deployment.md](deployment.md), then a real phone.
 
 - [ ] Deploy to `workers.dev`
-- [ ] GCP **Web application** client: JS origin = this origin; redirect
-      `/api/auth/callback/google`; scopes `openid email profile` only.
-      Not Desktop, not `oauth-catch`, not `localhost:4100`.
-      [setup.md](setup.md#once-before-any-person)
-- [ ] Worker secrets: Google + `SESSION_SECRET` + `CRANE_BEARERS`.
-      `ALLOWED_SUBS` optional. Spike `MAILBOX_SECRET` gone from prod.
-      **Gantree Settings + mint on build** — not this checkout
-      ([gantree manage_pendant_cf_todo.md](https://github.com/shotah/gantree/blob/main/docs/manage_pendant_cf_todo.md)).
-      Leftover: `npm run secrets:push`
-
-### Pocket (P5)
-
-**Walk:** Add to Home Screen. LTE, no Tailscale. Google. Send text with
-GPS granted. Photo. Cron ping with the app open. `[last pin]` is
-this-send.
-
-- [ ] Confirm Android Chrome PWA and iPhone Add to Home Screen
-- [ ] Two allowlisted accounts, two phones, one crane: Ada's reply does
+- [ ] GCP **Web** client: JS origin = this origin; redirect
+      `/api/auth/callback/google`; `openid email profile` only
+      ([setup.md](setup.md#once-before-any-person))
+- [ ] Worker secrets: Google + `SESSION_SECRET` + `CRANE_BEARERS`
+      (`ALLOWED_SUBS` optional). Spike `MAILBOX_SECRET` gone. Mint from
+      Gantree Settings + Build, not `npm run secrets:push` from here
+- [ ] VAPID in Worker secrets (`npm run vapid`) so lock-screen ping
+      works. Gantree Settings does not mint it yet
+- [ ] Android Chrome PWA and iPhone Add to Home Screen (LTE, no
+      Tailscale). Text + GPS, photo, cron ping with the app open
+- [ ] Two allowlisted humans, two phones, one crane: Ada's reply does
       not land on Bob; Bob foregrounds and the queued reply appears
-- [ ] Yank Ada's `sub` mid-chat → next send is 4401, not a reply
-
-Do not close those on two laptop tabs.
+- [ ] Yank Ada's `sub` mid-chat → next send is `4401`, not a reply
 
 ---
 
-## Then — one list, first human
-
-The crane publishes `allow`; this Worker stores it and admits from it.
-`ALLOWED_SUBS` is optional extra. Walk is recreate, not a Cloudflare
-paste per human.
-
-### Crane publishes the allowlist · gantry-pendant + ai-gantry
-
-**Walk:** `ALLOWED_SUBS` is gone from Worker secrets. Crane boots with
-`PENDANT_ALLOWED_USERS`, dials in, publishes. Ada signs in and joins.
-Stranger signs in, sees own `sub` + "send this to the yard admin",
-never joins the room. Admin adds the email to crane `.env`, recreates;
-Ada's friend is in. No `wrangler secret put`.
-
-- [x] Frame `kind: "allow"` crane→DO; phone must not publish
-- [x] DO stores allowlist per slug; phone handshake asks the DO
-- [x] On publish: close phone sockets no longer allowed (`4401`)
-- [x] Mint session for any **verified** Google account; `/api/auth/me`
-      returns `{ sub, email, cranes }`; DO still denies unless allowed
-- [x] Phone picks from `cranes`; empty shows email + `sub` + copy.
-      Never on the query string
-- [ ] ai-gantry: publish allowlist on connect; keep local check as a
-      free redundant filter (other repo)
-- [x] `ALLOWED_SUBS` optional in handshake, wrangler, [setup.md](setup.md)
-
-### Yard copy · gantree
-
-**Walk:** add Ada on the board; recreate Kit; she still cannot talk
-until the crane list (and, until the publish work lands, Cloudflare)
-has the same `sub`.
-
-- [ ] Gantree `/profile`: Google `sub` (not email-as-key)
-- [ ] Confirm-scary copy onto `PENDANT_ALLOWED_USERS`
-- [ ] After crane-publish: Worker list is gone; this is the one paste
-
-### Examples auto-bind · ai-gantry
-
-**Walk:** new pendant crane with examples on; capability pings appear
-without `/examples`.
-
-- [ ] Same auto-bind case as Telegram, user id = Google `sub`
-
-### Maps uses the pin · ai-gantry
-
-**Walk:** LTE, GPS on, "coffee near me" → tool args are this-send
-coords, not a stale Telegram pin.
-
-- [ ] Confirm the pendant crane has maps MCP
-- [ ] PERSONA / recipe: use `[last pin]`; do not ask for a pin unless
-      `here` is empty
-- [ ] Do **not** reverse-geocode in the PWA or Worker
-- [ ] Clock footer `[last pin ±12m]` from `accuracy_m` (prompt-only)
-
----
-
-## Later
-
-Foreground cheap-PWA extras that are already in (battery, net, GPS
-toggle, silent pin, wake, haptic, badge, shortcuts, photo compress,
-Web Push once VAPID is on the Worker)
-need the pocket walk above, not more code. Mouth UI misses below wait
-on the same walk. Do not start Expo until the PWA path is painful.
-
-### This repo
-
-- [ ] **Voice into compose** — `SpeechRecognition`; fill the textarea,
-      do not auto-send. Not a voice-note bubble.
-- [ ] **Share target** — Android share sheet → compose (do not register
-      `share_target` until the POST handler exists)
-- [ ] **Offline outbound queue** — page-side unsent frames; do not cache
-      chat in `sw.js`
-- [x] **Web Push** — VAPID in Worker secrets; subscribe after Google;
-      lock-screen cron when no phone socket. Installed PWA, iOS 16.4+.
-      Gantree Settings does not mint VAPID yet — `npm run vapid` then
-      leftover `secrets:push` / `wrangler secret put`.
-- [ ] **Custom hostname** — cookies + OAuth redirect; crane URL
-      updated; recreate
-- [x] **Typing action** — pendant paints crane `kind: "typing"` (header
-      `live · typing…`). Crane emit walk:
-      [agent_typing_response_todo.md](agent_typing_response_todo.md)
-- [ ] Sliding session refresh (today is hard 7d)
-- [x] Prune stale entries in the DO rate-limit map
-- [x] Native cab auth — `POST /api/auth/token` + phone `Authorization`
-      (session JWE). Client lives in `repos/gantry-cab`.
-
-### Mouth UI
-
-The shell is a thread, not a Telegram clone. These are the misses that
-still fight a phone talking to Kit. Not groups, stickers, or Mini Apps.
-
-**Walk (history):** kill the tab, reopen. Ada still sees the last
-turns, not an empty thread, while Kit's session is unchanged. The
-SQLite queue stays unread-only catch-up. This is a short persisted
-transcript for this `sub`. Cap it. Evict old. Do **not** cache chat in
-`sw.js`. Architecture already allowed later HTTP for history/media.
-
-- [x] **Reload keeps the thread** — hydrate bubbles for this `user_id`
-      on connect (`t:<sub>`, 80, `replay: true`). Not a second session
-      store on the crane. Queue (`QUEUE_*`, 1h) is not the transcript.
-      Cab: ship the APK that skips Auto HUN on `replay` (`Wire.kt` /
-      `shouldSpeak`). Old Cab still paints.
-- [x] **No blank slate on reload** — the PWA paints the last thread,
-      face, and wallpaper from IndexedDB before the socket is up
-      (`app/lib/kv.ts`); hydrate folds in by `id`, blobs revalidate
-      with `If-None-Match` → 304. Page-side, not `sw.js`.
-- [x] Waiting-room `/me` poll 3 s (429 backoff). Auth bucket 40/min.
-- [x] Optional `LOCATION_HINT` wrangler var on `MAILBOX.get`
-
-**Walk (presence):** yank the crane. Header stays `live` (phone socket)
-but shows she is gone / inbound is queued. Bring the crane back:
-presence flips without a fake `typing…`. Inbound `ack` still must not
-type. Same anti-hatch as
-[agent_typing_response_todo.md](agent_typing_response_todo.md).
-
-- [ ] **Crane up vs phone live** — DO already knows the crane socket.
-      Overlay `asleep` / `queued` on the subtitle. `live` stays socket
-      health. Never infer from inbound `ack`.
-
-**Walk (photo):** type "this hatch?", paste a screenshot or pick a photo,
-Send. One inbound: caption + one JPEG. Attach must not fire a second
-empty-text turn. Paste-into-compose is a user attach, not a clipboard
-dump on the wire.
-
-- [ ] **Caption + attach** — photo sits on the draft until Send. Paste
-      image into the box. Camera (`capture`) is fine; gallery stays.
-      `IMAGE_MAX` stays 1.
-- [ ] **Pin on the bubble** — outbound that carried `context.geo` shows
-      `±Nm this send` (accuracy only). Tap opens maps. Do not
-      reverse-geocode. Do not put coords in `Text`. Silent pin stays
-      silent (no bubble).
-- [ ] **Timestamps** — `ChatBubble.at` is already there; paint time and
-      a day chip. Phone clock, not a second server now.
-- [ ] **Copy / retry** — long-press copies text (and fenced code).
-      Unacked inbound leaves `sending` forever today; flip to failed
-      and resend. Drop the ghost or reuse `id` — pick one, test ack
-      dedup.
-- [ ] **Stop a turn** — while `typing…`, a control that cancels Handle.
-      Empty `/cancel` already stops the ticker; the phone needs a
-      button. Crane must abort (other repo); this checkout only sends.
-- [ ] **Quote** — inbound can name the bubble `id` you are answering.
-      Kit sees which hatch photo. No thread-within-thread chrome.
-- [ ] **Inline confirm** — Kit asks "latch the gate?" with Yes / No.
-      Tap is a short inbound (or a dedicated kind), not a 👍 that
-      secretly starts Handle. Skip reactions.
-- [ ] **One non-image file** — log / `.ics` / pdf under the same byte
-      cap. Not a document dump. Crane must accept it (other repo).
-- [ ] **Draft survives reload** — compose text in localStorage. Not
-      the thread.
-- [ ] **Mute pings** — local pref: `push` does not badge / notify /
-      haptic. Socket still paints the bubble.
-- [ ] Photo lightbox / save; jump-to-bottom when a ping lands off the
-      floor; session chip when `/new` actually resets history.
+## Other checkouts
 
 ### ai-gantry
 
-- [x] Phone replaces the last Kit bubble on `kind: "draft"` (pendant).
-      Crane `ReplyWriter` still later — this is the stream writer, not
-      typing: [agent_typing_response_todo.md](agent_typing_response_todo.md)
+- [ ] Publish `allow` on connect (`PENDANT_ALLOWED_USERS`); keep the
+      local check as a redundant filter. Then Worker `ALLOWED_SUBS`
+      can go
+- [ ] Examples auto-bind on a new pendant crane (same case as Telegram,
+      user id = Google `sub`)
+- [ ] Maps: tool args are this-send coords, not a stale Telegram pin.
+      PERSONA uses `[last pin]`; do not ask unless `here` is empty.
+      Clock footer `[last pin ±12m]` from `accuracy_m` (prompt-only)
 - [ ] Honor pendant stop / `/cancel` so Handle aborts; typing ticker
       dies before any reply
+      ([agent_typing_response_todo.md](agent_typing_response_todo.md))
 - [ ] Reply-to: inbound names a prior frame `id`; Completer sees which
-      bubble (photo) Ada quoted
-- [ ] Inline Yes / No on a reply (Telegram callback shape). Pendant
-      paints buttons; tap is a short inbound, not a reaction
-- [ ] One non-image file on the channel under the chat cap (sibling of
-      `Images`, not a second mailbox)
+      bubble Ada quoted
+- [ ] Inline Yes / No on a reply (Telegram callback shape). Tap is a
+      short inbound, not a reaction
+- [ ] One non-image file on the channel under the chat cap
 
-### Sister mouths (not this checkout)
+### gantree
 
-Same Durable Object. Do not fork the mailbox. [frontends.md](frontends.md).
+- [ ] `/profile`: Google `sub` (not email-as-key)
+- [ ] Confirm-scary copy onto `PENDANT_ALLOWED_USERS`
+- [ ] After crane-publish: Worker list is gone; the fold is the one
+      paste
 
-- **gantry-cab** is the Android + Auto app. Wire changes (`seq` / `at`,
-  `replay`, new `kind`, auth) need a look at `Wire.kt` / `Mouth.kt`
-  there. Cab inserts by seq like the PWA (`mailbox/Thread.kt`).
-  Transcript hydrate: ship Cab so Auto skips `replay` HUNs.
-- **iOS native** is later. Same room. Sign in with Apple is a mailbox
-  auth change, not a second Worker.
-- Expo / bookmark-is-not-enough: Background GPS, APNs, TestFlight —
-  **no** store listing required. Do not start this to “catch up” Cab.
+### gantry-cab
 
-Hostname-based Cloudflare Access on the **document** origin only is
-optional after a custom hostname. Never "Protect this Worker".
+Same Durable Object. Do not fork the mailbox.
+[frontends.md](frontends.md).
+
+- [ ] Ship the APK that skips Auto HUN on `replay` (`shouldSpeak`)
+- [ ] Caption + attach: one inbound, not an empty-text photo turn
+      ahead of the caption (PWA already stages)
+- [ ] Walk sibling inbound after the Worker fans it
+      ([sibling_phones.md](sibling_phones.md)). Cab already paints
+      `inbound` as you; keep `MailboxClient.sweep`
+
+Wire changes (`seq` / `at`, `replay`, new `kind`, auth) still need a
+look at `Wire.kt` / `Mouth.kt`. iOS native is later (Sign in with Apple
+is a mailbox auth change). Do not start Expo to catch up Cab.
+
+---
+
+## This repo
+
+- [ ] **Voice into compose** — `SpeechRecognition`; fill the
+      textarea, do not auto-send
+- [ ] **Share target** — Android share sheet → compose (do not
+      register `share_target` until the POST handler exists)
+- [ ] **Offline outbound queue** — page-side unsent frames; do not
+      cache chat in `sw.js`
+- [ ] **Custom hostname** — cookies + OAuth redirect; crane URL
+      updated; recreate
+- [ ] Sliding session refresh (today is hard 7d)
+
+### Mouth UI
+
+Still fights a phone talking to Kit. Not groups, stickers, or Mini
+Apps. Do not reverse-geocode. Do not put coords in `Text`.
+
+- [ ] **Crane up vs phone live** — overlay `asleep` / `queued` on the
+      subtitle. `live` stays socket health. Never infer from inbound
+      `ack`
+- [ ] **Sibling phones see inbound live** — Ada's PWA send lands on
+      her open Cab socket (and the reverse) without a reconnect. Same
+      body to `sub:<userId>` except the sender. Design:
+      [sibling_phones.md](sibling_phones.md)
+- [ ] **Pin on the bubble** — outbound that carried `context.geo`
+      shows `±Nm this send`. Tap opens maps. Silent pin stays silent
+- [ ] **Timestamps** — paint `ChatBubble.at` and a day chip (phone
+      clock)
+- [ ] **Copy / retry** — long-press copies text. Unacked inbound
+      leaves `sending` forever; flip to failed and resend
+- [ ] **Stop a turn** — button while `typing…`. This checkout sends
+      `/cancel`; crane must abort
+- [ ] **Quote** — inbound names the bubble `id` you are answering. No
+      thread-within-thread chrome
+- [ ] **Inline confirm** — Yes / No tap is a short inbound. Skip
+      reactions
+- [ ] **One non-image file** — log / `.ics` / pdf under the chat cap
+- [ ] **Draft survives reload** — compose text in localStorage (not
+      the thread)
+- [ ] **Mute pings** — local pref: `push` does not badge / notify /
+      haptic. Socket still paints
+- [ ] Photo lightbox / save
+- [ ] Jump-to-bottom when a ping lands off the floor
+- [ ] Session chip when `/new` actually resets history
 
 ---
 
 ## Not this version
 
-- Hosted pendant SaaS (other people's cranes on our Worker)
-- Chat in the Gantree console
-- Inbound port on the crane
-- Worker-level Cloudflare Access ("Protect this Worker")
-- Reusing `google-oauth.json` / Strava / Garmin as login
-- Feature-matching Telegram (groups, stickers, Mini Apps, reactions,
-  read receipts, mentions, link unfurl)
-- Gantree mobile layout
-- Putting the mailbox on the portal Worker
-- Mini Tailscale hub as the architecture (laptop hack only)
-- SSID / BSSID / Bluetooth / clipboard / contacts on the wire
-  (paste-into-compose is a photo attach, not a clipboard dump)
-- Guessing crane presence or typing from inbound `ack`
-- `watchPosition` in the background (PWA)
-- Reverse-geocode in the client
-- `[location]` prepended to every `Text`
+Hosted SaaS, chat in Gantree, inbound port on the crane, Worker-level
+Access, Telegram feature-match, Gantree mobile layout, reverse-geocode
+in the client, `[location]` in `Text`. See
+[design.md](design.md#principles).

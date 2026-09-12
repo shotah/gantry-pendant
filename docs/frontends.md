@@ -78,6 +78,14 @@ Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`):
   path. Cab `THREAD_MAX` is 80 (mailbox hydrates 80). **Ship Cab with
   this mailbox** so Auto HUNs skip `replay` (`shouldSpeak(kind, replay)`).
   An old APK still paints and still toasts every hydrate frame.
+- **Sibling phones, live.** Hydrate is how a *new* socket learns Ada's
+  inbound. Her *already-open* sockets do not get a copy today — Cab
+  holds one line for hours, so browser-sent turns sit in `t:<sub>`
+  until Cab reconnects. Cab's quiet sweep (`MailboxClient.sweep`, no
+  down state) is catch-up, not the live path. The Worker end state is
+  [sibling_phones.md](sibling_phones.md): fan the same inbound body to
+  `sub:<userId>` except the sender. Additive; mouths already paint
+  `inbound` as "you" and skip HUN / notify on it.
 - **Thread on the device.** The PWA keeps the last thread per room per
   `sub` in IndexedDB (`app/lib/threadStore.ts`, `thread:<slug>:<sub>`,
   `THREAD_MAX` 500, drafts and `sending` bubbles excluded) and paints it
@@ -99,7 +107,11 @@ Source of truth: `lib/mailbox/caps.ts`, `lib/phone/photo.ts`,
 `mailbox/SendError.kt`.
 
 **Wire.** One `images: [{ url }]` per frame, `url` a
-`data:image/jpeg;base64,…`. The mailbox measures the **data URL**
+`data:image/jpeg;base64,…`. Caption and photo travel **together**: the
+PWA encodes on attach, holds the data URL on the draft, and Send emits
+one `inbound` with `text` and `images[0]`. Attaching never sends by
+itself (no empty-text turn ahead of the caption). Cab has its own
+compose; if it stages the same way the mailbox needs nothing new. The mailbox measures the **data URL**
 (`utf8Bytes(url) ≤ IMAGE_BYTES_MAX` = 1 500 000) and the whole frame
 (`≤ FRAME_BYTES_MAX` = 2 000 000). Base64 is 4/3 of the bytes, so the
 **raw JPEG budget is `PHOTO_JPEG_BYTES_MAX`** = `floor((1 500 000 − 32) / 4) × 3`

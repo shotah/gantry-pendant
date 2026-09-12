@@ -30,12 +30,64 @@ describe("Compose", () => {
   it("opens the photo picker when asked", () => {
     const onPhoto = vi.fn();
     render(<Compose onSend={vi.fn()} onPhoto={onPhoto} />);
+    const gallery = document.querySelector("input[type=file]:not([capture])") as HTMLInputElement;
+    const click = vi.spyOn(gallery, "click");
     fireEvent.click(screen.getByRole("button", { name: "attach" }));
     fireEvent.click(screen.getByRole("button", { name: "Photo" }));
-    const input = document.querySelector("input[type=file]") as HTMLInputElement;
+    expect(click).toHaveBeenCalled();
+    expect(gallery.hasAttribute("capture")).toBe(false);
     const file = new File([new Uint8Array([1])], "a.jpg", { type: "image/jpeg" });
-    fireEvent.change(input, { target: { files: [file] } });
-    expect(onPhoto).toHaveBeenCalled();
+    fireEvent.change(gallery, { target: { files: [file] } });
+    expect(onPhoto).toHaveBeenCalledWith(file);
+  });
+
+  it("opens the rear camera from the same menu and sends the shot down the photo path", () => {
+    const onPhoto = vi.fn();
+    render(<Compose onSend={vi.fn()} onPhoto={onPhoto} />);
+    const camera = document.querySelector("input[type=file][capture]") as HTMLInputElement;
+    expect(camera.getAttribute("capture")).toBe("environment");
+    expect(camera.getAttribute("accept")).toBe("image/*");
+    const click = vi.spyOn(camera, "click");
+    fireEvent.click(screen.getByRole("button", { name: "attach" }));
+    fireEvent.click(screen.getByRole("button", { name: "Camera" }));
+    expect(click).toHaveBeenCalled();
+    const shot = new File([new Uint8Array([1])], "shot.jpg", { type: "image/jpeg" });
+    fireEvent.change(camera, { target: { files: [shot] } });
+    expect(onPhoto).toHaveBeenCalledWith(shot);
+  });
+
+  it("shows the staged photo, lets Send go with no caption, and clears it on Remove", () => {
+    const onSend = vi.fn();
+    const onPhotoClear = vi.fn();
+    const url = "data:image/jpeg;base64,/9j/";
+    const { rerender } = render(<Compose onSend={onSend} onPhoto={vi.fn()} />);
+    const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
+    expect(send.disabled).toBe(true);
+    expect(screen.queryByAltText("Photo to send")).toBeNull();
+    rerender(<Compose onSend={onSend} onPhoto={vi.fn()} photo={url} onPhotoClear={onPhotoClear} />);
+    expect((screen.getByAltText("Photo to send") as HTMLImageElement).src).toBe(url);
+    expect(send.disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Remove photo" }));
+    expect(onPhotoClear).toHaveBeenCalledTimes(1);
+    fireEvent.click(send);
+    expect(onSend).toHaveBeenCalledWith("");
+  });
+
+  it("sends the caption as text; the owner attaches the staged photo to the same turn", () => {
+    const onSend = vi.fn();
+    render(<Compose onSend={onSend} onPhoto={vi.fn()} photo="data:image/jpeg;base64,/9j/" />);
+    fireEvent.change(screen.getByPlaceholderText("Message"), { target: { value: " this hatch? " } });
+    fireEvent.keyDown(screen.getByPlaceholderText("Message"), { key: "Enter" });
+    expect(onSend).toHaveBeenCalledWith("this hatch?");
+    expect(onSend).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers neither camera nor photo without onPhoto", () => {
+    render(<Compose onSend={vi.fn()} onGpsToggle={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "attach" }));
+    expect(screen.queryByRole("button", { name: "Camera" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Photo" })).toBeNull();
+    expect(document.querySelector("input[type=file]")).toBeNull();
   });
 
   it("sends a pasted image through onPhoto", () => {

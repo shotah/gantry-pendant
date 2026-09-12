@@ -1,14 +1,12 @@
 # Edge cases and gotchas
 
 Things that bite after deploy, across **gantry-pendant**, **gantree**,
-**ai-gantry**, and **gantry-cab**. How they fail, and how to cover them.
-Who talks: [setup.md](setup.md). Other mouths:
-[frontends.md](frontends.md). How it got to workers.dev:
-[deployment.md](deployment.md). Shape:
-[architecture.md](architecture.md). Auth:
-[security.md](security.md). What's left: [todo.md](todo.md).
-
-This is not a product page. It is the second brain the walks still need.
+**ai-gantry**, and **gantry-cab**. Symptom, cause, cover — not a walk
+of how the product works. Wire and paint live in
+[frontends.md](frontends.md). Who talks: [setup.md](setup.md). How it
+got to workers.dev: [deployment.md](deployment.md). Shape:
+[architecture.md](architecture.md). Auth: [security.md](security.md).
+What's left: [todo.md](todo.md).
 
 ---
 
@@ -41,7 +39,8 @@ Room    last allow frame (until the next dial)
 
 | Symptom | Usual cause |
 | --- | --- |
-| Google works, empty crane list, never joins | not on Kit’s `.env`, or Kit has not dialed since the edit. A `401` on `/api/avatar?slug=kit` is the demo slug, not sign-in. |
+| Google works, empty crane list, never joins | not on Kit’s `.env`, or Kit has not dialed since the edit. A `401` on `/api/avatar?slug=kit` is the demo slug, not sign-in. Session cookie is not a room — copy email/`sub` off the waiting room, never the query string |
+| `PERSONA.md` has their email | prompt text, not a mailbox key. Kit’s Pendant fold writes `PENDANT_ALLOWED_USERS` |
 | Socket is live, Kit ignores the frame | on the room list, missing from `PENDANT_ALLOWED_USERS` (crane restarted, not recreated) |
 | Crane dies at boot | empty `PENDANT_ALLOWED_USERS` (fail-closed, same as Telegram) |
 | Phone: no crane on this mailbox yet | Google is on, no `CRANE_BEARERS` — Build a pendant crane |
@@ -61,26 +60,6 @@ instant kill if the crane is down.
 **Cover:** after the crane list, recreate (restart keeps a ghost
 allowlist). The room closes yanked sockets `4401` when the new `allow`
 lands. Bearer rotation is the instant kill if the crane is down.
-
----
-
-## How you even get a Google `sub`
-
-Profile can store a Google `sub` once learned (digits). Email is enough
-to start. Inject user copies email into `PERSONA.md` as text, not as a
-mailbox key. Kit’s Pendant fold writes `PENDANT_ALLOWED_USERS`.
-
-The OIDC callback **mints** a session for any verified Google account.
-The cookie opens no room. `/api/auth/me` returns `{ sub, email, cranes }`.
-A stranger sees `cranes: []` and their own id — never anyone else’s.
-
-**Cover:**
-
-1. Sign in on the pendant. Empty crane list shows email + `sub` with a
-   copy button. Send that to the yard admin. Do **not** put `sub` on
-   the query string.
-2. Admin ticks them on Kit’s Pendant fold (email is enough), recreates.
-3. Next `/me` lists the crane. First frame carries `user_id` + `email`.
 
 ---
 
@@ -171,15 +150,16 @@ You cannot run telegram + pendant in the same process.
 | Chrome Install never appears | already installed, or no click + 30s on the page (engagement heuristic) | DevTools → Application → Manifest still shows Install |
 | GPS denied / HTTP / no gesture / toggle off | message still sends; no `context.geo` | expected; do not block send |
 | iOS `watchPosition` | killed in the background | we only `getCurrentPosition` on send |
-| HEIC / iPhone photo | canvas JPEG when `createImageBitmap` can decode | otherwise “bad photo” |
-| Camera photo (2–8 MB) | in-app JPEG ladder: long edge from Settings → Photo size (Full 1600 / **Medium 1024** / Small 640, `pendant.photo`) at q 0.9 → 0.6, then edge × 0.75 down to 320 px, until the **base64 data URL** fits `IMAGE_BYTES_MAX` (raw budget `PHOTO_JPEG_BYTES_MAX`) | “Photo not sent — still too big after shrinking” strip only if the ladder bottoms out; “couldn't read that image” when the decoder fails (HEIC on an older browser) |
-| Lock screen ping while app is dead | Web Push if VAPID is set and they enabled notifications (installed PWA; iOS 16.4+ standalone) | Settings → Enable notifications after Google. Missing VAPID → queue only; native APNs/FCM later |
-| Queue while Mini reboots | ≤50 frames, 1 hour TTL, then drop | unread catch-up only |
-| Transcript on reload | last 80 `inbound` / `reply` / `push` per `sub` | kill the tab, reopen; not `sw.js`. Cab paints the same frames (`replay: true` skips Auto HUN — ship Cab with this mailbox) |
-| Blank slate on reload | PWA paints the last thread (IndexedDB, per room per `sub`, ≤ 500, no drafts / `sending`), face, and wallpaper from the device before the socket is up; hydrate folds in by `id` | face / backdrop refetch with `If-None-Match` → 304 keeps the paint; a changed rev swaps; 404 clears. Theme already boots from `localStorage` |
+| HEIC / iPhone photo | canvas JPEG when `createImageBitmap` can decode | otherwise “couldn't read that image”; ladder/caps are [frontends.md](frontends.md#photos-what-every-mouth-must-do-the-same) |
+| Camera photo still too big after shrink | ladder bottoms out (floor 320 px) | “Photo not sent — still too big after shrinking”; Settings → Photo size is per-device |
+| Attach → Camera on desktop | `capture` is a hint; desktop (and some Android) still shows a picker | expected; gallery is Attach → Photo |
+| Lock screen ping while app is dead | no tray unless VAPID is set **and** they enabled notifications (installed PWA; iOS 16.4+ standalone) | Settings → Enable notifications after Google. Missing VAPID → queue only |
+| Queue while Mini reboots | ≤50 frames, 1 hour TTL, then drop | unread catch-up only; not the transcript |
+| Old Cab on hydrate | mailbox replays last 80 with `replay: true` | old APK still toasts / Auto HUNs every frame — ship Cab that skips `shouldSpeak` on `replay` |
+| Private / no IndexedDB | thread, face, wallpaper still blank until the socket hydrates | expected; drafts and `sending` never hit disk even when IDB works. Sign-out does not wipe the rows |
 | Rate limit (30 frames/min; bytes 4 MB burst = two full photo frames, refill 256 KB per min) | socket stays up, frames return `error` `rate` with the refused `id` (additive) | PWA and Cab mark that bubble “Not sent — too much too fast”. Burst below one frame was the old photo bug: every camera shot bounced as `rate` forever |
 | Session hard 7d (JWT `exp` at mint) | next send closes 4401 | sign in again; yank `sub` takes effect on the next frame |
-| Service worker | no chat cache (good) — the page keeps its own copy in IndexedDB | also no offline compose |
+| Service worker | does not cache chat or API (by design) | no offline compose |
 
 SSID / BSSID / Bluetooth / clipboard must never go on the wire. Battery
 and `net` attach on send when the OS exposes them; the prompt stays stingy.
@@ -191,7 +171,8 @@ and `net` attach on send when the OS exposes them; the prompt stays stingy.
 | Gotcha | What happens | Cover |
 | --- | --- | --- |
 | “Sent” with the socket down | local echo is not delivered | bubble stays **pending** until the DO acks; reconnect + `since` redelivers |
-| Two devices, one human | replies route by `user_id` / `sub` | both of Ada’s phones see Ada’s replies; Bob does not |
+| Two devices, one human | crane `reply` fans to every `sub:<ada>` socket | both of Ada’s phones see Ada’s replies; Bob does not |
+| Browser send missing on Cab (Cab send visible in the browser) | inbound is stored on `t:<sub>` and hydrates on connect; live it only goes to the crane + sender ack. The PWA redials on visible; Cab holds one socket | [sibling_phones.md](sibling_phones.md) — Worker fans inbound to Ada’s other sockets. Cab quiet sweep is catch-up, not the live path. Spike ≠ Google |
 | Cab vs PWA after a wire change | Cab ignores unknown JSON; it may still paint arrival order | [frontends.md](frontends.md) — walk `Wire.kt` / `Mouth.kt` |
 | iOS PWA background drop | socket dies | reconnect on visible (`visibilitychange` / `onclose`); redeliver |
 | `context.at` untrusted | phone clock can lie | order by DO time; `at` is a hint |
@@ -202,45 +183,32 @@ and `net` attach on send when the OS exposes them; the prompt stays stingy.
 
 ## GPS and `[last pin]` (ai-gantry)
 
-The point of owning the client: coords on **this** send, not a stale
-Telegram pin.
+Phone puts `context.geo` on the frame. Channel calls `here.Set`. Do
+**not** stuff `[location]` into `Message.Text` — that re-bills coords
+on every later Completer call.
 
-- Phone puts `context.geo` on the frame. Channel calls `here.Set`.
-- **Do not** stuff `[location]` into `Message.Text`. That would re-bill
-  coords on every later Completer call.
-- Bare geo (no text, no photo) is a silent pin: cursor updates, no
-  model turn. Same idea as a Telegram bare pin.
-- `here.Pin` is in-memory on the crane. Process restart clears it
-  (same as today).
-- Clock footer `[last pin]` is prompt-only, not stored in `gantry.db`.
+| Gotcha | Cover |
+| --- | --- |
+| Kit cites an old Telegram pin | wrong crane (`CHANNEL` still telegram), or this send omitted GPS |
+| Crane restarted, pin is gone | `here.Pin` is in-memory; clock footer `[last pin]` is prompt-only, not `gantry.db` |
+| Bare geo (no text, no photo) | silent pin: cursor updates, no model turn |
+| No capability pings on pendant | `EXAMPLES_QTY` auto-bind is still telegram-only; `/examples` on demand still works. Spark auto-bind does run (`sub` as `ChatID`) |
 
-If Kit still cites an old Telegram pin, you are on the wrong crane
-(`CHANNEL` is still telegram) or the send went out with GPS omitted.
-
-**Cover:** P5 walk on LTE with permission granted. Confirm the footer
-matches this-send. Accuracy `±12m` on the pin is Later.
-
-Spark auto-bind runs for pendant (Google `sub` as `ChatID`).
-**Examples** (`EXAMPLES_QTY`) auto-bind is still telegram-only — capability
-pings will not appear on a pendant crane until that case is added.
-`/examples` on demand still works.
-
-Streaming placeholder + edit (`ReplyWriter`) is Later. Whole replies
-first. A long turn looks idle until the model finishes.
+Accuracy `±12m` on the pin is Later. Long turns look idle until the
+model finishes (`ReplyWriter` is Later).
 
 ---
 
-## What Gantree does **not** do
+## Yard is not the mailbox
 
-- No chat route, no `/api/gantries/…/messages`.
-- No Worker **code** deploy (this repo’s CI still ships the Worker).
-- Operator **email** is not a password reset.
-- `repos/` is excluded from the yard `tsconfig` on purpose — this
-  checkout typechecks itself.
+| Gotcha | Cover |
+| --- | --- |
+| Saved a Gantree profile, still cannot talk | Gantree has no chat route. Settings → Pendant (Google + session), Build channel pendant, recreate |
+| Operator email as a password | it is not. Session is Google on the Worker |
+| `MAILBOX_SECRET` / `PENDANT_DEV` on `workers.dev` | spike only; leave them off prod |
 
-**Cover:** Gantree Settings → Pendant once (Google + session). Build
-channel pendant (yard mints bearer). Recreate. Keep `MAILBOX_SECRET` /
-`PENDANT_DEV` off `workers.dev`.
+This repo’s CI still ships the Worker. `repos/` is excluded from the
+yard `tsconfig` — this checkout typechecks itself.
 
 ---
 

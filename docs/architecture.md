@@ -111,6 +111,12 @@ The room is **per crane slug**. Sessions are **per human** (`sub`).
 - Phone frames go to the crane socket. Crane `reply` requires
   `user_id` and fans to `getWebSockets(sub)`. Crane `push` with no
   `user_id` broadcasts to every phone in the room.
+- **Sibling phones** (PWA + Cab, same Google `sub`): an `inbound` is
+  stored on `t:<sub>` and already hydrates on reconnect. Live, it is
+  still only sent to the crane and acked to the sender — Ada's other
+  open sockets hear nothing until they redial. That hole, and the
+  one-loop fix, are [sibling_phones.md](sibling_phones.md). Not a
+  group chat; not a second mailbox.
 - Every queued frame gets an `id`, a mailbox `seq`, and `at`.
   Phone-bound frames persist per `sub` until `ack` or TTL. On
   reconnect the phone sends `since` as the last id **or** the highest
@@ -194,7 +200,7 @@ browser reaches the board. Chat does not use it.
 
 The architecture does not care about stores. The client is a WebSocket
 consumer of the Worker. Transcript hydrates on connect — not the unread
-queue, and not `sw.js` — [todo.md](todo.md#mouth-ui). Later HTTP can
+queue, and not `sw.js`. Later HTTP can
 still serve media. Location uses the browser Geolocation API on send.
 The car mouth is **gantry-cab** (native Android Auto), not Expo wrapping
 this UI.

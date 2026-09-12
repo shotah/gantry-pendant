@@ -4,7 +4,8 @@ A phone we own, talking to a crane, without opening a port on the
 harness. Pitch: [root readme](../README.md). What it looks like:
 [screens.md](screens.md). Wire:
 [architecture.md](architecture.md). Other mouths:
-[frontends.md](frontends.md). Authn: [security.md](security.md).
+[frontends.md](frontends.md). Same human, two mouths:
+[sibling_phones.md](sibling_phones.md). Authn: [security.md](security.md).
 What's left: [todo.md](todo.md).
 
 ## Problem

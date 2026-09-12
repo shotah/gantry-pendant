@@ -93,7 +93,7 @@ guardrail.
 
 ## Fit gates
 
-Same as [todo.md](todo.md#fit-gates), plus:
+Same as [design.md](design.md#principles), plus:
 
 1. **The crane's bearer is the identity.** The MCP presents
    `PENDANT_BEARER` on `Authorization`. `bearerForSlug` binds it to one

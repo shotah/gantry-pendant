@@ -802,12 +802,54 @@ describe("PhoneShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "settings" }));
     const input = document.querySelector("form input[type=file]") as HTMLInputElement;
     fireEvent.change(input, { target: { files: [new File([new Uint8Array([1])], "IMG_0002.jpg", { type: "image/jpeg" })] } });
+    // Attach stages; nothing is on the wire until Send.
+    const staged = await screen.findByAltText("Photo to send") as HTMLImageElement;
+    expect(staged.src.startsWith("data:image/jpeg;base64,")).toBe(true);
+    expect(widths).toEqual([640]);
+    expect(ws.send).not.toHaveBeenCalledWith(expect.stringContaining("images"));
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => {
       expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("data:image/jpeg;base64,"));
     });
-    expect(widths).toEqual([640]);
     expect(document.querySelector("li img[src^='data:image/jpeg;base64,']")).toBeTruthy();
     expect(screen.getByText("sending")).toBeTruthy();
+    expect(screen.queryByAltText("Photo to send")).toBeNull();
+  });
+
+  it("sends caption and photo as one turn, and Remove takes the photo off the draft", async () => {
+    vi.stubGlobal("createImageBitmap", async () => ({ width: 800, height: 600, close() {} }));
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (this: HTMLCanvasElement, cb) {
+      cb(new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: "image/jpeg" }));
+    });
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    const input = document.querySelector("form input[type=file]") as HTMLInputElement;
+    const shot = new File([new Uint8Array([1])], "IMG_0003.jpg", { type: "image/jpeg" });
+    fireEvent.change(input, { target: { files: [shot] } });
+    expect(await screen.findByAltText("Photo to send")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Remove photo" }));
+    expect(screen.queryByAltText("Photo to send")).toBeNull();
+    expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(input, { target: { files: [shot] } });
+    expect(await screen.findByAltText("Photo to send")).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText(/Message Kit/), { target: { value: "this hatch?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => {
+      expect(ws.send).toHaveBeenCalledTimes(1);
+    });
+    const frame = JSON.parse(ws.send.mock.calls[0]?.[0] ?? "{}") as { kind?: string; text?: string; images?: { url: string }[] };
+    expect(frame.kind).toBe("inbound");
+    expect(frame.text).toBe("this hatch?");
+    expect(frame.images).toHaveLength(1);
+    expect(frame.images?.[0]?.url.startsWith("data:image/jpeg;base64,")).toBe(true);
+    const bubble = screen.getByText("this hatch?").closest("li");
+    expect(bubble?.querySelector("img[src^='data:image/jpeg;base64,']")).toBeTruthy();
+    expect(screen.queryByAltText("Photo to send")).toBeNull();
   });
 
   it("reads Settings → Photo size back from storage on load", async () => {
