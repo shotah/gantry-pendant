@@ -64,3 +64,19 @@ export function persistRole(from: Role, kind?: FrameKind, userId?: string): Role
 export function persistInboundForPhone(from: Role, kind?: FrameKind): boolean {
   return from === "phone" && kind === "inbound";
 }
+
+/** Live copy of Ada's inbound to her other open sockets. Not a reroute of the crane path. */
+export function siblingPhoneTag(from: Role, kind?: FrameKind, userId?: string): string | undefined {
+  if (from !== "phone" || kind !== "inbound") {
+    return undefined;
+  }
+  const id = userId?.trim();
+  if (!id) {
+    return undefined;
+  }
+  return subTag(id);
+}
+
+export function exceptSender<T>(sockets: readonly T[], sender: T): T[] {
+  return sockets.filter((s) => s !== sender);
+}

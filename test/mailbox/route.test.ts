@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { persistInboundForPhone, persistRole, phoneKindAllowed, resolvePhoneKind, routeTag } from "@/lib/mailbox/route";
+import { exceptSender, persistInboundForPhone, persistRole, phoneKindAllowed, resolvePhoneKind, routeTag, siblingPhoneTag } from "@/lib/mailbox/route";
 import { shouldTranscript } from "@/lib/mailbox/transcript";
 import type { WireFrame } from "@/lib/mailbox/frame";
 
@@ -74,5 +74,18 @@ describe("route", () => {
     expect(persistInboundForPhone("crane", "reply")).toBe(false);
     expect(shouldTranscript("inbound")).toBe(true);
     expect(shouldTranscript("error")).toBe(false);
+  });
+
+  it("fans inbound to Ada's other sockets, not Bob and not a pin", () => {
+    expect(siblingPhoneTag("phone", "inbound", "ada")).toBe("sub:ada");
+    expect(siblingPhoneTag("phone", "inbound", "  ")).toBeUndefined();
+    expect(siblingPhoneTag("phone", "pin", "ada")).toBeUndefined();
+    expect(siblingPhoneTag("phone", "ack", "ada")).toBeUndefined();
+    expect(siblingPhoneTag("crane", "inbound", "ada")).toBeUndefined();
+    const ada = { id: "pwa" };
+    const cab = { id: "cab" };
+    const bob = { id: "bob" };
+    expect(exceptSender([ada, cab, bob], ada)).toEqual([cab, bob]);
+    expect(exceptSender([ada], ada)).toEqual([]);
   });
 });

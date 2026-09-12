@@ -133,11 +133,11 @@ The room is **per crane slug**. Sessions are **per human** (`sub`).
   `user_id` and fans to `getWebSockets(sub)`. Crane `push` with no
   `user_id` broadcasts to every phone in the room.
 - **Sibling phones** (PWA + Cab, same Google `sub`): an `inbound` is
-  stored on `t:<sub>` and already hydrates on reconnect. Live, it is
-  still only sent to the crane and acked to the sender — Ada's other
-  open sockets hear nothing until they redial. That hole, and the
-  one-loop fix, are [sibling_phones.md](sibling_phones.md). Not a
-  group chat; not a second mailbox.
+  stored on `t:<sub>` and hydrates on reconnect. Live, the same body
+  also fans to `sub:<userId>` except the sender. Spike (no `sub`)
+  still waits on reconnect. Walk:
+  [sibling_phones.md](sibling_phones.md). Not a group chat; not a
+  second mailbox.
 - Every queued frame gets an `id`, a mailbox `seq`, and `at`.
   Phone-bound frames persist per `sub` until `ack` or TTL. On
   reconnect the phone sends `since` as the last id **or** the highest

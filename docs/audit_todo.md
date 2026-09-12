@@ -13,8 +13,10 @@ the chat wire (headers, cookie CSRF, push host allowlist, config
 `version`, Google return-to, CI token scope). Cron pings that never
 came back lined up with tag collision, unscoped phone acks, and a
 lexical `since` cursor — not with a listed human changing Kit's face.
-Decisions live in [security.md](security.md). Session revocation,
-native nonce (Cab lockstep), and real CF rate limits are still open.
+Decisions live in [security.md](security.md). Session revocation and
+real CF rate limits are still open. Native nonce is **issued**, not
+required, until the Cab APK that GETs `/api/auth/nonce` is the
+sideload.
 
 ---
 
@@ -288,12 +290,13 @@ off for a crane.
       rate-limiting rules (or the Rate Limiting binding) on `/ws/*`,
       `/api/auth/*`, `/api/push`. Keep the DO per-`sub` frame and byte
       buckets.
-- [ ] **Native token nonce is client-chosen.** `POST /api/auth/token`
-      checks the ID token's `nonce` against the body's `nonce`; the cab
-      supplies both. Issue the nonce server-side (`GET
-      /api/auth/nonce`, one-time, 5 min) so a stolen ID token cannot be
-      replayed for a 7 d session. Cab change too — do not land this
-      until Cab can fetch the nonce.
+- [ ] **Native token nonce is required.** `GET /api/auth/nonce`
+      (5 min, one-time) is issued. POST `/api/auth/token` consumes a
+      stored nonce (`ok`) and still accepts a **missing** row so an
+      old APK that minted locally can sign in. Replay or expired
+      server nonce is 401. Cab already GETs the route and falls back
+      on 401. **Require** stored nonces after that APK is the
+      sideload. `test/auth/nonce.test.ts`.
 - [x] **CI hardening** (partial). Workflow default is `contents:
       read`; `contents: write` is the coverage-badge job only.
       `npm audit --omit=dev` is a check step. Leftover: pin actions

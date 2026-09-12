@@ -1,14 +1,13 @@
 # Sibling phones (live inbound)
 
-One human, two mouths, one Durable Object. The room already stores
-Ada's turns under her `sub`. What it does **not** do is push an
-`inbound` she just sent on the PWA onto her still-open Cab socket (or
-the other way around). That is a live-delivery hole, not a new mailbox
-shape.
+One human, two mouths, one Durable Object. The room stores Ada's turns
+under her `sub`. The Worker also copies a live `inbound` she just
+sent on the PWA onto her still-open Cab socket (and the other way
+around). Spike (no `sub`) still waits on reconnect + Cab sweep.
 
-Walk: [architecture.md](architecture.md#mailbox-room). Mouths:
-[frontends.md](frontends.md). Cab's quiet catch-up (no flash) is
-documented there too; this page is the Worker end state.
+Walk both mouths on a deployed origin (same Google). Design:
+[architecture.md](architecture.md#mailbox-room). Mouths:
+[frontends.md](frontends.md).
 
 ---
 
@@ -27,12 +26,12 @@ tagged `sub:<userId>`. Face / backdrop / theme already announce to every
 socket in the room. Reload already hydrates `t:<sub>` onto whichever
 mouth reconnects.
 
-The only missing send is: a phone `inbound` is live-routed to the
+Before this shipped, a phone `inbound` was live-routed to the
 **crane**, stored for Ada, acked to the **sender**, and never copied to
 Ada's other open sockets.
 
 ```text
-today, Ada types on the PWA while Cab's socket is still up:
+before, Ada types on the PWA while Cab's socket is still up:
 
   PWA ──inbound──► DO ──► crane          (live)
                  DO ──ack──► PWA        (this socket only)
@@ -47,7 +46,7 @@ the same store Cab never re-reads.
 
 ---
 
-## Proposed end state
+## End state (shipped)
 
 Same body, same `id` / `seq` / `at`, live (not `replay`), to Ada's
 **other** phone sockets. The sender still gets `ack`. The crane still
@@ -92,20 +91,16 @@ that drops `up`.
 
 ## Worker change
 
-Today (`worker/mailbox.ts`, `dest === "crane"`): send to crane
-peers, maybe queue for the crane, `rememberPhone` (queue + transcript)
-when `persistInboundForPhone`, then `ack` the sender.
+`worker/mailbox.ts`, `dest === "crane"`: send to crane peers, maybe
+queue for the crane, `rememberPhone` when `persistInboundForPhone`,
+then fan, then `ack` the sender.
 
-Add, after `rememberPhone`, when `meta.userId` is set:
-
-1. `body` is already `encodeFrame(out)` with mailbox `seq` / `at`.
-2. For each **open** socket in `this.peers(subTag(meta.userId))`
-   except `ws`, `p.send(body)`.
-3. Skip if there is no `userId` (spike / loopback). Those mouths stay
-   on reconnect + Cab sweep.
-
-Helper belongs next to `routeTag` / `persistInboundForPhone` in
-`lib/mailbox/route.ts` so it is unit-tested without the DO:
+**Shipped:** after `rememberPhone`, when `meta.userId` is set, send
+the same `body` (mailbox `seq` / `at`) to each **open** socket in
+`this.peers(siblingPhoneTag(…))` except `ws`. Spike (no `userId`)
+stays on reconnect + Cab sweep. Do **not** change `routeTag("phone",
+…)` — that is still `role:crane`. Exclude `ws` so the sender keeps
+`pending` until the real `ack`.
 
 ```text
 siblingPhoneTag(from, kind, userId) → subTag(userId)
@@ -113,13 +108,7 @@ siblingPhoneTag(from, kind, userId) → subTag(userId)
   else undefined
 ```
 
-Do **not** change `routeTag("phone", …)` itself. That tag is still
-`role:crane`. Sibling fan-out is a second send, not a reroute of the
-crane path.
-
-Exclude `ws` so the sender is not painted twice as a new bubble before
-`ack`. Cab / PWA would survive a duplicate `id`; skipping is cheaper
-and keeps `pending` waiting on the real `ack`.
+`test/mailbox/route.test.ts`.
 
 ---
 
@@ -127,7 +116,7 @@ and keeps `pending` waiting on the real `ack`.
 
 | Mouth sign-in | Socket `userId` | Live sibling | Hydrate on reconnect |
 | --- | --- | --- | --- |
-| Google on both | same `sub` | yes, after this change | already (personal `t:<sub>`) |
+| Google on both | same `sub` | yes | already (personal `t:<sub>`) |
 | Spike on Cab, Google on PWA | Cab has none | no | PWA sees Cab via broadcast `t:_`; Cab never sees PWA personal rows |
 | Spike on both | none | no | both hydrate the broadcast row |
 
@@ -146,7 +135,7 @@ PWA and Cab already ingest a live `inbound` they did not send:
 - Unknown id → insert, `from: you`.
 - `shouldSpeak` / Auto HUN / browser notify stay off for `inbound`.
 
-**Cover after the Worker patch:**
+**Walk:**
 
 1. Google on Cab and PWA, both sockets up. Type in the browser — Cab
    paints it without going Offline, without clearing the thread, as
@@ -179,14 +168,10 @@ the same `sub`.
 
 ## Ship
 
-1. Pendant: helper + test in `test/mailbox/route.test.ts`, send loop in
-   `worker/mailbox.ts`, a mailbox integration test that two phone
-   sockets on the same `sub` both see the inbound and a third `sub`
-   does not.
-2. Walk Cab + PWA on the deployed Worker (same Google account).
-3. Leave Cab `MailboxClient.sweep` in place. Optionally later raise
-   `SWEEP_EVERY_MS` or tick only on resume once the Worker has been
-   live long enough that the 2 min poll is just Doze insurance.
+1. [x] Pendant helper + send loop (`siblingPhoneTag`,
+   `worker/mailbox.ts`).
+2. [ ] Walk Cab + PWA on the deployed Worker (same Google account).
+3. Leave Cab `MailboxClient.sweep` in place.
 
 Cab does not need a lockstep APK for (1). Walk it anyway —
 [frontends.md](frontends.md) says a PWA-only paint is not enough when

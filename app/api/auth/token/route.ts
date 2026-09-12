@@ -3,6 +3,7 @@ import { configError, tooMany, unauthorized } from "@/lib/auth/deny";
 import { limitAuthIp, limitAuthSub } from "@/lib/auth/limit";
 import { resolveAuthMode } from "@/lib/auth/mode";
 import { mintNativeSession, parseNativeTokenBody } from "@/lib/auth/native";
+import { consumeNativeNonce, nativeNonceAccepted, nativeNonceStore } from "@/lib/auth/nonce";
 import { hostFromRequest } from "@/lib/dev/mode";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,10 @@ export async function POST(req: Request) {
   }
   const body = parseNativeTokenBody(parsed);
   if (!body) {
+    return unauthorized();
+  }
+  const nonceTake = await consumeNativeNonce(nativeNonceStore(env.DIRECTORY), body.nonce);
+  if (!nativeNonceAccepted(nonceTake)) {
     return unauthorized();
   }
   const session = await mintNativeSession({

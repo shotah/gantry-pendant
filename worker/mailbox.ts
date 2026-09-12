@@ -44,7 +44,7 @@ import {
   shouldTranscript,
   transcriptStoreKey,
 } from "../lib/mailbox/transcript";
-import { persistInboundForPhone, persistRole, resolvePhoneKind, routeTag } from "../lib/mailbox/route";
+import { exceptSender, persistInboundForPhone, persistRole, resolvePhoneKind, routeTag, siblingPhoneTag } from "../lib/mailbox/route";
 import { parseEmailVerified, parseExpMs, socketMessageAllowed } from "../lib/mailbox/socketAuth";
 import { pruneDualLimits, takeFrame, type DualLimit } from "../lib/mailbox/rate";
 import { cranePublishedDraft, phoneMustNotPublishDraft } from "../lib/mailbox/draft";
@@ -316,6 +316,12 @@ export class Mailbox extends DurableObject<Env> {
       }
       if (persistInboundForPhone(meta.role, out.kind)) {
         await this.rememberPhone(phoneRow());
+      }
+      const sibling = siblingPhoneTag(meta.role, out.kind, meta.userId);
+      if (sibling) {
+        for (const p of exceptSender(openSockets(this.peers(sibling)), ws)) {
+          p.send(body);
+        }
       }
       if (meta.role === "phone" && out.kind === "inbound") {
         ws.send(encodeFrame({ kind: "ack", id: out.id }));

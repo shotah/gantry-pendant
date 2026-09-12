@@ -36,7 +36,7 @@ before you call it done. A PWA-only paint is not enough.
 | --- | --- |
 | Additive JSON (`seq`, `at`, extra `context`) | Old clients must keep working. Cab `parseFrame` drops unknown keys — that is the bar |
 | New required field, new `kind`, or a required header | Cab (and later iOS) must ship in lockstep, or the mailbox must tolerate the old client |
-| Auth (`/api/auth/*`, session JWE, 4401) | Cab POSTs the ID token and stores the JWE. Spike query creds are PWA loopback only. Cookie CSRF is PWA-only — do not send `pendant_session` from OkHttp. Additive `version` on `GET /api/auth/config` is dropped today (`AuthConfig` keeps `mode` / `google`) |
+| Auth (`/api/auth/*`, session JWE, 4401) | Cab POSTs the ID token and stores the JWE. Spike query creds are PWA loopback only. Cookie CSRF is PWA-only — do not send `pendant_session` from OkHttp. Additive `version` on `GET /api/auth/config` is dropped today (`AuthConfig` keeps `mode` / `google`). `GET /api/auth/nonce` is optional: Cab fetches it and falls back to a local mint on 401/404. Do not require it until that APK is the sideload |
 | Queue / `ack` / `since` / `seq` | Cab parses `seq` / `at`, inserts like `placeInThread`, acks the highest seq. Transcript hydrate is the same frames plus `replay` — see below |
 | Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Do not assume it needs the PWA CSS |
 | Photo caps, encode ladder, `error` tokens | Both mouths encode to the same budget and paint refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
@@ -79,14 +79,11 @@ Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`):
   path. Cab `THREAD_MAX` is 80 (mailbox hydrates 80). **Ship Cab with
   this mailbox** so Auto HUNs skip `replay` (`shouldSpeak(kind, replay)`).
   An old APK still paints and still toasts every hydrate frame.
-- **Sibling phones, live.** Hydrate is how a *new* socket learns Ada's
-  inbound. Her *already-open* sockets do not get a copy today — Cab
-  holds one line for hours, so browser-sent turns sit in `t:<sub>`
-  until Cab reconnects. Cab's quiet sweep (`MailboxClient.sweep`, no
-  down state) is catch-up, not the live path. The Worker end state is
-  [sibling_phones.md](sibling_phones.md): fan the same inbound body to
-  `sub:<userId>` except the sender. Additive; mouths already paint
-  `inbound` as "you" and skip HUN / notify on it.
+- **Sibling phones, live.** The Worker fans the same inbound body to
+  `sub:<userId>` except the sender (`siblingPhoneTag`). Hydrate still
+  covers a *new* socket. Cab `MailboxClient.sweep` stays catch-up /
+  Doze insurance. Additive; mouths already paint `inbound` as "you"
+  and skip HUN / notify. Walk: [sibling_phones.md](sibling_phones.md).
 - **Thread on the device.** The PWA keeps the last thread per room per
   `sub` in IndexedDB (`app/lib/threadStore.ts`, `thread:<slug>:<sub>`,
   `THREAD_MAX` 500, drafts and `sending` bubbles excluded) and paints it

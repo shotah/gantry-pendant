@@ -76,8 +76,9 @@ Two laptop tabs do not close these. Walk:
 Same Durable Object. Do not fork the mailbox.
 [frontends.md](frontends.md). Work lives in that checkout:
 [`docs/pendant_handoff.md`](https://github.com/shotah/gantry-cab/blob/main/docs/pendant_handoff.md)
-(ship hydrate APK, caption+attach, sibling walk, header face, native
-nonce lockstep). Do not edit Cab Kotlin from this repo.
+(ship hydrate APK, walk sibling inbound). Cab half of nonce / 4401 /
+header face / caption+attach is in tree. Worker issues `/api/auth/nonce`
+and fans sibling inbound. Do not edit Cab Kotlin from this repo.
 
 Wire changes (`seq` / `at`, `replay`, new `kind`, auth) still need a
 look at `Wire.kt` / `Mouth.kt`. iOS native is later (Sign in with Apple
@@ -107,10 +108,10 @@ Apps. Do not reverse-geocode. Do not put coords in `Text`.
 - [ ] **Crane up vs phone live** — overlay `asleep` / `queued` on the
       subtitle. `live` stays socket health. Never infer from inbound
       `ack`
-- [ ] **Sibling phones see inbound live** — Ada's PWA send lands on
-      her open Cab socket (and the reverse) without a reconnect. Same
-      body to `sub:<userId>` except the sender. Design:
-      [sibling_phones.md](sibling_phones.md)
+- [x] **Sibling phones see inbound live** — Worker fans the same body
+      to `sub:<userId>` except the sender. Spike (no `sub`) stays on
+      reconnect. Walk Cab + PWA on a deployed origin (same Google).
+      Design: [sibling_phones.md](sibling_phones.md)
 - [ ] **Pin on the bubble** — outbound that carried `context.geo`
       shows `±Nm this send`. Tap opens maps. Silent pin stays silent
 - [ ] **Timestamps** — paint `ChatBubble.at` and a day chip (phone

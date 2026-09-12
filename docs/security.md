@@ -165,10 +165,12 @@ Handshake mints the session and tags the socket (`sub`, `exp`). Google
 ID tokens do **not** ride later frames. The PWA WebSocket is
 same-origin and sends the httpOnly cookie. Native cab upgrades with
 `Authorization: Bearer` holding that same JWE (minted at
-`POST /api/auth/token` from a Google ID token + nonce). Crane upgrade
-sends `Authorization: Bearer` too — a **different** token, bound to the
-slug. Bind DO id to the crane slug in that crane bearer (`kit` cannot
-write `ada`).
+`POST /api/auth/token` from a Google ID token + nonce). `GET
+/api/auth/nonce` issues a one-time nonce (5 min). POST consumes it
+when present; a missing row still mints (old APK). Replay of a
+consumed server nonce is 401. Crane upgrade sends `Authorization:
+Bearer` too — a **different** token, bound to the slug. Bind DO id to
+the crane slug in that crane bearer (`kit` cannot write `ada`).
 
 On every `webSocketMessage` the mailbox re-checks the **room list**
 (`sub` match, or verified email match) plus optional static
