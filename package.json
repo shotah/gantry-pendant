@@ -1,6 +1,6 @@
 {
   "name": "gantry-pendant",
-  "version": "0.1.39",
+  "version": "0.1.40",
   "private": true,
   "engines": {
     "node": ">=22"
