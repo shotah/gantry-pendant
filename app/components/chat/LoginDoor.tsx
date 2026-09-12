@@ -5,6 +5,8 @@ import { ThemeSelect } from "../shared/ThemeSelect";
 import { ConfigGapNote } from "./ConfigGapNote";
 import { isIos, isStandalone, signInHint } from "@/app/lib/install";
 import type { ConfigGap } from "@/lib/auth/mode";
+import { googleStartHref } from "@/lib/auth/returnTo";
+import { parseSlug } from "@/lib/mailbox/slug";
 
 type AuthCfg = {
   mode: "spike" | "oidc" | null;
@@ -15,6 +17,7 @@ type AuthCfg = {
 export function LoginDoor() {
   const [cfg, setCfg] = useState<AuthCfg | null>(null);
   const [hint, setHint] = useState("");
+  const [googleHref, setGoogleHref] = useState("/api/auth/google");
 
   useEffect(() => {
     setHint(signInHint({
@@ -22,6 +25,8 @@ export function LoginDoor() {
       standalone: isStandalone(window, navigator),
       retry: false,
     }));
+    const slug = parseSlug(new URLSearchParams(window.location.search).get("slug") ?? "");
+    setGoogleHref(googleStartHref(slug));
     void fetch("/api/auth/config")
       .then((r) => r.json() as Promise<AuthCfg>)
       .then(setCfg)
@@ -51,7 +56,7 @@ export function LoginDoor() {
                 ? (
                     <a
                       className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark"
-                      href="/api/auth/google"
+                      href={googleHref}
                     >
                       Continue with Google
                     </a>

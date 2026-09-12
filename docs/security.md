@@ -152,6 +152,12 @@ They do not see chat or GPS unless **we** log it.
   present (browsers). Missing `Origin` is allowed (Go crane).
 - Authenticated `/ws/` strips `X-Pendant-Op` so a spoofed header cannot
   reach avatar HTTP.
+- HTML and `/api` responses get CSP / HSTS / `nosniff` /
+  `frame-ancestors 'none'` in the Worker. WebSocket 101 is not wrapped.
+- Cookie-bearing mutating `/api/*` needs `Sec-Fetch-Site`
+  `same-origin`/`none` or a matching `Origin`. Cab POSTs the JWE on
+  `Authorization` with no session cookie — that path is not CSRF'd.
+  `GET /api/auth/logout` is gone.
 
 ### Authn on every frame
 
@@ -223,7 +229,8 @@ from `ChatID` (Google `sub`).
 - Web Push subscriptions (endpoint + keys) live on the crane's Durable
   Object, keyed by Google `sub`. Yanking a person from the room list
   drops them. A 410 from the push service drops that device. Do not log
-  endpoints.
+  endpoints. Endpoints must be browser push hosts (FCM, Mozilla, Apple,
+  WNS) — not an arbitrary `https://` a listed human could point at.
 
 ### Abuse
 

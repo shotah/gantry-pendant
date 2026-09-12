@@ -36,7 +36,8 @@ describe("LoginDoor", () => {
   it("offers Google when oidc is armed", async () => {
     stubOidcConfig();
     const { container } = render(<LoginDoor />);
-    expect(await screen.findByRole("link", { name: "Continue with Google" })).toBeTruthy();
+    const link = await screen.findByRole("link", { name: "Continue with Google" });
+    expect(link.getAttribute("href")).toBe("/api/auth/google");
     const door = container.querySelector("[data-shot=login]");
     expect(door?.className.split(/\s+/)).toEqual(expect.arrayContaining([
       "h-full",
@@ -56,5 +57,13 @@ describe("LoginDoor", () => {
     render(<LoginDoor />);
     expect(await screen.findByRole("link", { name: "Continue with Google" })).toBeTruthy();
     expect(screen.getByText(/Sign in here first, then Share → Add to Home Screen/)).toBeTruthy();
+  });
+
+  it("carries ?slug= through the Google start link", async () => {
+    window.history.replaceState({}, "", "/login?slug=kit");
+    stubOidcConfig();
+    render(<LoginDoor />);
+    const link = await screen.findByRole("link", { name: "Continue with Google" });
+    expect(link.getAttribute("href")).toBe("/api/auth/google?next=%2F%3Fslug%3Dkit");
   });
 });

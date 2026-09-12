@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import { createHash, randomBytes } from "node:crypto";
+import { parseGoogleNext } from "./returnTo";
 
 export const GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
 export const GOOGLE_TOKEN = "https://oauth2.googleapis.com/token";
@@ -11,7 +12,7 @@ export type GoogleIdentity = { sub: string; email?: string; emailVerified: boole
 
 export type Pkce = { verifier: string; challenge: string };
 
-export type OAuthBind = { state: string; verifier: string; nonce: string };
+export type OAuthBind = { state: string; verifier: string; nonce: string; next?: string };
 
 export function callbackUrl(origin: string): string {
   return `${origin.replace(/\/$/, "")}/api/auth/callback/google`;
@@ -77,7 +78,8 @@ export function decodeOAuthBind(raw: string | undefined): OAuthBind | null {
     if (typeof nonce !== "string" || !nonce) {
       return null;
     }
-    return { state, verifier, nonce };
+    const next = typeof rec.next === "string" ? parseGoogleNext(rec.next) : "/";
+    return next === "/" ? { state, verifier, nonce } : { state, verifier, nonce, next };
   } catch {
     return null;
   }

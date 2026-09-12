@@ -1,7 +1,9 @@
 import handler from "vinext/server/app-router-entry";
+import { csrfDenied, csrfOk } from "../lib/auth/csrf";
 import { handshake, handshakePhone, rateId, roleFromQuery, stampEmail, stampUserId } from "../lib/auth/handshake";
 import { resolveAuthMode } from "../lib/auth/mode";
 import { stampMailboxHeaders, upgradeOriginOk } from "../lib/auth/upgrade";
+import { withSecurityHeaders } from "../lib/http/security";
 import { fetchRoomUsers } from "../lib/mailbox/allow";
 import { mailboxStub } from "../lib/mailbox/location";
 import { slugFromPath } from "../lib/mailbox/slug";
@@ -85,6 +87,10 @@ export default {
     if (url.pathname.startsWith("/ws/")) {
       return mailboxUpgrade(request, env);
     }
-    return handler.fetch(request, env, ctx);
+    if (!csrfOk(request)) {
+      return withSecurityHeaders(request, csrfDenied());
+    }
+    const res = await handler.fetch(request, env, ctx);
+    return withSecurityHeaders(request, res);
   },
 };

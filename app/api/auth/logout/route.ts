@@ -16,7 +16,3 @@ function leave(req: Request) {
 export function POST(req: Request) {
   return leave(req);
 }
-
-export function GET(req: Request) {
-  return leave(req);
-}

@@ -3,6 +3,7 @@ import { AUTH_RETRY_LOCATION } from "@/lib/auth/bounce";
 import { unauthorized, tooMany } from "@/lib/auth/deny";
 import { decodeOAuthBind, exchangeCode, verifyIdToken } from "@/lib/auth/google";
 import { limitAuthIp, limitAuthSub } from "@/lib/auth/limit";
+import { googleCallbackLocation } from "@/lib/auth/returnTo";
 import { clearCookie, mintSession, parseCookie, sessionCookie, STATE_COOKIE } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +59,7 @@ export async function GET(req: Request) {
     email: identity.email,
     emailVerified: identity.emailVerified,
   });
-  const headers = new Headers({ Location: "/" });
+  const headers = new Headers({ Location: googleCallbackLocation(bind.next) });
   headers.append("Set-Cookie", sessionCookie(token, secure));
   headers.append("Set-Cookie", clearCookie(STATE_COOKIE, secure));
   return new Response(null, { status: 302, headers });

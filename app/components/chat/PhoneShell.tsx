@@ -50,6 +50,7 @@ import { applyTheme, cacheRoomTheme, cachedRoomTheme, paintTheme, parseTheme, TH
 import { browserWakeLock, releaseScreenWake, type WakeLockSentinel } from "@/app/lib/wake";
 import { authRetryFromQuery } from "@/lib/auth/bounce";
 import type { ConfigGap } from "@/lib/auth/mode";
+import { googleStartHref } from "@/lib/auth/returnTo";
 import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
 import { backdropRevFromUnknown } from "@/lib/backdrop/store";
 import { themeIdFromUnknown, isThemeNotice } from "@/lib/theme/store";
@@ -1044,7 +1045,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
         <KitAvatar {...faceProps} size="lg" editable={false} />
         <p className="text-sm text-body">Sign in with Google to talk.</p>
-        <a className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark" href="/api/auth/google">
+        <a className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark" href={googleStartHref(slugTouched ? slug : null)}>
           Continue with Google
         </a>
         {googleHint

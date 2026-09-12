@@ -50,6 +50,11 @@ describe("google oidc helpers", () => {
   it("round-trips verifier and nonce in the state cookie payload", () => {
     const bind = { state: "st", verifier: "ver", nonce: "nce" };
     expect(decodeOAuthBind(encodeOAuthBind(bind))).toEqual(bind);
+    expect(decodeOAuthBind(encodeOAuthBind({ ...bind, next: "/?slug=kit" }))).toEqual({
+      ...bind,
+      next: "/?slug=kit",
+    });
+    expect(decodeOAuthBind(JSON.stringify({ ...bind, next: "https://evil.example" }))).toEqual(bind);
     expect(decodeOAuthBind(undefined)).toBeNull();
     expect(decodeOAuthBind("st")).toBeNull();
     expect(decodeOAuthBind("{}")).toBeNull();

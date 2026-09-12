@@ -34,6 +34,12 @@ describe("push subscription", () => {
     expect(parsePushSub(sub)).toEqual(sub);
     expect(parseHttpsEndpoint("http://fcm.googleapis.com/x")).toBeNull();
     expect(parseHttpsEndpoint("https://fcm.googleapis.com/x")).toBe("https://fcm.googleapis.com/x");
+    expect(parseHttpsEndpoint("https://updates.push.services.mozilla.com/wpush/v2/x")).toBe(
+      "https://updates.push.services.mozilla.com/wpush/v2/x",
+    );
+    expect(parseHttpsEndpoint("https://evil.example/push")).toBeNull();
+    expect(parseHttpsEndpoint("https://fcm.googleapis.com.evil.example/x")).toBeNull();
+    expect(parseHttpsEndpoint("https://user:pass@fcm.googleapis.com/x")).toBeNull();
     expect(parseHttpsEndpoint("not a url")).toBeNull();
     expect(parsePushSub({ endpoint: sub.endpoint, keys: { p256dh: "aa", auth: sub.keys.auth } })).toBeNull();
   });

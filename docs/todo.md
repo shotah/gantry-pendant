@@ -74,16 +74,10 @@ Two laptop tabs do not close these. Walk:
 ### gantry-cab
 
 Same Durable Object. Do not fork the mailbox.
-[frontends.md](frontends.md).
-
-- [ ] Ship the APK that skips Auto HUN on `replay` (`shouldSpeak`)
-- [ ] Caption + attach: one inbound, not an empty-text photo turn
-      ahead of the caption (PWA already stages)
-- [ ] Walk sibling inbound after the Worker fans it
-      ([sibling_phones.md](sibling_phones.md)). Cab already paints
-      `inbound` as you; keep `MailboxClient.sweep`
-- [ ] Handheld mic → compose (`SpeechRecognizer`), no auto-send.
-      Auto stays host STT. Design: [voice.md](voice.md)
+[frontends.md](frontends.md). Work lives in that checkout:
+[`docs/pendant_handoff.md`](https://github.com/shotah/gantry-cab/blob/main/docs/pendant_handoff.md)
+(ship hydrate APK, caption+attach, sibling walk, header face, native
+nonce lockstep). Do not edit Cab Kotlin from this repo.
 
 Wire changes (`seq` / `at`, `replay`, new `kind`, auth) still need a
 look at `Wire.kt` / `Mouth.kt`. iOS native is later (Sign in with Apple

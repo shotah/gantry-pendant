@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { authorizeUrl, encodeOAuthBind, newNonce, newPkce, newState } from "@/lib/auth/google";
 import { blockedGoogleStartLocation } from "@/lib/auth/mode";
+import { parseGoogleNext } from "@/lib/auth/returnTo";
 import { hostFromRequest } from "@/lib/dev/mode";
 import { stateCookie } from "@/lib/auth/session";
 
@@ -12,10 +13,12 @@ export function GET(req: Request) {
     return new Response(null, { status: 302, headers: { Location: blocked } });
   }
   const clientId = env.GOOGLE_CLIENT_ID?.trim() ?? "";
-  const origin = new URL(req.url).origin;
+  const url = new URL(req.url);
+  const origin = url.origin;
   const state = newState();
   const pkce = newPkce();
   const nonce = newNonce();
+  const next = parseGoogleNext(url.searchParams.get("next"));
   const location = authorizeUrl({
     clientId,
     origin,
@@ -24,11 +27,14 @@ export function GET(req: Request) {
     nonce,
   });
   const secure = origin.startsWith("https:");
+  const bind = next === "/"
+    ? { state, verifier: pkce.verifier, nonce }
+    : { state, verifier: pkce.verifier, nonce, next };
   return new Response(null, {
     status: 302,
     headers: {
       Location: location,
-      "Set-Cookie": stateCookie(encodeOAuthBind({ state, verifier: pkce.verifier, nonce }), secure),
+      "Set-Cookie": stateCookie(encodeOAuthBind(bind), secure),
     },
   });
 }

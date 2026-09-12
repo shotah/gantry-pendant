@@ -212,6 +212,7 @@ describe("PhoneShell", () => {
     render(<PhoneShell />);
     expect(await screen.findByText("Sign in with Google to talk.")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Continue with Google" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Continue with Google" }).getAttribute("href")).toBe("/api/auth/google");
     expect(screen.queryByRole("button", { name: "Change Kit's photo" })).toBeNull();
     expect(screen.queryByText(/Add to Home Screen/)).toBeNull();
     expect(screen.queryByText(/Google didn't finish/)).toBeNull();
@@ -234,6 +235,14 @@ describe("PhoneShell", () => {
     render(<PhoneShell />);
     expect(await screen.findByRole("link", { name: "Continue with Google" })).toBeTruthy();
     expect(screen.getByText("Google didn't finish. Try again.")).toBeTruthy();
+  });
+
+  it("carries a typed slug through the Google start link", async () => {
+    window.history.replaceState({}, "", "/?slug=kit");
+    stubOidc(null);
+    render(<PhoneShell />);
+    const link = await screen.findByRole("link", { name: "Continue with Google" });
+    expect(link.getAttribute("href")).toBe("/api/auth/google?next=%2F%3Fslug%3Dkit");
   });
 
   it("points a bounced iPhone Home Screen app back through Safari", async () => {

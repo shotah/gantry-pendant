@@ -20,6 +20,40 @@ export type StoredPush = {
   at: number;
 };
 
+/** Browser push hosts only. A listed human must not point the Worker at a URL. */
+const PUSH_HOSTS_EXACT = new Set([
+  "fcm.googleapis.com",
+  "fcmregistrations.googleapis.com",
+  "android.googleapis.com",
+  "updates.push.services.mozilla.com",
+  "web.push.apple.com",
+  "notify.windows.com",
+]);
+
+function hostSuffix(host: string, parent: string): boolean {
+  return host === parent || host.endsWith(`.${parent}`);
+}
+
+export function pushHostAllowed(host: string): boolean {
+  const h = host.trim().toLowerCase();
+  if (!h || !/[a-z]/.test(h) || h.startsWith(".") || h.includes("..") || h.includes(":")) {
+    return false;
+  }
+  if (PUSH_HOSTS_EXACT.has(h)) {
+    return true;
+  }
+  if (hostSuffix(h, "push.apple.com")) {
+    return true;
+  }
+  if (hostSuffix(h, "push.services.mozilla.com")) {
+    return true;
+  }
+  if (hostSuffix(h, "notify.windows.com")) {
+    return true;
+  }
+  return false;
+}
+
 export function parseHttpsEndpoint(raw: unknown): string | null {
   if (typeof raw !== "string") {
     return null;
@@ -31,6 +65,12 @@ export function parseHttpsEndpoint(raw: unknown): string | null {
   try {
     const url = new URL(s);
     if (url.protocol !== "https:") {
+      return null;
+    }
+    if (url.username || url.password) {
+      return null;
+    }
+    if (!pushHostAllowed(url.hostname)) {
       return null;
     }
     return s;

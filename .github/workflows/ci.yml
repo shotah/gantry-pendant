@@ -5,9 +5,8 @@ on:
   pull_request:
   workflow_dispatch:
 
-# contents:write needed to push the coverage badge to gh-pages on main.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   check:
@@ -21,6 +20,7 @@ jobs:
           node-version: "22"
           cache: npm
       - run: HUSKY=0 npm ci
+      - run: npm audit --omit=dev
       - run: npm run lint && git diff --exit-code
       - run: npm run typecheck
       - run: npm run test:coverage
@@ -32,8 +32,23 @@ jobs:
           name: coverage
           path: coverage/coverage-summary.json
 
+  coverage-badge:
+    name: Coverage badge
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage
+          path: coverage
       - name: Generate coverage badge
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
           mkdir -p badges
           chmod +x scripts/coverage-badge.sh
@@ -43,7 +58,6 @@ jobs:
       #   badges/coverage.svg  → README coverage badge
       # Pages source: branch gh-pages / (root). Enable once in repo Settings → Pages.
       - name: Push gh-pages (coverage badge)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

@@ -7,11 +7,14 @@ Threat model and the principals: [security.md](security.md). Misses in
 the field: [edgecases.md](edgecases.md).
 
 Bugs 1–13 and the Dev security items below are **done** in this
-checkout (2026-09-10). Cron pings that never came back lined up with
-tag collision, unscoped phone acks, and a lexical `since` cursor —
-not with a listed human changing Kit's face. Decisions live in
-[security.md](security.md). Before go-live and after go-live lists
-are still open.
+checkout (2026-09-10). A 2026-09-12 pass closed the cheap Before
+go-live items that do not slow the two-tab walk and do not change
+the chat wire (headers, cookie CSRF, push host allowlist, config
+`version`, Google return-to, CI token scope). Cron pings that never
+came back lined up with tag collision, unscoped phone acks, and a
+lexical `since` cursor — not with a listed human changing Kit's face.
+Decisions live in [security.md](security.md). Session revocation,
+native nonce (Cab lockstep), and real CF rate limits are still open.
 
 ---
 
@@ -201,8 +204,9 @@ crane bearer. Also `readAvatarUpload` read the whole body before the
 
 Not on [todo.md](todo.md) yet. Small, and none of them change the wire.
 
-- [ ] **Return-to after Google** — the callback always lands on `/`.
-      Carry `?slug=` / a deep link through the `state` cookie.
+- [x] **Return-to after Google** — `next` on the state cookie is `/` or
+      `/?slug=<slug>`. PWA start links carry a typed slug. Cab uses
+      `POST /api/auth/token`, not this redirect.
 - [ ] **Sign out everywhere + devices** — list this `sub`'s push
       subscriptions with a remove button. Turns the stolen-phone
       runbook into a tap. Needs revocation (Before go-live).
@@ -214,9 +218,9 @@ Not on [todo.md](todo.md) yet. Small, and none of them change the wire.
 - [ ] **`wrangler types`** — replace hand-rolled `types/cloudflare.d.ts`
       and `worker-env.d.ts`. Import over write; the hand copy already
       lags the real `DurableObjectStorage` surface.
-- [ ] **Pin deps** — `react`, `react-dom`, `typescript`, `@types/*`,
-      `tailwindcss`, `@tailwindcss/postcss` are `latest`. Pin majors;
-      add Renovate or Dependabot weekly.
+- [x] **Pin deps** — `react`, `react-dom`, `typescript`, `@types/*`,
+      `tailwindcss`, `@tailwindcss/postcss` are caret majors, not
+      `latest`. Weekly bot is still After go-live.
 - [ ] **Push fail counter** — only 404 / 410 drop a subscription. Count
       consecutive `fail` and drop after N.
 - [ ] **Non-blocking push fan-out** — `notifyOffline` awaits every push
@@ -226,8 +230,9 @@ Not on [todo.md](todo.md) yet. Small, and none of them change the wire.
       map, and dead push rows, instead of `loadQueue` doing it on every
       frame. Rate-map prune on each `take` already landed; alarm is
       still nicer.
-- [ ] **Version on `/api/auth/config`** — `package.json` version so a
-      release can be checked from a phone.
+- [x] **Version on `/api/auth/config`** — additive `version` from
+      `package.json`. Cab `AuthConfig` drops unknown keys. Settings
+      already paints the bundled `v*` from `RELEASE`.
 
 ---
 
@@ -256,29 +261,28 @@ Do now. None of these add a paste or a step to the two-tab walk.
 Before a human outside the yard gets the origin, or Telegram is turned
 off for a crane.
 
-- [ ] **Response headers.** None exist today. Document routes:
-      `Content-Security-Policy` (the two inline boot scripts in
-      `app/layout.tsx` need a nonce or hash; `img-src 'self' data:
-      https:` for markdown and photos; `connect-src 'self' wss:`;
-      `frame-ancestors 'none'`), `Strict-Transport-Security`,
-      `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`,
-      `Permissions-Policy: geolocation=(self), camera=(self),
-      microphone=()`. API routes: `Cache-Control: no-store`.
+- [x] **Response headers.** Worker wraps Vinext: CSP (`frame-ancestors
+      'none'`, `connect-src 'self' ws: wss:`, `img-src 'self' data:
+      blob: https:`), HSTS on https, `nosniff`, `Referrer-Policy:
+      no-referrer`, `Permissions-Policy: geolocation=(self),
+      camera=(self), microphone=()`, API `Cache-Control: no-store`.
+      101 upgrades are not wrapped. Leftover: script/style hashes for
+      the two boot scripts — Vinext still needs `'unsafe-inline'`.
+      `test/http/security.test.ts`.
 - [ ] **Session revocation.** Sign-out only clears the cookie; a copied
       JWE is good until `exp` (7 d). Add a per-`sub` "not before"
       (`iat` floor) or a `jti` denylist in KV. "Sign out everywhere"
       and the stolen-phone runbook use it. Pair with the sliding
       refresh line in todo.md.
-- [ ] **CSRF defense in depth.** `SameSite=Lax` is the only guard on
-      `POST /api/avatar`, `PUT|DELETE /api/push`, `POST
-      /api/auth/logout`. Require `Sec-Fetch-Site` ∈ `same-origin`,
-      `none` (or a matching `Origin`) on mutating routes. Drop
-      `GET /api/auth/logout`. `__Host-` cookie prefix.
-- [ ] **Push endpoint allowlist.** `parseHttpsEndpoint` accepts any
-      `https://`; the Worker POSTs to it. Restrict to the browser push
-      hosts (`fcm.googleapis.com`, `*.push.apple.com`,
-      `*.push.services.mozilla.com`, `*.notify.windows.com`). A listed
-      human should not be able to point the Worker at a URL.
+- [x] **CSRF defense in depth.** Cookie-bearing mutating `/api/*`
+      needs `Sec-Fetch-Site` ∈ `same-origin`/`none` or a matching
+      `Origin`. Cab `Authorization` POSTs have no session cookie and
+      stay allowed. `GET /api/auth/logout` is gone (PhoneShell already
+      POSTs). Leftover: `__Host-` cookie prefix (breaks loopback http).
+      `test/auth/csrf.test.ts`.
+- [x] **Push endpoint allowlist.** `parseHttpsEndpoint` is FCM /
+      Mozilla / Apple / WNS hosts only. Userinfo and lookalike hosts
+      fail. Cab does not `PUT /api/push`. `test/push/subscription.test.ts`.
 - [ ] **Real rate limits.** `/ws/` upgrade and `/api/auth/google` have
       none; the in-isolate map is per-colo (bug 6). Cloudflare WAF
       rate-limiting rules (or the Rate Limiting binding) on `/ws/*`,
@@ -288,19 +292,20 @@ off for a crane.
       checks the ID token's `nonce` against the body's `nonce`; the cab
       supplies both. Issue the nonce server-side (`GET
       /api/auth/nonce`, one-time, 5 min) so a stolen ID token cannot be
-      replayed for a 7 d session. Cab change too.
-- [ ] **CI hardening.** `permissions: contents: write` is workflow-wide
-      in `ci.yml`; scope it to the badge job. Pin actions by SHA.
-      `npm audit --omit=dev` gate. Consider deploying on `v*` tags
-      only, not every push to `main`.
+      replayed for a 7 d session. Cab change too — do not land this
+      until Cab can fetch the nonce.
+- [x] **CI hardening** (partial). Workflow default is `contents:
+      read`; `contents: write` is the coverage-badge job only.
+      `npm audit --omit=dev` is a check step. Leftover: pin actions
+      by SHA; consider deploying on `v*` tags only.
 - [ ] **Confirm on the deployed origin** (already in the edgecases
       checklist, restated because it is the go-live gate):
       `MAILBOX_SECRET` and `PENDANT_DEV` unset; `/crane` is 404;
       `?secret=` on an oidc upgrade is 401; `/api/auth/config` shows
       `mode: "oidc"`, `dev: false`.
-- [ ] **`/api/auth/config` is public** and names the config gap
-      (`session` / `crane`). Fine for the yard; decide whether it stays
-      once the origin is public.
+- [x] **`/api/auth/config` stays public.** Cab and the PWA need `mode`
+      / `google`. `gap` is yard setup copy, not a credential. Additive
+      `version` is fine. Do not hide it when the origin is public.
 - [ ] **Custom hostname** (todo.md) → `Secure` cookie always, fixed
       cookie domain, OAuth redirect updated.
 - [x] **Avatar write policy** (bug 12) decided and written down:
