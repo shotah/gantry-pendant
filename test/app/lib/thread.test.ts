@@ -79,6 +79,18 @@ describe("thread on the device", () => {
     expect(persistableThread(thread).map((m) => m.id)).toEqual(["a", "refused"]);
   });
 
+  it("strips live so a reload cannot keep the draft React key", () => {
+    type LiveBubble = Bubble & { live?: boolean };
+    const thread: LiveBubble[] = [
+      { id: "a", at: 1, seq: 1 },
+      { id: "r1", at: 2, seq: 2, live: true },
+    ];
+    const next = persistableThread(thread);
+    expect(next.map((m) => m.id)).toEqual(["a", "r1"]);
+    expect(next.find((m) => m.id === "r1")?.live).toBe(false);
+    expect(thread.find((m) => m.id === "r1")?.live).toBe(true);
+  });
+
   it("knows when nothing changed so it can skip the write", () => {
     const a = { id: "a", at: 1 };
     const b = { id: "b", at: 2 };

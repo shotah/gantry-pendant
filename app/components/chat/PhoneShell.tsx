@@ -637,12 +637,13 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             return rest;
           }
           const prevDraft = prev.find((m) => m.id === DRAFT_BUBBLE_ID);
-          return placeInThread(rest, {
+          return placeInThread(rest.map((m) => (m.live ? { ...m, live: false } : m)), {
             id: DRAFT_BUBBLE_ID,
             from: "kit",
             text,
             kind: "draft",
             at: prevDraft?.at ?? Date.now(),
+            live: true,
           });
         });
         return;
@@ -688,17 +689,20 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         rememberSeen(seenIds.current, id);
       }
       setMessages((prev) => {
+        const fromDraft = frame.kind === "reply" && prev.some((m) => m.id === DRAFT_BUBBLE_ID);
         const rest = frame.kind === "reply"
           ? prev.filter((m) => m.id !== DRAFT_BUBBLE_ID)
           : prev;
-        return placeInThread(rest, {
-          id: id ?? `${Date.now()}-${rest.length}`,
+        const cleared = rest.map((m) => (m.live ? { ...m, live: false } : m));
+        return placeInThread(cleared, {
+          id: id ?? `${Date.now()}-${cleared.length}`,
           from: bubbleFrom(phone, frame.kind),
           text: frame.text ?? "",
           kind: frame.kind,
           at: at ?? Date.now(),
           seq,
           photo: frame.images?.[0]?.url,
+          live: fromDraft,
         });
       });
       if (phone) {

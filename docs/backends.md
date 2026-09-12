@@ -133,6 +133,11 @@ The **cadence is the crane's.** `stream.go` throttles at `streamMinGap`
 after the last delta so a fast model does not leave the bubble on
 `bo`. `Finish` / `Discard` stop that timer (and a `finished` flag)
 before the `reply` or empty `draft` goes out. Mailbox cost is nil.
+`reply` / `push` to a live phone **fans first**, then writes the queue
+row and transcript — waiting on persist before `send` was the hitch
+after a complete draft. Offline Web Push still follows persist. PWA
+promotes the draft to a reply with a stable React key (`live`); Cab
+already has one Compose node, so that paint is PWA-only.
 Do **not** coalesce, buffer, or timer drafts in the DO — that would
 put a second clock in the room.
 

@@ -74,4 +74,20 @@ describe("Thread", () => {
     const body = screen.getByText("⏳ spinning up");
     expect(body.closest(".italic")).toBeTruthy();
   });
+
+  it("keeps the same DOM node when a live draft becomes a reply", () => {
+    const { rerender } = render(
+      <Thread
+        messages={[{ id: "__draft__", from: "kit", text: "Hello", kind: "draft", at: 1, live: true }]}
+      />,
+    );
+    const node = screen.getByText("Hello").closest("li");
+    rerender(
+      <Thread
+        messages={[{ id: "r1", from: "kit", text: "Hello", kind: "reply", at: 1, live: true }]}
+      />,
+    );
+    expect(screen.getByText("Hello").closest("li")).toBe(node);
+    expect(screen.getByText("Hello").closest(".italic")).toBeNull();
+  });
 });

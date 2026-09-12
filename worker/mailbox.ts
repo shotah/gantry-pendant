@@ -289,10 +289,12 @@ export class Mailbox extends DurableObject<Env> {
       bytes: utf8Bytes(body),
     });
     if (dest === "phone") {
-      await this.rememberPhone(phoneRow());
+      // Fan live sockets before durable persist. Drafts already skip
+      // storage; waiting on queue+transcript here is the draft→reply hitch.
       for (const p of peers) {
         p.send(body);
       }
+      await this.rememberPhone(phoneRow());
       await this.notifyOffline(out);
       return;
     }

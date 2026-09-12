@@ -12,6 +12,8 @@ export type ChatBubble = {
   seq?: number;
   photo?: string;
   pending?: boolean;
+  /** Same React key as the draft so promoting to reply does not remount. */
+  live?: boolean;
   /** Mailbox refused it; sentence from `describeSendError`. */
   failed?: string;
 };
@@ -37,7 +39,7 @@ export function Thread({ messages, empty }: { messages: ChatBubble[]; empty?: Re
       {messages.map((m) => {
         const mine = m.from === "you";
         return (
-          <li key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+          <li key={m.live ? "kit-live" : m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[85%] rounded-2xl border px-3 py-2 text-chat leading-relaxed ${
                 mine

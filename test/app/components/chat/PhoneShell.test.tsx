@@ -1152,11 +1152,29 @@ describe("PhoneShell", () => {
     });
     expect(await screen.findByText("Making Calls: ✓")).toBeTruthy();
     expect(screen.queryByText("⏳ spinning up")).toBeNull();
+    const draftNode = screen.getByText("Making Calls: ✓").closest("li");
     act(() => {
       ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "You rode 21mi." }));
     });
-    expect(await screen.findByText("You rode 21mi.")).toBeTruthy();
+    const reply = await screen.findByText("You rode 21mi.");
+    expect(reply.closest("li")).toBe(draftNode);
     expect(screen.queryByText("Making Calls: ✓")).toBeNull();
+  });
+
+  it("promotes a complete draft to a reply without a second bubble", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "Hello there" }));
+    });
+    expect((await screen.findByText("Hello there")).closest(".italic")).toBeTruthy();
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "Hello there" }));
+    });
+    expect(screen.getAllByText("Hello there")).toHaveLength(1);
+    expect(screen.getByText("Hello there").closest(".italic")).toBeNull();
   });
 
   it("drops an empty draft without leaving a bubble", async () => {

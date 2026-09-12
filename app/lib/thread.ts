@@ -61,15 +61,19 @@ export function placeInThread<T extends ThreadOrder>(messages: T[], bubble: T): 
   return next;
 }
 
-type Persistable = { id: string; kind?: string; pending?: boolean };
+type Persistable = { id: string; kind?: string; pending?: boolean; live?: boolean };
 
 /**
  * What is worth keeping on the device between loads: settled bubbles only.
  * A `sending` bubble either lands (the transcript replays it) or never did;
  * a draft is Kit mid-sentence. Neither should greet you as history.
+ * `live` is a this-session React key so promoting draft→reply does not remount;
+ * a reload must not keep it or the next draft steals that node's identity.
  */
 export function persistableThread<T extends Persistable>(messages: T[]): T[] {
-  return messages.filter((m) => !m.pending && !isDraftBubble(m));
+  return messages
+    .filter((m) => !m.pending && !isDraftBubble(m))
+    .map((m) => (m.live ? { ...m, live: false } : m));
 }
 
 /** Same bubbles in the same order — skip the write. */
