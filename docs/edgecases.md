@@ -1,7 +1,7 @@
 # Edge cases and gotchas
 
 Things that bite after deploy, across **gantry-pendant**, **gantree**,
-**ai-gantry**, and **gantry-cab**. Symptom, cause, cover — not a walk
+**ai-gantry**, **gantry-cab**, and **gantry-helm**. Symptom, cause, cover — not a walk
 of how the product works. Wire and paint live in
 [frontends.md](frontends.md). Who talks: [setup.md](setup.md). How it
 got to workers.dev: [deployment.md](deployment.md). Shape:

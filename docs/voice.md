@@ -204,7 +204,8 @@ The PWA pays the Web Speech tax.
 | **Cab Auto** | Host STT → inbound, auto-send | Auto reads the card | **Done** | Keep. Do not wrap the PWA. |
 | **Cab handheld** | `SpeechRecognizer` → compose | Optional `TextToSpeech`, off by default | Medium | Same Google stack as Auto. Reliable APIs. |
 | **PWA Chrome Android** | `SpeechRecognition` → compose | `speechSynthesis` later / skip | Medium | First PWA target. Interim / `continuous` are flaky — tap-to-talk, not always-on. Hide the mic when the API is missing. |
-| **PWA iOS A2HS** | Web Speech often dies in the standalone WebView | TTS needs a user gesture; background kills it | High | Do not prove voice here. Native iOS later. |
+| **PWA iOS A2HS** | Web Speech often dies in the standalone WebView | TTS needs a user gesture; background kills it | High | Do not prove voice here. Helm is the iPhone mouth. |
+| **Helm CarPlay** | Host STT → inbound, auto-send | CarPlay reads the communication notification | **In Helm** | Same mailbox. `surface: carplay`. No second recognizer. |
 | **PWA Firefox / desktop Safari** | STT missing or off | TTS ok-ish | — | Mic hidden. Typing stays. |
 | **Google Assistant Action** | Dead product (Conversational Actions ended 2023) | — | Don't | See [Assistant](#google-assistant-is-the-wrong-button). |
 | **Worker Whisper / cloud TTS** | POST clip, get text / audio | New media route | High | Fallback if Web Speech is unusable. Not v1. Still not the Completer. |
@@ -373,6 +374,14 @@ Ada's PWA and Ada's Cab are one human. Live inbound fan-out is
 - [ ] Ship the APK that honors `replay` with the hydrating Worker
       ([todo.md](todo.md#gantry-cab))
 
+### gantry-helm (car)
+
+- [x] Surfaces `ios` / `carplay` kept on this Worker
+- [ ] Communication notification reads live `reply` / `push`
+- [ ] Spoken Reply → `inbound` + `surface: carplay`
+- [ ] `shouldSpeak` skips `replay` / `inbound` / controls
+      (Helm `docs/pendant_handoff.md`)
+
 ### gantry-pendant (this repo) — pocket dictation
 
 - [ ] Mic on compose when `SpeechRecognition` exists
@@ -397,7 +406,7 @@ PWA-only paint. Cab does not need a mailbox change.
   text comes back, Completer still sees words)
 - PWA "Read replies" toggle
 - `context.input: spoken` if PERSONA wants it
-- Native iOS STT/TTS when that mouth exists
+- Helm handheld dictation into compose (CarPlay already speaks)
 
 ### Not this version
 

@@ -89,9 +89,16 @@ header face / caption+attach / thread cache / blob `If-None-Match` is
 in tree. Worker issues `/api/auth/nonce` and fans sibling inbound.
 Do not edit Cab Kotlin from this repo.
 
+### gantry-helm
+
+Same Durable Object. Work lives in that checkout:
+[`docs/pendant_handoff.md`](https://github.com/shotah/gantry-helm/blob/main/docs/pendant_handoff.md).
+Do not edit Helm Swift from this repo.
+
 Wire changes (`seq` / `at`, `replay`, new `kind`, auth) still need a
-look at `Wire.kt` / `Mouth.kt`. iOS native is later (Sign in with Apple
-is a mailbox auth change). Do not start Expo to catch up Cab.
+look at Cab `Wire.kt` / `Mouth.kt` and Helm `Wire.swift` /
+`Mouth.swift`. Sign in with Apple is a mailbox auth change. Do not
+start Expo to catch up Cab or Helm.
 
 ---
 

@@ -51,8 +51,8 @@ Two phone ideas people mix up:
 6. **Client is TypeScript / Vinext.** Same `app/` muscle as Gantree.
    Gantree is Vinext **on Node** because it needs `docker.sock`. This
    app has no Docker — Vinext's actual happy path is Cloudflare
-   Workers. PWA first. The car mouth is a native sister
-   (`gantry-cab`), not Expo wrapping this UI.
+   Workers. PWA first. The car mouths are native sisters
+   (`gantry-cab`, `gantry-helm`), not Expo wrapping this UI.
 7. **The phone may send more than text.** Telegram only gets a location
    when you drop a pin. Owning the client means a small **context**
    blob on the wire (GPS first). The prompt stays stingy; the session
@@ -170,7 +170,7 @@ me" / leave-by / directions should not require a ritual pin.
 | --- | --- | --- |
 | `geo`: lat, lon, `accuracy_m` (GPS on + granted) | `here.Set` this send → `[last pin]` | **Not** copied into `Message.Text` |
 | `at` + IANA `tz` | Parsed if a mouth sends them; PWA does not stamp them until the harness reads phone tz | No |
-| `battery` / `net` / `surface` | Same: additive, unused. Cab may still send them | No |
+| `battery` / `net` / `surface` | Same: additive, unused. Cab / Helm may still send them | No |
 
 Do **not** stuff `[location]` into the user text on every send. That
 is how Telegram location messages work, and it would re-bill coords
@@ -184,7 +184,7 @@ context?: {
   geo?: { lat, lon, accuracy_m, alt_m?, heading?, speed_mps? }
   battery?: { pct, charging }
   net?: wifi | cellular | unknown
-  surface?: browser | android | android_auto
+  surface?: browser | android | android_auto | ios | carplay
 }
 ```
 
@@ -221,13 +221,14 @@ Reuse `internal/here`. Do not invent a second location store. Accuracy
 
 ## Android and iPhone
 
-PWA for the pocket. Cab for the car. Same mailbox.
+PWA for the pocket. Cab and Helm for the car. Same mailbox.
 
 | Path | Android | iPhone | When |
 | --- | --- | --- | --- |
 | **PWA** | Install from Chrome | Add to Home Screen. Push exists since 16.4; background is still weak. | First client |
 | **gantry-cab** | Sideload APK + Android Auto | — | Spoken reply / reminders in the car |
-| **Expo** | Sideload APK | Apple Developer ($99/yr) + TestFlight (EAS can sign) | When PWA feels like a bookmark |
+| **gantry-helm** | — | Sideload / Xcode + CarPlay message cards | Spoken reply / reminders in the car |
+| **Expo** | Sideload APK | Apple Developer ($99/yr) + TestFlight (EAS can sign) | Don't. Native mouths exist. |
 
 Store listing is not the experiment. Sideload and a Home Screen icon are.
 

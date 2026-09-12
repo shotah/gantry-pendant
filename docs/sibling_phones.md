@@ -18,7 +18,7 @@ The mailbox is already:
 ```text
 room  = crane slug          (one DO)
 human = Google sub          (session, transcript key, socket tag)
-mouth = PWA | Cab | later iOS   (sockets, not identities)
+mouth = PWA | Cab | Helm        (sockets, not identities)
 ```
 
 Crane `reply` / `typing` / `draft` already fan to **every** socket

@@ -55,9 +55,13 @@ describe("frame", () => {
     const browser = parseFrame(JSON.stringify({ context: { surface: "browser" } }));
     const android = parseFrame(JSON.stringify({ context: { surface: "android" } }));
     const auto = parseFrame(JSON.stringify({ context: { surface: "android_auto" } }));
+    const ios = parseFrame(JSON.stringify({ context: { surface: "ios" } }));
+    const carplay = parseFrame(JSON.stringify({ context: { surface: "carplay" } }));
     expect(browser.ok && browser.frame.context?.surface).toBe("browser");
     expect(android.ok && android.frame.context?.surface).toBe("android");
     expect(auto.ok && auto.frame.context?.surface).toBe("android_auto");
+    expect(ios.ok && ios.frame.context?.surface).toBe("ios");
+    expect(carplay.ok && carplay.frame.context?.surface).toBe("carplay");
     const oldPhone = parseFrame(JSON.stringify({ context: { surface: "phone" } }));
     const oldCar = parseFrame(JSON.stringify({ context: { surface: "car" } }));
     const desktop = parseFrame(JSON.stringify({ context: { surface: "desktop" } }));

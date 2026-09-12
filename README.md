@@ -27,10 +27,11 @@ Object room on Cloudflare. A new harness channel next to Telegram.
 [gantree](https://github.com/shotah/gantree) still operates the crane
 — build, grants, recreate. It never sits in a chat turn.
 [gantry-cab](https://github.com/shotah/gantry-cab) is the same room in
-the car. One Worker. Zero inbound ports.
+the car. [gantry-helm](https://github.com/shotah/gantry-helm) is the
+same room on an iPhone. One Worker. Zero inbound ports.
 
 ```text
-PWA / Cab  →  this Worker (Google + Durable Object)  ←  crane (outbound)
+PWA / Cab / Helm  →  this Worker (Google + Durable Object)  ←  crane (outbound)
 ```
 
 The handset only needs HTTPS. The Mini does not have to be the
@@ -58,7 +59,7 @@ Every screen, Lamp, Paper, extra-large type, crane stand-in:
 
 ## The household
 
-Four checkouts. One product. Nested under gantree (`repos/…`), each
+Five checkouts. One product. Nested under gantree (`repos/…`), each
 with its own git remote — same pattern as `repos/ai-gantry`.
 
 ```mermaid
@@ -66,12 +67,14 @@ flowchart LR
   subgraph you ["You hold"]
     PWA["Pendant PWA"]
     Cab["gantry-cab"]
+    Helm["gantry-helm"]
   end
   DO["Mailbox DO"]
   Crane["ai-gantry"]
   Yard["gantree"]
   PWA -->|"cookie + wss"| DO
   Cab -->|"JWE + wss"| DO
+  Helm -->|"JWE + wss"| DO
   Crane -->|"outbound wss"| DO
   Yard -->|"env + bearer"| Crane
   Yard -.->|"Worker secrets"| DO
@@ -81,6 +84,7 @@ flowchart LR
 | --- | --- |
 | **this** (`app/` + `worker/`) | Chat UI, Google door, PWA. Durable Object room per crane slug. Deploys **code** only. |
 | [gantry-cab](https://github.com/shotah/gantry-cab) | Android + Auto mouth. Same frames, same room. Not a TWA wrapping this UI. |
+| [gantry-helm](https://github.com/shotah/gantry-helm) | iOS + CarPlay mouth. Same frames, same room. Not a WKWebView wrapping this UI. |
 | [ai-gantry](https://github.com/shotah/ai-gantry) | The crane. Completer, PERSONA, MCP. `CHANNEL=pendant` is a sibling of Telegram. |
 | [gantree](https://github.com/shotah/gantree) | Operator board. Writes `.env`, mints the bearer, ticks who may talk. Never in the token path. |
 
@@ -89,7 +93,8 @@ Build mints a bearer per crane. The crane publishes who may talk when
 it dials. The Worker is the room, not a second allowlist.
 
 Sister READMEs tell the same household from their side. Cab for the
-car. Gantree for the yard. This one for the handheld and the mailbox.
+Android car. Helm for the iPhone. Gantree for the yard. This one for
+the handheld and the mailbox.
 
 Wire, queue, `ack` / `since` / `seq`:
 [docs/architecture.md](docs/architecture.md) ·
@@ -108,7 +113,7 @@ The plan lives here, not in chat.
 | What the mouth looks like | [docs/screens.md](docs/screens.md) |
 | What you paste where | [docs/setup.md](docs/setup.md) |
 | First `workers.dev` | [docs/deployment.md](docs/deployment.md) |
-| Cab, later iOS | [docs/frontends.md](docs/frontends.md) |
+| Cab and Helm | [docs/frontends.md](docs/frontends.md) |
 | The crane end of the wire | [docs/backends.md](docs/backends.md) |
 | Why this shape | [docs/design.md](docs/design.md) |
 | How the sockets meet | [docs/architecture.md](docs/architecture.md) |

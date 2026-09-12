@@ -4,7 +4,7 @@ How the phone proves it may talk to Kit, how the crane proves it is
 Kit, and why that is **not** google-mcp OAuth. Shape:
 [architecture.md](architecture.md). Why a Worker mailbox:
 [design.md](design.md). Who pastes what: [setup.md](setup.md). Cab
-and later iOS: [frontends.md](frontends.md).
+and Helm: [frontends.md](frontends.md).
 
 Gantree's door (operator passphrase) stays on the **yard**. Harness
 allowlists stay on the **crane**. This Worker is a third door: the

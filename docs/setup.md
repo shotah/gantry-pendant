@@ -233,9 +233,10 @@ the session hit its hard 7-day `exp`. Cron / spark can lock-screen ping
 when Web Push is on (VAPID secrets + Enable notifications). Without those
 keys the queue still holds the frame until the app is open.
 
-The car mouth is a sister APK (`repos/gantry-cab`): same Worker,
-`POST /api/auth/token`, then the session JWE on `Authorization`. Android
-Auto reads `reply` / `push` aloud. Setup: cab `docs/setup.md`.
+The car mouths are sister apps: Cab (`repos/gantry-cab`) and Helm
+(`repos/gantry-helm`). Same Worker, `POST /api/auth/token`, then the
+session JWE on `Authorization`. Android Auto / CarPlay read `reply` /
+`push` aloud. Setup: that checkout's `docs/setup.md`.
 
 A stranger who hits Sign in with Google gets a session and an empty
 crane list. They never join a room.

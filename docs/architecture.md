@@ -37,7 +37,7 @@ Object is that hub on our Cloudflare account.
 
 ## Household
 
-Four repos. Pitch and the same diagram:
+Five checkouts. Pitch and the same diagram:
 [root readme](../README.md#the-household).
 
 ```mermaid
@@ -45,12 +45,14 @@ flowchart LR
   subgraph you ["You hold"]
     PWA["Pendant PWA"]
     Cab["gantry-cab"]
+    Helm["gantry-helm"]
   end
   DO["Mailbox DO"]
   Crane["ai-gantry"]
   Yard["gantree"]
   PWA -->|"cookie + wss"| DO
   Cab -->|"JWE + wss"| DO
+  Helm -->|"JWE + wss"| DO
   Crane -->|"outbound wss"| DO
   Yard -->|"env + bearer"| Crane
   Yard -.->|"Worker secrets"| DO
@@ -64,9 +66,9 @@ crane bearer. This repo only deploys Worker **code**.
 ## Target
 
 ```text
-[ phone PWA  |  gantry-cab APK  |  later: iOS ]
+[ phone PWA  |  gantry-cab APK  |  gantry-helm IPA ]
         |
-        |  HTTPS + cookie (PWA) or Authorization JWE (Cab)
+        |  HTTPS + cookie (PWA) or Authorization JWE (Cab / Helm)
         |  wss to same origin
         v
 [ Vinext on Cloudflare Workers ]
@@ -113,6 +115,9 @@ gantry-pendant/            this checkout — Vinext app + DO mailbox
 gantry-cab/                Android + Auto mouth — same mailbox, own repo
                            (nested `repos/gantry-cab`)
 
+gantry-helm/               iOS + CarPlay mouth — same mailbox, own repo
+                           (nested `repos/gantry-helm`)
+
 ai-gantry/                 harness — internal/channel/ sibling
   internal/channel/        Channel, Pusher, Message, Outbound
     telegram/
@@ -132,7 +137,7 @@ The room is **per crane slug**. Sessions are **per human** (`sub`).
 - Phone frames go to the crane socket. Crane `reply` requires
   `user_id` and fans to `getWebSockets(sub)`. Crane `push` with no
   `user_id` broadcasts to every phone in the room.
-- **Sibling phones** (PWA + Cab, same Google `sub`): an `inbound` is
+- **Sibling phones** (PWA + Cab + Helm, same Google `sub`): an `inbound` is
   stored on `t:<sub>` and hydrates on reconnect. Live, the same body
   also fans to `sub:<userId>` except the sender. Spike (no `sub`)
   still waits on reconnect. Walk:
@@ -224,8 +229,8 @@ The architecture does not care about stores. The client is a WebSocket
 consumer of the Worker. Transcript hydrates on connect — not the unread
 queue, and not `sw.js`. Later HTTP can
 still serve media. Location uses the browser Geolocation API on send.
-The car mouth is **gantry-cab** (native Android Auto), not Expo wrapping
-this UI. Voice is a mouth skin: OS STT → the same `inbound` text,
+The car mouths are **gantry-cab** (Android Auto) and **gantry-helm**
+(CarPlay communication notifications), not Expo wrapping this UI. Voice is a mouth skin: OS STT → the same `inbound` text,
 OS / Auto TTS of `reply` / `push`. The Completer never sees a clip —
 [voice.md](voice.md).
 
@@ -237,10 +242,11 @@ PNGs on HTTPS (or loopback). No extra PWA plugin.
 ```text
 PWA (both phones)   ─┐
 gantry-cab (Auto)   ─┼─►  same Durable Object
+gantry-helm (CarPlay)┘
 ```
 
-Native Android (the car mouth) is **gantry-cab**, a sister checkout. It
-does not wrap this Vinext app. Same frames, same Google `sub`. Phone
+Native Android is **gantry-cab**. Native iOS is **gantry-helm**.
+Neither wraps this Vinext app. Same frames, same Google `sub`. Phone
 auth is the session JWE on `Authorization` after `POST /api/auth/token`.
 The PWA still uses the httpOnly cookie.
 

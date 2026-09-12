@@ -16,57 +16,65 @@ Do not treat `app/components/chat` as the only phone.
 | --- | --- | --- |
 | Pendant PWA | this repo `app/` | Handheld browser / Add to Home Screen |
 | Cab | [gantry-cab](https://github.com/shotah/gantry-cab) (`repos/gantry-cab`) | Full Android app + Android Auto (`MessagingStyle`). Same mailbox, not a TWA wrapping this PWA |
+| Helm | [gantry-helm](https://github.com/shotah/gantry-helm) (`repos/gantry-helm`) | Full iOS app + CarPlay communication notifications. Same mailbox, not a WKWebView wrapping this PWA |
 | Crane stand-in | this repo `/crane` | Loopback only (`PENDANT_DEV`) |
-| iOS native | not yet | Same Durable Object when it exists. Do not fork the Worker |
 
 Gantree is not a mouth. ai-gantry is the crane, not a phone.
 
-Cab talks like the PWA: `GET /api/auth/config`, `POST /api/auth/token`
-(native JWE), `GET /api/auth/me`, then `wss /ws/<slug>?role=phone`.
-Google is a Web client id in the APK (`aud`) plus an Android OAuth
-client — walk is on the cab side.
+Cab and Helm talk like the PWA: `GET /api/auth/config`,
+`GET /api/auth/nonce`, `POST /api/auth/token` (native JWE),
+`GET /api/auth/me`, then `wss /ws/<slug>?role=phone`. Google is the
+pendant **Web** client id (`aud`) plus a **new** native OAuth
+client (Android package / iOS bundle) — walk is on that checkout.
+Cookie CSRF is PWA-only. Neither OkHttp nor URLSession stores
+`pendant_session`.
 
 ---
 
 ## When you change this repo
 
 If the edit is **wire, auth, queue, or thread order**, walk Cab
-before you call it done. A PWA-only paint is not enough.
+and Helm before you call it done. A PWA-only paint is not enough.
 
 | Kind of change | Other mouths |
 | --- | --- |
-| Additive JSON (`seq`, `at`, extra `context`) | Old clients must keep working. Cab `parseFrame` drops unknown keys — that is the bar |
-| New required field, new `kind`, or a required header | Cab (and later iOS) must ship in lockstep, or the mailbox must tolerate the old client |
-| Auth (`/api/auth/*`, session JWE, 4401) | Cab POSTs the ID token and stores the JWE. Spike query creds are PWA loopback only. Cookie CSRF is PWA-only — do not send `pendant_session` from OkHttp. Additive `version` on `GET /api/auth/config` is dropped today (`AuthConfig` keeps `mode` / `google`). `GET /api/auth/nonce` is issued: Cab fetches it and mints locally on a failed GET (404 / junk / empty). Close `4401` / handshake 401 drops the stored JWE; 403 does not. Do not **require** stored nonces until that APK is the sideload |
-| Queue / `ack` / `since` / `seq` | Cab parses `seq` / `at`, inserts like `placeInThread`, acks the highest seq. Transcript hydrate is the same frames plus `replay` — see below |
-| Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Do not assume it needs the PWA CSS |
-| Draft→reply remount | PWA `live` React key so Markdown does not remount. Not on the wire. Cab Compose is already one node |
-| Photo caps, encode ladder, `error` tokens | Both mouths encode to the same budget and paint refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
-| Face / backdrop blobs and their notices | Cab refetches `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
-| Header face (size, hang, stroke) | Cab TopAppBar, not PWA-only — [Header face](#header-face) |
-| Room theme | Cab follows Kit when `followTheme` is on; GET `/api/theme` on connect — [Theme](#theme-what-every-mouth-must-do-the-same) |
-| PWA-only UI (font, Install) | Cab has its own Compose shell |
-| Voice (STT / TTS) | Mouth-local. No audio on the wire. Cab Auto already reads `reply` / `push` and stuffs spoken Reply into `inbound`. Handheld dictation is compose-only — [voice.md](voice.md) |
+| Additive JSON (`seq`, `at`, extra `context`) | Old clients must keep working. Cab `parseFrame` and Helm `parseFrame` drop unknown keys — that is the bar |
+| New required field, new `kind`, or a required header | Cab and Helm must ship in lockstep, or the mailbox must tolerate the old client |
+| Auth (`/api/auth/*`, session JWE, 4401) | Cab and Helm POST the ID token and store the JWE. Spike query creds are PWA loopback only. Cookie CSRF is PWA-only — do not send `pendant_session` from OkHttp or URLSession. Additive `version` on `GET /api/auth/config` is dropped today (`AuthConfig` keeps `mode` / `google`). `GET /api/auth/nonce` is issued: both fetch it and mint locally on a failed GET (404 / junk / empty). Close `4401` / handshake 401 drops the stored JWE; 403 does not. Do not **require** stored nonces until those native builds are the sideload |
+| Queue / `ack` / `since` / `seq` | Cab and Helm parse `seq` / `at`, insert like `placeInThread`, ack the highest seq. Transcript hydrate is the same frames plus `replay` — see below |
+| Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Helm pins the last bubble. Do not assume either needs the PWA CSS |
+| Draft→reply remount | PWA `live` React key, Cab / Helm `composeKey` (`kit-live`) so Markdown does not remount when `__draft__` becomes `r1`. Not on the wire. |
+| Photo caps, encode ladder, `error` tokens | Every mouth encodes to the same budget and paints refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
+| Face / backdrop blobs and their notices | Cab and Helm refetch `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
+| Header face (size, hang, stroke) | Cab TopAppBar and Helm header overlay, not PWA-only — [Header face](#header-face) |
+| Room theme | Cab and Helm follow Kit when `followTheme` is on; GET `/api/theme` on connect — [Theme](#theme-what-every-mouth-must-do-the-same) |
+| PWA-only UI (font, Install) | Cab has Compose. Helm has SwiftUI. |
+| Voice (STT / TTS) | Mouth-local. No audio on the wire. Cab Auto / Helm CarPlay already read `reply` / `push` and stuff spoken Reply into `inbound`. Handheld dictation is compose-only — [voice.md](voice.md) |
+| `context.surface` | Closed set: `browser` \| `android` \| `android_auto` \| `ios` \| `carplay`. Unknown names (including Cab’s old `pendant`) are dropped. Additive; old APKs still send `android` / `android_auto` |
 
 **Cover:** after a mailbox frame change, read
 `repos/gantry-cab/app/src/main/java/com/gantree/cab/mailbox/Wire.kt` and
-`Mouth.kt`; for caps, ladder, or photo size, `mailbox/Photo.kt` and
-`mailbox/SendError.kt`; for face / backdrop / room theme,
-`mailbox/Avatar.kt`, `mailbox/Look.kt`, `mailbox/ThemeApi.kt`; for the
-header circle itself, `ui/KitAvatar.kt` and `ui/CabScreen.kt`
-(`TopAppBar` `navigationIcon`). If Cab would paint wrong or drop a
-turn, file it there (or patch both). Do not wait for an iOS repo to
-exist before writing the contract down.
+`Mouth.kt`, and `repos/gantry-helm/Sources/Mailbox/Wire.swift` and
+`Mouth.swift`; for caps, ladder, or photo size, Cab `mailbox/Photo.kt`
+/ `SendError.kt` and Helm `Photo.swift` / `SendError.swift`; for face
+/ backdrop / room theme, `Avatar` / `Look` / `ThemeApi` on both; for
+the header circle itself, Cab `ui/KitAvatar.kt` + `ui/CabScreen.kt`
+and Helm `HelmScreen` (82 / 80×40 / −2/−4 / 2 pt `line`). If either
+native mouth would paint wrong or drop a turn, file it there (or
+patch both). Sign in with Apple is still a mailbox auth change
+([security.md](security.md)); APNs is lock-screen, same later as Cab
+FCM. Do not grow a second Durable Object.
 
 ---
 
-## `seq` / `at` (what Cab sees today)
+## `seq` / `at` (what Cab and Helm see today)
 
 The Durable Object stamps `seq` (monotonic) and `at` (mailbox
 epoch ms) on queued frames. The PWA inserts by `seq`, then `at`, and
 reconnect-acks the **highest seq**. Drafts stay last.
 
-Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`):
+Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`) and Helm
+(`Sources/Mailbox/Thread.swift`, `Mouth.ingest`, `MailboxSocket`):
 
 - Parses `seq` / `at`. Junk (`0`, negatives, strings) is dropped, same
   as `orderSeq` / `orderAt` here.
@@ -78,14 +86,16 @@ Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`):
   strips client order.
 - **Transcript hydrate** replays existing `inbound` / `reply` / `push`
   with additive `replay: true`. Paint is the same `ingest` / `placeInThread`
-  path. Cab `THREAD_MAX` is 80 (mailbox hydrates 80). **Ship Cab with
-  this mailbox** so Auto HUNs skip `replay` (`shouldSpeak(kind, replay)`).
-  An old APK still paints and still toasts every hydrate frame.
+  path. Cab and Helm `THREAD_MAX` is 80 (mailbox hydrates 80). **Ship
+  those builds with this mailbox** so Auto / CarPlay HUNs skip
+  `replay` (`shouldSpeak(kind, replay)`). An old APK still paints and
+  still toasts every hydrate frame.
 - **Sibling phones, live.** The Worker fans the same inbound body to
   `sub:<userId>` except the sender (`siblingPhoneTag`). Hydrate still
-  covers a *new* socket. Cab `MailboxClient.sweep` stays catch-up /
-  Doze insurance. Additive; mouths already paint `inbound` as "you"
-  and skip HUN / notify. Walk: [sibling_phones.md](sibling_phones.md).
+  covers a *new* socket. Cab `MailboxClient.sweep` and Helm
+  `MailboxSocket.sweep` stay catch-up / Doze / frozen-socket insurance.
+  Additive; mouths already paint `inbound` as "you" and skip HUN /
+  notify. Walk: [sibling_phones.md](sibling_phones.md).
 - **Thread on the device.** The PWA keeps the last thread per room per
   `sub` in IndexedDB (`app/lib/threadStore.ts`, `thread:<slug>:<sub>`,
   `THREAD_MAX` 500, drafts and `sending` bubbles excluded) and paints it
@@ -95,7 +105,8 @@ Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`):
   the mailbox drops what the phone already holds instead of waiting for
   a reconnect. **Mailbox contract is unchanged**: it still flushes the
   transcript first and treats `ack since` the same as before. Cab already
-  does this with `ThreadCache` (JSON on disk, not Room); first `ack`
+  does this with `ThreadCache` (JSON on disk, not Room); Helm does
+  the same in `Sources/Mailbox/ThreadCache.swift`. First `ack`
   `since` is the highest cached seq.
 
 ---
@@ -105,7 +116,8 @@ Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`):
 Source of truth: `lib/mailbox/caps.ts`, `lib/phone/photo.ts`,
 `app/lib/jpegFromFile.ts`, `lib/phone/sendError.ts`. Cab mirrors in
 `mailbox/Photo.kt`, `mailbox/Jpeg.kt`, `mailbox/JpegIo.kt`,
-`mailbox/SendError.kt`.
+`mailbox/SendError.kt`. Helm mirrors in `Sources/Mailbox/Photo.swift`,
+`Jpeg.swift`, `SendError.swift`.
 
 **Wire.** One `images: [{ url }]` per frame, `url` a
 `data:image/jpeg;base64,…`. Caption and photo travel **together**: the
@@ -132,7 +144,8 @@ for a JPEG already ≤ edge and ≤ budget. Cab runs the same ladder:
 `shrinkSteps` / `shrinkToFit` in `mailbox/Photo.kt` (pure, tested
 against the same 1600 → 1200 / floor-380 cases as
 `test/app/lib/jpegFromFile.test.ts`), driven by `jpegFromUri` in
-`mailbox/JpegIo.kt` with `PHOTO_JPEG_BYTES_MAX` as the budget. Start at
+`mailbox/JpegIo.kt` with `PHOTO_JPEG_BYTES_MAX` as the budget. Helm
+runs the same `shrinkSteps` / `shrinkToFit` in `Photo.swift`. Start at
 `min(edge, image)` — never upscale.
 
 **Photo size** (Settings, per device, not on the wire). Long edge:
@@ -147,9 +160,10 @@ Vision tokens track pixel area (~w·h/750), not JPEG bytes — that is why
 this is an edge knob and not a quality knob. PWA stores it at
 `localStorage["pendant.photo"]`; Cab stores the same id at
 `SharedPreferences("cab")["photo"]` (`CabPrefs.photoSize`) and reads
-the table from `PHOTO_SIZES` in `mailbox/Photo.kt` — same ids, same
-edges, same `Medium · 1024 px` chip text, so the two mouths agree on
-what "Medium" means. Change the table here, change it there.
+the table from `PHOTO_SIZES` in `mailbox/Photo.kt`; Helm stores it at
+UserDefaults `helm` / `photo` (`photoSizes` in `Photo.swift`) — same
+ids, same edges, same `Medium · 1024 px` chip text, so the mouths
+agree on what "Medium" means. Change the table here, change it there.
 
 **Errors.** The mailbox answers a refused frame with
 `{ kind: "error", text, id }` where `text` is a token — `rate`,
@@ -165,11 +179,11 @@ bubble by `id`, else your newest still `pending`; crane bubbles are
 never marked), `ChatLine.failed` paints red under the bubble, strings
 are copied in `mailbox/SendError.kt` (`describeSendError`,
 `describePhotoError`). `movesCursor(kind)` in `mailbox/Thread.kt`
-keeps `ack` and `error` off the `since` cursor — before that an
-`error` with `id` would have made Cab resume from the refused id on a
-fresh session. A refusal with no matching bubble (a bare pin) falls
-back to the old hint line. Keep the token strings stable; both mouths
-switch on them.
+(and Helm `Thread.swift`) keeps `ack` and `error` off the `since`
+cursor — before that an `error` with `id` would have made a native
+mouth resume from the refused id on a fresh session. A refusal with
+no matching bubble (a bare pin) falls back to the old hint line.
+Keep the token strings stable; every mouth switches on them.
 
 The Worker echoes `id` on every refusal that has one: parse errors after
 JSON.parse (`too large` image, extra image, bad kind), then `rate` and
@@ -290,7 +304,9 @@ PWA: `PhoneShell` header. Cab already hangs the same way: 82.dp
 inside the bar), nudge **-2.dp x / -4.dp y**, 2.dp `line` stroke. The
 avatar is a Scaffold overlay (`zIndex` above the bar) so `TopAppBar`
 clip never eats it. `DocsShot.kt` `paintHeader` uses the same 82 /
-80×40 / −2/−4 numbers.
+80×40 / −2/−4 numbers. Helm hangs the same numbers in `Look.swift`
+(`headerFaceSize` / slot / nudge / stroke) as a header overlay, not
+inside the bar.
 
 ---
 
@@ -360,10 +376,21 @@ paints when follow is on. `ThemeApi` GETs `/api/theme?slug=` on connect
 `SharedPreferences("cab")["followTheme"]` mirrors `pendant.followTheme`.
 `shouldSpeak` stays false. Auto HUNs do not care.
 
+**Helm.** `Look.swift` `themeIds` and `Palette.swift` hexes match
+the same catalog. `Mouth.roomTheme` plus `paintedTheme` paint when
+follow is on. `ThemeApi` GETs `/api/theme?slug=` on connect. Human
+chip pick writes `theme` and sets `followTheme` off. UserDefaults
+`helm` / `followTheme` mirrors `pendant.followTheme`. `shouldSpeak`
+stays false. CarPlay HUNs do not care.
+
 ---
 
-## iOS (later)
+## Helm
 
-Same room, new client. Sign in with Apple is a mailbox auth change
-([security.md](security.md)); APNs is lock-screen, same later as Cab
-FCM. Do not grow a second Durable Object for a Swift app.
+Same room, Swift client (`repos/gantry-helm`). Surfaces on the
+wire: `ios` (pocket) and `carplay` (spoken Reply / Test car voice).
+Those names are additive on this Worker — old Cab APKs still send
+`android` / `android_auto`. Sign in with Apple is a mailbox auth
+change ([security.md](security.md)); APNs is lock-screen, same
+later as Cab FCM. Do not grow a second Durable Object. Handoff lives
+in Helm `docs/pendant_handoff.md`.
