@@ -114,11 +114,11 @@ function parseContext(raw: unknown): PhoneContext | undefined {
     ctx.net = o.net;
   }
   if (
-    o.surface === "browser" ||
-    o.surface === "android" ||
-    o.surface === "android_auto" ||
-    o.surface === "ios" ||
-    o.surface === "carplay"
+    o.surface === "browser"
+    || o.surface === "android"
+    || o.surface === "android_auto"
+    || o.surface === "ios"
+    || o.surface === "carplay"
   ) {
     ctx.surface = o.surface;
   }
