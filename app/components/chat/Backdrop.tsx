@@ -1,11 +1,12 @@
 "use client";
 
-import { useBlobUrl } from "@/app/lib/blobUrl";
+import { blobCacheKey, useBlobUrl } from "@/app/lib/blobUrl";
 import { backdropRequestPath } from "@/lib/backdrop/http";
 
 /**
  * Kit's wallpaper behind the thread. Absolute inside a `relative` parent;
  * bubbles are opaque, so only the gutter shows it. 404 (none / cleared) paints nothing.
+ * The last wallpaper paints from IndexedDB before the fetch lands.
  */
 export function Backdrop({
   slug,
@@ -18,7 +19,11 @@ export function Backdrop({
   secret?: string;
   bearer?: string;
 }) {
-  const src = useBlobUrl(slug ? backdropRequestPath({ slug, rev, secret, bearer }) : null);
+  const src = useBlobUrl(
+    slug ? backdropRequestPath({ slug, rev, secret, bearer }) : null,
+    "",
+    slug ? blobCacheKey("backdrop", slug) : undefined,
+  );
   if (!src) {
     return null;
   }

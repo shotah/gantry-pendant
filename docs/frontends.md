@@ -78,6 +78,16 @@ Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`):
   path. Cab `THREAD_MAX` is 80 (mailbox hydrates 80). **Ship Cab with
   this mailbox** so Auto HUNs skip `replay` (`shouldSpeak(kind, replay)`).
   An old APK still paints and still toasts every hydrate frame.
+- **Thread on the device.** The PWA keeps the last thread per room per
+  `sub` in IndexedDB (`app/lib/threadStore.ts`, `thread:<slug>:<sub>`,
+  `THREAD_MAX` 500, drafts and `sending` bubbles excluded) and paints it
+  before the socket is up. Hydrate frames then fold in by `id`
+  (`mergeThread`, live wins) — same dedup as a reconnect. The first
+  `ack` of a fresh load carries `since` = the highest cached `seq`, so
+  the mailbox drops what the phone already holds instead of waiting for
+  a reconnect. **Mailbox contract is unchanged**: it still flushes the
+  transcript first and treats `ack since` the same as before. Cab may
+  do the same with Room; nothing here requires it.
 
 ---
 
@@ -176,7 +186,8 @@ the same wallpaper.
 | Body (POST) | raw `image/jpeg`, or multipart `file` | same |
 | Cap | `AVATAR_MAX_BYTES` 5 MiB (dropping to 1.5 MB — DO rows are 2 MB) | `BACKDROP_MAX_BYTES` = 1 500 000 |
 | Gate | JPEG magic (`FF D8 FF`), ≥ 32 bytes | same |
-| GET | `image/jpeg`, `X-Pendant-Rev: <rev>`, `Cache-Control: private, max-age=0, must-revalidate`; **404** when none | same; 404 after `DELETE` |
+| GET | `image/jpeg`, `X-Pendant-Rev: <rev>`, `ETag: "<rev>"`, `Cache-Control: private, max-age=0, must-revalidate`; **404** when none | same; 404 after `DELETE` |
+| Conditional GET | `If-None-Match: "<rev>"` → empty **304** with the same `X-Pendant-Rev` / `ETag` when the rev is current (additive; a client that never sends it always gets 200 + bytes) | same |
 | Cache bust | `?v=<rev>` | `?v=<rev>` |
 | 400 body | `{ "error": "image too large (max 5MB)" \| "need a JPEG …" \| "file required" }` | `{ "error": "image too large (max 1.5MB)" \| … }` |
 
@@ -212,6 +223,16 @@ the header circle (PWA `KitAvatar`, Cab `ui/KitAvatar.kt`). On
 `backdrop` → refetch `GET /api/backdrop?slug&v=<rev>`; 404 or `rev: 0`
 paints **nothing** — the theme canvas is the fallback. Fetch on connect
 too (no `v`) so a fresh session gets the current one without a notice.
+
+**Keep the last one.** A fresh load should not open on the fallback
+icon and a bare canvas while the JPEGs download. The PWA keeps the last
+bytes plus their rev per slug in IndexedDB (`app/lib/blobUrl.ts`,
+`look:avatar:<slug>` / `look:backdrop:<slug>`), paints that first, and
+fetches with `If-None-Match: "<rev>"` — 304 keeps the paint, 200 swaps
+and re-stores, 404 drops the row, a failed fetch leaves the cached
+paint. No rev, secret, or bearer in the key. Cab today refetches with
+no validator and gets 200 + bytes every time; that still works. To
+match, keep `{ rev, bytes }` per slug on disk and send `If-None-Match`.
 Wallpaper goes **behind the thread only**, cover-fit, dimmed so bubbles
 stay legible (PWA: 60 % opacity over `--canvas`; Cab: `Modifier.alpha(0.6f)`
 behind `ChatScroll`; header and compose stay panel). It is a per-device

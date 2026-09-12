@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { fromStub, withSlug } from "@/lib/auth/slugRoute";
 import { acceptJpeg } from "@/lib/avatar/jpeg";
-import { readAvatarUpload } from "@/lib/avatar/http";
+import { conditionalHeaders, readAvatarUpload } from "@/lib/avatar/http";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ const OP = { "X-Pendant-Op": "avatar" };
 export async function GET(req: Request) {
   return withSlug(env, req, async (_slug, stub) => fromStub(await stub.fetch(new Request("https://mailbox/avatar", {
     method: "GET",
-    headers: OP,
+    headers: { ...OP, ...conditionalHeaders(req) },
   }))));
 }
 

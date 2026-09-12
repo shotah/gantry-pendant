@@ -176,9 +176,10 @@ You cannot run telegram + pendant in the same process.
 | Lock screen ping while app is dead | Web Push if VAPID is set and they enabled notifications (installed PWA; iOS 16.4+ standalone) | Settings → Enable notifications after Google. Missing VAPID → queue only; native APNs/FCM later |
 | Queue while Mini reboots | ≤50 frames, 1 hour TTL, then drop | unread catch-up only |
 | Transcript on reload | last 80 `inbound` / `reply` / `push` per `sub` | kill the tab, reopen; not `sw.js`. Cab paints the same frames (`replay: true` skips Auto HUN — ship Cab with this mailbox) |
+| Blank slate on reload | PWA paints the last thread (IndexedDB, per room per `sub`, ≤ 500, no drafts / `sending`), face, and wallpaper from the device before the socket is up; hydrate folds in by `id` | face / backdrop refetch with `If-None-Match` → 304 keeps the paint; a changed rev swaps; 404 clears. Theme already boots from `localStorage` |
 | Rate limit (30 frames/min; bytes 4 MB burst = two full photo frames, refill 256 KB per min) | socket stays up, frames return `error` `rate` with the refused `id` (additive) | PWA and Cab mark that bubble “Not sent — too much too fast”. Burst below one frame was the old photo bug: every camera shot bounced as `rate` forever |
 | Session hard 7d (JWT `exp` at mint) | next send closes 4401 | sign in again; yank `sub` takes effect on the next frame |
-| Service worker | no chat cache (good) | also no offline compose |
+| Service worker | no chat cache (good) — the page keeps its own copy in IndexedDB | also no offline compose |
 
 SSID / BSSID / Bluetooth / clipboard must never go on the wire. Battery
 and `net` attach on send when the OS exposes them; the prompt stays stingy.

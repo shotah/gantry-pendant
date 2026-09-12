@@ -131,7 +131,7 @@ Summary:
 | Auth | listed phone cookie, native JWE, or crane `Authorization: Bearer` | same door (`lib/auth/slugRoute.ts`) | same |
 | Body | JPEG, ≤ `AVATAR_MAX_BYTES` | JPEG, ≤ `BACKDROP_MAX_BYTES` | `{ "theme": "<id>" }` |
 | Store | `avatar` `{ jpeg, rev }` | `backdrop` `{ jpeg, rev }` | `theme` string id |
-| GET | `image/jpeg` + `X-Pendant-Rev`, 404 when none | same | `{ theme, themes: cards }` |
+| GET | `image/jpeg` + `X-Pendant-Rev` + `ETag: "<rev>"`, 404 when none; `If-None-Match` on the current rev → 304 | same | `{ theme, themes: cards }` |
 | Notice | `{ kind: "face", text: "<rev>" }` | `{ kind: "backdrop", rev: <n> }` — **no text**; `rev: 0` = cleared | `{ kind: "theme", theme: "<id>" \| null }` — **no text**; flushed on phone connect |
 | Cache bust | `?v=<rev>` | `?v=<rev>` | n/a (CSS tokens are already on the page) |
 

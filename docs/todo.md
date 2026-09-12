@@ -172,6 +172,10 @@ transcript for this `sub`. Cap it. Evict old. Do **not** cache chat in
       store on the crane. Queue (`QUEUE_*`, 1h) is not the transcript.
       Cab: ship the APK that skips Auto HUN on `replay` (`Wire.kt` /
       `shouldSpeak`). Old Cab still paints.
+- [x] **No blank slate on reload** — the PWA paints the last thread,
+      face, and wallpaper from IndexedDB before the socket is up
+      (`app/lib/kv.ts`); hydrate folds in by `id`, blobs revalidate
+      with `If-None-Match` → 304. Page-side, not `sw.js`.
 - [x] Waiting-room `/me` poll 3 s (429 backoff). Auth bucket 40/min.
 - [x] Optional `LOCATION_HINT` wrangler var on `MAILBOX.get`
 

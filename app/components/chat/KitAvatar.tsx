@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { uploadAvatarFile } from "@/app/lib/avatar";
-import { useBlobUrl } from "@/app/lib/blobUrl";
+import { blobCacheKey, useBlobUrl } from "@/app/lib/blobUrl";
 import { avatarRequestPath } from "@/lib/avatar/http";
 import { displaySlug } from "@/lib/avatar/store";
 
@@ -36,7 +36,11 @@ export function KitAvatar({
   onRev?: (rev: number) => void;
   onError?: (msg: string) => void;
 }) {
-  const src = useBlobUrl(slug ? avatarRequestPath({ slug, rev, secret, bearer }) : null, FALLBACK);
+  const src = useBlobUrl(
+    slug ? avatarRequestPath({ slug, rev, secret, bearer }) : null,
+    FALLBACK,
+    slug ? blobCacheKey("avatar", slug) : undefined,
+  );
   const fileRef = useRef<HTMLInputElement>(null);
   const dim = DIM[size];
   const name = displaySlug(slug);

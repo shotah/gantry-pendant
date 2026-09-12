@@ -12,7 +12,19 @@ import { NotifyEnable } from "./NotifyEnable";
 import { SettingsMenu } from "./SettingsMenu";
 import { bubbleFrom, Thread, type ChatBubble } from "./Thread";
 import { mailboxUrl, parseIncoming } from "@/app/lib/socket";
-import { ackSince, advanceCursor, capThread, failInThread, placeInThread, rememberSeen } from "@/app/lib/thread";
+import {
+  ackSince,
+  advanceCursor,
+  capThread,
+  cursorOf,
+  failInThread,
+  mergeThread,
+  persistableThread,
+  placeInThread,
+  rememberSeen,
+  sameThread,
+} from "@/app/lib/thread";
+import { loadThread, saveThread, threadCacheKey } from "@/app/lib/threadStore";
 import { browserBattery } from "@/app/lib/battery";
 import { browserBumpBadge, browserClearBadge } from "@/app/lib/badge";
 import { browserGeo } from "@/app/lib/geo";
@@ -142,6 +154,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const lastSeenId = useRef<string | undefined>(undefined);
   const lastSeenSeq = useRef(0);
   const seenIds = useRef(new Set<string>());
+  const roomRef = useRef("");
+  const hydratedKey = useRef("");
+  const lastSaved = useRef<ChatBubble[]>([]);
   const idSeq = useRef(0);
   const pinned = useRef(true);
   const [typing, setTyping] = useState(false);
@@ -375,6 +390,62 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     phone && cfg?.mode === "oidc" && !cfg.dev && me && !listed,
   );
   const canSocket = Boolean(cfg && roomSlug && listed && (cfg.mode === "spike" ? secret : phone ? me : bearer));
+  // The on-device thread row: only for a room this phone is about to dial, never for a sample paint.
+  const threadKey = phone && !painting && canSocket ? threadCacheKey(roomSlug, me?.sub) : "";
+
+  useEffect(() => {
+    const prev = roomRef.current;
+    roomRef.current = roomSlug;
+    if (!prev || prev === roomSlug) {
+      return;
+    }
+    // A different room: its bubbles, cursor, and dedup set are not this one's.
+    seenIds.current.clear();
+    lastSeenId.current = undefined;
+    lastSeenSeq.current = 0;
+    lastSaved.current = [];
+    setMessagesRaw([]);
+  }, [roomSlug]);
+
+  useEffect(() => {
+    if (!threadKey) {
+      return;
+    }
+    let dead = false;
+    void loadThread(threadKey).then((cached) => {
+      if (dead) {
+        return;
+      }
+      hydratedKey.current = threadKey;
+      lastSaved.current = cached;
+      for (const m of cached) {
+        rememberSeen(seenIds.current, m.id);
+      }
+      // Ack from what is already on the device so the mailbox skips what we hold.
+      const next = advanceCursor({ id: lastSeenId.current, seq: lastSeenSeq.current }, cursorOf(cached));
+      lastSeenId.current = next.id;
+      lastSeenSeq.current = next.seq;
+      // Always a fresh array: the write effect below must run once the row is read.
+      setMessagesRaw((prev) => capThread(mergeThread(cached, prev)));
+    });
+    return () => {
+      dead = true;
+    };
+  }, [threadKey]);
+
+  useEffect(() => {
+    // Write only after this room's row has been read, so a room switch cannot
+    // file the old thread under the new key. Drafts and `sending` stay off disk.
+    if (!threadKey || hydratedKey.current !== threadKey) {
+      return;
+    }
+    const next = persistableThread(messages);
+    if (sameThread(next, lastSaved.current)) {
+      return;
+    }
+    lastSaved.current = next;
+    void saveThread(threadKey, next);
+  }, [messages, threadKey]);
 
   useEffect(() => {
     if (!phone || cfg?.mode !== "oidc" || !me || !listed || !roomSlug || needGoogle || mailboxGap || waitingForCrane) {

@@ -61,6 +61,47 @@ export function placeInThread<T extends ThreadOrder>(messages: T[], bubble: T): 
   return next;
 }
 
+type Persistable = { id: string; kind?: string; pending?: boolean };
+
+/**
+ * What is worth keeping on the device between loads: settled bubbles only.
+ * A `sending` bubble either lands (the transcript replays it) or never did;
+ * a draft is Kit mid-sentence. Neither should greet you as history.
+ */
+export function persistableThread<T extends Persistable>(messages: T[]): T[] {
+  return messages.filter((m) => !m.pending && !isDraftBubble(m));
+}
+
+/** Same bubbles in the same order — skip the write. */
+export function sameThread<T>(a: readonly T[], b: readonly T[]): boolean {
+  return a.length === b.length && a.every((m, i) => m === b[i]);
+}
+
+/**
+ * Fold the on-device copy under whatever the socket has already painted.
+ * Live wins on an id clash: it carries the mailbox's latest `seq` / `at`.
+ */
+export function mergeThread<T extends ThreadOrder>(cached: readonly T[], live: readonly T[]): T[] {
+  if (!cached.length) {
+    return [...live];
+  }
+  const seen = new Set(live.map((m) => m.id));
+  const next = [...live, ...cached.filter((m) => !seen.has(m.id))];
+  next.sort(compareThread);
+  return next;
+}
+
+/**
+ * Highest mailbox `seq` on the cached thread, for the first `ack` `since` of a
+ * fresh load. Bubbles the mailbox never stamped (refused sends) do not count.
+ */
+export function cursorOf<T extends ThreadOrder>(messages: readonly T[]): ThreadCursor {
+  return messages.reduce<ThreadCursor>(
+    (cur, m) => (m.seq == null ? cur : advanceCursor(cur, { id: m.id, seq: m.seq })),
+    { seq: 0 },
+  );
+}
+
 type Sendable = { id: string; from: "you" | "kit"; pending?: boolean; failed?: string };
 
 /**

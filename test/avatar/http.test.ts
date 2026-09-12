@@ -1,5 +1,60 @@
 import { describe, expect, it } from "vitest";
-import { avatarRequestPath, mailboxToAvatarUrl, readAvatarUpload } from "@/lib/avatar/http";
+import {
+  avatarRequestPath,
+  blobEtag,
+  blobResponse,
+  conditionalHeaders,
+  etagMatches,
+  mailboxToAvatarUrl,
+  readAvatarUpload,
+} from "@/lib/avatar/http";
+
+describe("blobResponse", () => {
+  const hit = { jpeg: new Uint8Array([0xff, 0xd8, 0xff, 1]).buffer, rev: 1700 };
+
+  it("serves the JPEG with rev, ETag, and no-store-ish cache headers", async () => {
+    const res = blobResponse(hit, null);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/jpeg");
+    expect(res.headers.get("X-Pendant-Rev")).toBe("1700");
+    expect(res.headers.get("ETag")).toBe("\"1700\"");
+    expect(res.headers.get("Cache-Control")).toBe("private, max-age=0, must-revalidate");
+    expect(new Uint8Array(await res.arrayBuffer())[0]).toBe(0xff);
+  });
+
+  it("answers 304 with no body when If-None-Match already names this rev", async () => {
+    const res = blobResponse(hit, blobEtag(1700));
+    expect(res.status).toBe(304);
+    expect(res.headers.get("X-Pendant-Rev")).toBe("1700");
+    expect(res.headers.get("ETag")).toBe("\"1700\"");
+    expect(res.body).toBeNull();
+  });
+
+  it("sends the bytes again when the caller holds an older rev", () => {
+    expect(blobResponse(hit, blobEtag(1600)).status).toBe(200);
+  });
+});
+
+describe("etagMatches", () => {
+  it("accepts exact, weak, list, and star; refuses empty and other revs", () => {
+    expect(etagMatches("\"7\"", "\"7\"")).toBe(true);
+    expect(etagMatches("W/\"7\"", "\"7\"")).toBe(true);
+    expect(etagMatches("\"5\", \"7\"", "\"7\"")).toBe(true);
+    expect(etagMatches("*", "\"7\"")).toBe(true);
+    expect(etagMatches("\"8\"", "\"7\"")).toBe(false);
+    expect(etagMatches("", "\"7\"")).toBe(false);
+    expect(etagMatches(null, "\"7\"")).toBe(false);
+    expect(etagMatches(undefined, "\"7\"")).toBe(false);
+  });
+});
+
+describe("conditionalHeaders", () => {
+  it("forwards If-None-Match and nothing else", () => {
+    const withTag = new Request("https://x/api/avatar?slug=kit", { headers: { "If-None-Match": "\"9\"", Cookie: "s=1" } });
+    expect(conditionalHeaders(withTag)).toEqual({ "If-None-Match": "\"9\"" });
+    expect(conditionalHeaders(new Request("https://x/api/avatar?slug=kit"))).toEqual({});
+  });
+});
 
 describe("avatarRequestPath", () => {
   it("keeps a clean query when secret and bearer are omitted", () => {

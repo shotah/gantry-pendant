@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { directoryApply, directoryRemember } from "../lib/auth/directory";
+import { blobResponse } from "../lib/avatar/http";
 import { encodeFaceNotice, packAvatar, AVATAR_STORE_KEY, displaySlug, type StoredAvatar } from "../lib/avatar/store";
 import { BACKDROP_STORE_KEY, encodeBackdropNotice, packBackdrop, type StoredBackdrop } from "../lib/backdrop/store";
 import { encodeThemeNotice, encodeThemeState, parseThemeWrite, THEME_STORE_KEY } from "../lib/theme/store";
@@ -344,13 +345,7 @@ export class Mailbox extends DurableObject<Env> {
       if (!hit) {
         return new Response(null, { status: 404 });
       }
-      return new Response(hit.jpeg, {
-        headers: {
-          "Content-Type": "image/jpeg",
-          "X-Pendant-Rev": String(hit.rev),
-          "Cache-Control": "private, max-age=0, must-revalidate",
-        },
-      });
+      return blobResponse(hit, request.headers.get("If-None-Match"));
     }
     if (request.method === "PUT" || request.method === "POST") {
       const bytes = new Uint8Array(await request.arrayBuffer());

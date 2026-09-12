@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { fromStub, withSlug } from "@/lib/auth/slugRoute";
+import { conditionalHeaders } from "@/lib/avatar/http";
 import { acceptJpeg } from "@/lib/avatar/jpeg";
 import { readBackdropUpload } from "@/lib/backdrop/http";
 
@@ -10,7 +11,7 @@ const OP = { "X-Pendant-Op": "backdrop" };
 export async function GET(req: Request) {
   return withSlug(env, req, async (_slug, stub) => fromStub(await stub.fetch(new Request("https://mailbox/backdrop", {
     method: "GET",
-    headers: OP,
+    headers: { ...OP, ...conditionalHeaders(req) },
   }))));
 }
 
