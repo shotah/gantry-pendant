@@ -1,7 +1,8 @@
 # Frontends
 
 This Worker is the mailbox. The mouths are **other checkouts**.
-Wire: [architecture.md](architecture.md). Who pastes what:
+Wire: [architecture.md](architecture.md). The crane end of the same
+wire: [backends.md](backends.md). Who pastes what:
 [setup.md](setup.md). Gotchas: [edgecases.md](edgecases.md).
 
 A frame change here is a change for every client that already shipped.

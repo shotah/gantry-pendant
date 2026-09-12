@@ -141,7 +141,7 @@ The crane socket receives them and drops them (`missing user_id`).
 
 ---
 
-## MCP — `pendant-mcp` (new repo, sibling of `image-generation-mcp`)
+## MCP — `pendant-mcp` (sibling of `image-generation-mcp`)
 
 Go, `mark3labs/mcp-go`, stdio, `hostmanifest.go`, `make release`,
 same as `boards-mcp`. Server id **`pendant`**.

@@ -109,6 +109,7 @@ The plan lives here, not in chat.
 | What you paste where | [docs/setup.md](docs/setup.md) |
 | First `workers.dev` | [docs/deployment.md](docs/deployment.md) |
 | Cab, later iOS | [docs/frontends.md](docs/frontends.md) |
+| The crane end of the wire | [docs/backends.md](docs/backends.md) |
 | Why this shape | [docs/design.md](docs/design.md) |
 | How the sockets meet | [docs/architecture.md](docs/architecture.md) |
 | Two principals | [docs/security.md](docs/security.md) |
