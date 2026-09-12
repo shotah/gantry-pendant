@@ -47,6 +47,10 @@ Two laptop tabs do not close these. Walk:
 
 ### ai-gantry
 
+Harness Completer footer is **closed in that repo** (`[harness]` RoleSystem
+after speech). PWA send strip is closed here (audit §14). Cab still
+owns its Kotlin strip.
+
 - [ ] Publish `allow` on connect (`PENDANT_ALLOWED_USERS`); keep the
       local check as a redundant filter. Then Worker `ALLOWED_SUBS`
       can go
@@ -73,12 +77,17 @@ Two laptop tabs do not close these. Walk:
 
 ### gantry-cab
 
+- [ ] **Same send-path strip as this PWA** — Kotlin `inbound()` /
+      `MailboxService.sendBlocking`. Checklist lives in Cab
+      `docs/todo.md` Small. Do not edit Kotlin from here.
+
 Same Durable Object. Do not fork the mailbox.
 [frontends.md](frontends.md). Work lives in that checkout:
 [`docs/pendant_handoff.md`](https://github.com/shotah/gantry-cab/blob/main/docs/pendant_handoff.md)
 (ship hydrate APK, walk sibling inbound). Cab half of nonce / 4401 /
-header face / caption+attach is in tree. Worker issues `/api/auth/nonce`
-and fans sibling inbound. Do not edit Cab Kotlin from this repo.
+header face / caption+attach / thread cache / blob `If-None-Match` is
+in tree. Worker issues `/api/auth/nonce` and fans sibling inbound.
+Do not edit Cab Kotlin from this repo.
 
 Wire changes (`seq` / `at`, `replay`, new `kind`, auth) still need a
 look at `Wire.kt` / `Mouth.kt`. iOS native is later (Sign in with Apple
@@ -88,6 +97,11 @@ is a mailbox auth change). Do not start Expo to catch up Cab.
 
 ## This repo
 
+- [x] **Strip harness / clock header from `text` on send (FE)** —
+      `stripHarnessContext` in `lib/phone/text.ts` before the bubble
+      and `encodeFrame`. Pasted `[current time]` does not land on the
+      wire. `context` is `geo` only. Audit:
+      [audit_todo.md §14](audit_todo.md#14-phone-send-path-fe).
 - [ ] **Voice into compose** — `SpeechRecognition` when it exists;
       fill the textarea, do not auto-send. Audio never hits the
       mailbox or the Completer. Cab Auto already speaks. Design:

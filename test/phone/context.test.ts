@@ -1,23 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { buildContext, geoFromPosition } from "@/lib/phone/context";
+import { buildContext, geoFromPosition, wireContext } from "@/lib/phone/context";
 
 describe("phone context", () => {
-  it("always sends at + tz and only attaches granted geo", () => {
-    const now = new Date("2026-09-04T20:00:00.000Z");
+  it("sends geo only unless extra fields are passed", () => {
     const withGeo = buildContext({
+      geo: { lat: 47.6, lon: -122.3, accuracy_m: 8 },
+    });
+    expect(withGeo).toEqual({ geo: { lat: 47.6, lon: -122.3, accuracy_m: 8 } });
+    expect(wireContext(withGeo)).toEqual(withGeo);
+    const denied = buildContext({ geo: null });
+    expect(denied).toEqual({});
+    expect(wireContext(denied)).toBeUndefined();
+  });
+
+  it("still accepts at tz battery net surface when a mouth passes them", () => {
+    const now = new Date("2026-09-04T20:00:00.000Z");
+    expect(buildContext({
       now,
       timeZone: "America/Los_Angeles",
-      geo: { lat: 47.6, lon: -122.3, accuracy_m: 8 },
+      geo: { lat: 47.6, lon: -122.3 },
       net: "cellular",
       battery: { pct: 40, charging: true },
+      surface: "android_auto",
+    })).toEqual({
+      at: "2026-09-04T20:00:00.000Z",
+      tz: "America/Los_Angeles",
+      geo: { lat: 47.6, lon: -122.3 },
+      net: "cellular",
+      battery: { pct: 40, charging: true },
+      surface: "android_auto",
     });
-    expect(withGeo.at).toBe("2026-09-04T20:00:00.000Z");
-    expect(withGeo.tz).toBe("America/Los_Angeles");
-    expect(withGeo.geo).toEqual({ lat: 47.6, lon: -122.3, accuracy_m: 8 });
-    expect(withGeo.surface).toBe("browser");
-    const denied = buildContext({ now, timeZone: "UTC", geo: null, surface: "android_auto" });
-    expect(denied.geo).toBeUndefined();
-    expect(denied.surface).toBe("android_auto");
   });
 
   it("maps a GeolocationPosition-shaped fix", () => {

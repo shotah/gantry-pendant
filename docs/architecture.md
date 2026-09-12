@@ -179,9 +179,10 @@ for the next phone connect. A removed command is a ghost until the
 next publish. Pendant does not keep a second copy.
 
 Phone **context** is extra on the mailbox frame, not a second chat
-API. GPS, battery, and net ride next to `text`. The relay
-channel maps `context.geo` → `here.Set` (same pin the clock footer
-already prints). It does **not** prepend `[location]` to `Text`.
+API. Today the PWA sends `context.geo` on this send (GPS on + granted).
+It does **not** stamp `at` / `tz` / battery / net / surface until the
+harness reads them. The relay maps `context.geo` → `here.Set`. It
+does **not** prepend `[location]` to `Text`.
 
 ```text
 phone  { text, images?, context.geo }
@@ -273,5 +274,5 @@ for us. Apple's Web Push endpoint is a different thing.
 - Discord / Slack as outbound templates:
   `repos/ai-gantry/docs/discord.md`, `docs/slack.md`
 - Yard Tunnel vs portal: gantree `docs/install.md`, `docs/architecture.md`
-- "Tiny relay, gantry long-polls" (webhook inbound, same idea):
-  `repos/ai-gantry/todo.md` (Webhook inbound)
+- Open harness work (user-role clock leak):
+  `repos/ai-gantry/docs/todo.md`

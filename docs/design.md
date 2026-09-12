@@ -164,15 +164,13 @@ A client we own attaches coords to **every text** (and photo), so the
 pin is seconds old instead of hours. That is the point. "What's near
 me" / leave-by / directions should not require a ritual pin.
 
-**Wire is generous. Prompt is stingy.**
+**Wire is generous later. Prompt is stingy. PWA today is GPS first.**
 
-| On the wire (opt-in, OS permission) | Prompt / `here` | History (`session`) |
+| On the wire | Prompt / `here` | History (`session`) |
 | --- | --- | --- |
-| `geo`: lat, lon, `accuracy_m` | `here.Set` every turn → existing `[last pin]` footer | **Not** copied into `Message.Text` |
-| `at` + IANA `tz` from the phone | Already have a clock footer; phone tz can beat a stale profile | No |
-| `battery` pct + charging | On the wire when the OS exposes it; prompt only if cron cares | No |
-| `net`: wifi / cellular | On the wire when `navigator.connection` exists (Chrome Android) | No |
-| `surface`: browser / android / android_auto | Which mouth. This PWA always `browser` (desk tab or Home Screen). Cab stamps `android` in-hand and `android_auto` on a head unit. Not viewport, not UA. | No |
+| `geo`: lat, lon, `accuracy_m` (GPS on + granted) | `here.Set` this send → `[last pin]` | **Not** copied into `Message.Text` |
+| `at` + IANA `tz` | Parsed if a mouth sends them; PWA does not stamp them until the harness reads phone tz | No |
+| `battery` / `net` / `surface` | Same: additive, unused. Cab may still send them | No |
 
 Do **not** stuff `[location]` into the user text on every send. That
 is how Telegram location messages work, and it would re-bill coords
@@ -200,11 +198,12 @@ A silent **pin** control sends `{ context.geo }` with empty text
 (`kind: pin`). The harness treats that like a Telegram bare pin: cursor
 updates, no Completer.
 
-**Shipped on the phone:** GPS on send, in-app toggle, silent pin, clock
-(`at`/`tz`), battery + net when the OS exposes them, photo compress
-(HEIC/PNG → JPEG under the chat cap), screen wake while waiting,
+**Shipped on the phone:** GPS on send, in-app toggle, silent pin, photo
+compress (HEIC/PNG → JPEG under the chat cap), screen wake while waiting,
 vibrate + badge on inbound ping, manifest shortcuts (Message / Pin),
-Web Push (VAPID) when the phone socket is gone.
+Web Push (VAPID) when the phone socket is gone. `context.at` / `tz` /
+battery / net / surface stay off the PWA wire until the harness uses
+them (`lib/phone/context.ts`).
 
 **Later:** reverse-geocode is a maps **tool** on the crane, not a client
 field. Captioned photo (paste screenshot, do not send on attach), pin

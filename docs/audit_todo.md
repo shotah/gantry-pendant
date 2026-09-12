@@ -6,7 +6,7 @@ stay in [todo.md](todo.md); this is the hardening list beside it.
 Threat model and the principals: [security.md](security.md). Misses in
 the field: [edgecases.md](edgecases.md).
 
-Bugs 1–13 and the Dev security items below are **done** in this
+Bugs 1–14 and the Dev security items below are **done** in this
 checkout (2026-09-10). A 2026-09-12 pass closed the cheap Before
 go-live items that do not slow the two-tab walk and do not change
 the chat wire (headers, cookie CSRF, push host allowlist, config
@@ -190,6 +190,27 @@ crane bearer. Also `readAvatarUpload` read the whole body before the
       `test/app/lib/thread.test.ts`. "Reload keeps the thread" is still
       the product walk in [todo.md](todo.md).
 
+### 14. Phone send path (FE)
+
+Two FE jobs. **Not the Worker.** Do not merge `context` into `text`.
+Parse still accepts `at` / `tz` / battery / net / surface if an old
+mouth sends them.
+
+- [x] **`text` is speech.** `stripHarnessContext` drops pasted
+      `[harness]` / `[location` / `[current time]` / `[hours]` /
+      `[memory]` blocks before the bubble and `encodeFrame`.
+      `lib/phone/text.ts`. Tests: `test/phone/text.test.ts`,
+      `PhoneShell.test.tsx` (`tacos` not the clock footer).
+- [x] **`context` is GPS first.** PWA stamps `geo` only, and only when
+      GPS is on and granted. GPS off → no `context` key. Does not
+      stamp `at` / `tz` / `surface` / battery / net every turn (harness
+      unused except `geo` → `here`).
+- Cab still has the same `text` strip in that checkout. Not Kotlin
+  from here.
+
+Crane receive strip (already shipped):
+[ai-gantry `docs/todo.md`](https://github.com/shotah/ai-gantry/blob/main/docs/todo.md).
+
 ### Minor
 
 - [x] `PUT|DELETE /api/push` caps the actual body (chunked or not), not
@@ -294,9 +315,9 @@ off for a crane.
       (5 min, one-time) is issued. POST `/api/auth/token` consumes a
       stored nonce (`ok`) and still accepts a **missing** row so an
       old APK that minted locally can sign in. Replay or expired
-      server nonce is 401. Cab already GETs the route and falls back
-      on 401. **Require** stored nonces after that APK is the
-      sideload. `test/auth/nonce.test.ts`.
+      server nonce is 401. Cab already GETs the route and mints
+      locally on a failed GET (404 / junk / empty). **Require** stored
+      nonces after that APK is the sideload. `test/auth/nonce.test.ts`.
 - [x] **CI hardening** (partial). Workflow default is `contents:
       read`; `contents: write` is the coverage-badge job only.
       `npm audit --omit=dev` is a check step. Leftover: pin actions

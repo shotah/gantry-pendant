@@ -172,7 +172,7 @@ and `net` attach on send when the OS exposes them; the prompt stays stingy.
 | --- | --- | --- |
 | “Sent” with the socket down | local echo is not delivered | bubble stays **pending** until the DO acks; reconnect + `since` redelivers |
 | Two devices, one human | crane `reply` fans to every `sub:<ada>` socket | both of Ada’s phones see Ada’s replies; Bob does not |
-| Browser send missing on Cab (Cab send visible in the browser) | inbound is stored on `t:<sub>` and hydrates on connect; live it only goes to the crane + sender ack. The PWA redials on visible; Cab holds one socket | [sibling_phones.md](sibling_phones.md) — Worker fans inbound to Ada’s other sockets. Cab quiet sweep is catch-up, not the live path. Spike ≠ Google |
+| Browser send missing on Cab (Cab send visible in the browser) | inbound is stored on `t:<sub>` and hydrates on connect. Live, the Worker also fans the same body to `sub:<userId>` except the sender. Spike (no `sub`) still waits on reconnect. The PWA redials on visible; Cab holds one socket | [sibling_phones.md](sibling_phones.md) — walk both mouths on a deployed origin (same Google). Cab quiet sweep is catch-up / Doze, not the live path. Spike ≠ Google |
 | Cab vs PWA after a wire change | Cab ignores unknown JSON; it may still paint arrival order | [frontends.md](frontends.md) — walk `Wire.kt` / `Mouth.kt` |
 | iOS PWA background drop | socket dies | reconnect on visible (`visibilitychange` / `onclose`); redeliver |
 | `context.at` untrusted | phone clock can lie | order by DO time; `at` is a hint |

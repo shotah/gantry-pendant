@@ -25,11 +25,9 @@ import {
   sameThread,
 } from "@/app/lib/thread";
 import { loadThread, saveThread, threadCacheKey } from "@/app/lib/threadStore";
-import { browserBattery } from "@/app/lib/battery";
 import { browserBumpBadge, browserClearBadge } from "@/app/lib/badge";
 import { browserGeo } from "@/app/lib/geo";
 import { browserBuzzPush } from "@/app/lib/haptic";
-import { browserNet } from "@/app/lib/net";
 import { browserNotifyIncoming } from "@/app/lib/notify";
 import { browserSubscribePush } from "@/app/lib/push";
 import { isIos, isStandalone, signInHint } from "@/app/lib/install";
@@ -56,10 +54,11 @@ import { backdropRevFromUnknown } from "@/lib/backdrop/store";
 import { themeIdFromUnknown, isThemeNotice } from "@/lib/theme/store";
 import { Backdrop } from "./Backdrop";
 import { parseSlug } from "@/lib/mailbox/slug";
-import { buildContext } from "@/lib/phone/context";
+import { buildContext, wireContext } from "@/lib/phone/context";
 import { GEO_TIMEOUT_MS, GEO_WARM_MS, cachedGeo, geoHint } from "@/lib/phone/geo";
 import { DEFAULT_PHOTO_SIZE, PHOTO_SIZES, parsePhotoSize, photoEdge, type PhotoSizeId } from "@/lib/phone/photo";
 import { describePhotoError, describeSendError } from "@/lib/phone/sendError";
+import { stripHarnessContext } from "@/lib/phone/text";
 import {
   shouldDropMailboxOnHide,
   shouldReconnectMailbox,
@@ -843,20 +842,15 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     } else {
       geo = await browserGeo(timeoutMs);
     }
-    const battery = await browserBattery();
     return {
       geo,
-      context: buildContext({
-        geo: geo.ok ? geo.geo : null,
-        battery: battery.ok ? battery.battery : null,
-        net: browserNet(),
-      }),
+      context: wireContext(buildContext({ geo: geo.ok ? geo.geo : null })),
     };
   }
 
   async function sendText(text: string, photo?: string) {
     const wantGeo = phone && gpsOn;
-    const trimmed = text.trim();
+    const trimmed = stripHarnessContext(text).trim();
     const waitAck = canSocket && !painting;
     const outbound = Boolean(trimmed || photo);
     if (outbound) {

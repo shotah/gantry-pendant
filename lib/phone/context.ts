@@ -9,7 +9,7 @@ export type GeoFix = {
   speed_mps?: number;
 };
 
-/** Build the wire context. Omit geo when the OS denied or failed. */
+/** GPS first. Omit unused keys — the harness only reads `geo` → here. */
 export function buildContext(opts: {
   now?: Date;
   timeZone?: string;
@@ -18,12 +18,13 @@ export function buildContext(opts: {
   net?: PhoneContext["net"];
   surface?: PhoneContext["surface"];
 }): PhoneContext {
-  const now = opts.now ?? new Date();
-  const ctx: PhoneContext = {
-    at: now.toISOString(),
-    tz: opts.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-    surface: opts.surface ?? "browser",
-  };
+  const ctx: PhoneContext = {};
+  if (opts.now) {
+    ctx.at = opts.now.toISOString();
+  }
+  if (opts.timeZone) {
+    ctx.tz = opts.timeZone;
+  }
   if (opts.geo) {
     ctx.geo = opts.geo as Geo;
   }
@@ -33,7 +34,18 @@ export function buildContext(opts: {
   if (opts.net) {
     ctx.net = opts.net;
   }
+  if (opts.surface) {
+    ctx.surface = opts.surface;
+  }
   return ctx;
+}
+
+/** Drop `{}` so GPS-off turns do not store an empty context blob. */
+export function wireContext(ctx: PhoneContext): PhoneContext | undefined {
+  if (ctx.geo || ctx.battery || ctx.net || ctx.at || ctx.tz || ctx.surface) {
+    return ctx;
+  }
+  return undefined;
 }
 
 export function geoFromPosition(pos: {

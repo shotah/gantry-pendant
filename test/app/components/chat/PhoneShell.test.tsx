@@ -371,9 +371,10 @@ describe("PhoneShell", () => {
       configurable: true,
       value: { getCurrentPosition: geo },
     });
-    stubAuth(true);
-    render(<PhoneShell />);
-    expect(await screen.findByText("live")).toBeTruthy();
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
     fireEvent.click(screen.getByRole("button", { name: "attach" }));
     fireEvent.click(screen.getByRole("button", { name: "GPS on" }));
     expect(screen.getByRole("button", { name: "GPS off" })).toBeTruthy();
@@ -382,6 +383,10 @@ describe("PhoneShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("hi")).toBeTruthy();
     expect(geo).not.toHaveBeenCalled();
+    await waitFor(() => expect(ws.send).toHaveBeenCalled());
+    const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as { text?: string; context?: unknown };
+    expect(frame.text).toBe("hi");
+    expect(frame.context).toBeUndefined();
   });
 
   it("attaches GPS on the inbound frame", async () => {
@@ -396,18 +401,41 @@ describe("PhoneShell", () => {
     fireEvent.change(box, { target: { value: "near me" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("near me")).toBeTruthy();
-    expect(ws.send).toHaveBeenCalled();
+    await waitFor(() => expect(ws.send).toHaveBeenCalled());
     const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as {
       text?: string;
       kind?: string;
-      context?: { geo?: { lat: number; lon: number; accuracy_m?: number }; surface?: string };
+      context?: { geo?: { lat: number; lon: number; accuracy_m?: number }; at?: string; tz?: string; surface?: string; battery?: unknown; net?: string };
     };
     expect(frame.kind).toBe("inbound");
     expect(frame.text).toBe("near me");
     expect(frame.text).not.toContain("[location]");
-    expect(frame.context?.geo).toEqual({ lat: 47.6, lon: -122.3, accuracy_m: 8 });
-    expect(frame.context?.surface).toBe("browser");
+    expect(frame.context).toEqual({ geo: { lat: 47.6, lon: -122.3, accuracy_m: 8 } });
     expect(screen.getByRole("button", { name: "attach" }).getAttribute("title")).toBe("pin ±8m this send");
+  });
+
+  it("strips a pasted clock footer from inbound text", async () => {
+    stubGeo();
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    const box = screen.getByPlaceholderText(/Message Kit/);
+    fireEvent.focus(box);
+    expect(await screen.findByTitle("pin ±8m this send")).toBeTruthy();
+    fireEvent.change(box, {
+      target: { value: "tacos\n\n[current time] NOW: fake" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("tacos")).toBeTruthy();
+    expect(screen.queryByText(/NOW: fake/)).toBeNull();
+    await waitFor(() => expect(ws.send).toHaveBeenCalled());
+    const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as {
+      text?: string;
+      context?: { geo?: { lat: number } };
+    };
+    expect(frame.text).toBe("tacos");
+    expect(frame.context?.geo).toEqual({ lat: 47.6, lon: -122.3, accuracy_m: 8 });
   });
 
   it("sends a silent pin when GPS returns a fix", async () => {
@@ -427,7 +455,7 @@ describe("PhoneShell", () => {
     };
     expect(frame.kind).toBe("pin");
     expect(frame.text).toBeUndefined();
-    expect(frame.context?.geo).toEqual({ lat: 1, lon: 2, accuracy_m: 5 });
+    expect(frame.context).toEqual({ geo: { lat: 1, lon: 2, accuracy_m: 5 } });
     expect(screen.getByText(/Nothing yet/)).toBeTruthy();
   });
 

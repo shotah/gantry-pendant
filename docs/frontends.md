@@ -36,7 +36,7 @@ before you call it done. A PWA-only paint is not enough.
 | --- | --- |
 | Additive JSON (`seq`, `at`, extra `context`) | Old clients must keep working. Cab `parseFrame` drops unknown keys — that is the bar |
 | New required field, new `kind`, or a required header | Cab (and later iOS) must ship in lockstep, or the mailbox must tolerate the old client |
-| Auth (`/api/auth/*`, session JWE, 4401) | Cab POSTs the ID token and stores the JWE. Spike query creds are PWA loopback only. Cookie CSRF is PWA-only — do not send `pendant_session` from OkHttp. Additive `version` on `GET /api/auth/config` is dropped today (`AuthConfig` keeps `mode` / `google`). `GET /api/auth/nonce` is optional: Cab fetches it and falls back to a local mint on 401/404. Do not require it until that APK is the sideload |
+| Auth (`/api/auth/*`, session JWE, 4401) | Cab POSTs the ID token and stores the JWE. Spike query creds are PWA loopback only. Cookie CSRF is PWA-only — do not send `pendant_session` from OkHttp. Additive `version` on `GET /api/auth/config` is dropped today (`AuthConfig` keeps `mode` / `google`). `GET /api/auth/nonce` is issued: Cab fetches it and mints locally on a failed GET (404 / junk / empty). Close `4401` / handshake 401 drops the stored JWE; 403 does not. Do not **require** stored nonces until that APK is the sideload |
 | Queue / `ack` / `since` / `seq` | Cab parses `seq` / `at`, inserts like `placeInThread`, acks the highest seq. Transcript hydrate is the same frames plus `replay` — see below |
 | Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Do not assume it needs the PWA CSS |
 | Photo caps, encode ladder, `error` tokens | Both mouths encode to the same budget and paint refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
@@ -92,8 +92,9 @@ Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`):
   `ack` of a fresh load carries `since` = the highest cached `seq`, so
   the mailbox drops what the phone already holds instead of waiting for
   a reconnect. **Mailbox contract is unchanged**: it still flushes the
-  transcript first and treats `ack since` the same as before. Cab may
-  do the same with Room; nothing here requires it.
+  transcript first and treats `ack since` the same as before. Cab already
+  does this with `ThreadCache` (JSON on disk, not Room); first `ack`
+  `since` is the highest cached seq.
 
 ---
 
@@ -240,9 +241,10 @@ bytes plus their rev per slug in IndexedDB (`app/lib/blobUrl.ts`,
 `look:avatar:<slug>` / `look:backdrop:<slug>`), paints that first, and
 fetches with `If-None-Match: "<rev>"` — 304 keeps the paint, 200 swaps
 and re-stores, 404 drops the row, a failed fetch leaves the cached
-paint. No rev, secret, or bearer in the key. Cab today refetches with
-no validator and gets 200 + bytes every time; that still works. To
-match, keep `{ rev, bytes }` per slug on disk and send `If-None-Match`.
+  paint. No rev, secret, or bearer in the key. Cab `BlobCache` keeps
+  `{ rev, bytes }` per slug on disk and `AvatarApi` sends
+  `If-None-Match: "<rev>"` — 304 keeps the paint, 200 swaps, 404 drops
+  the row.
 Wallpaper goes **behind the thread only**, cover-fit, dimmed so bubbles
 stay legible (PWA: 60 % opacity over `--canvas`; Cab: `Modifier.alpha(0.6f)`
 behind `ChatScroll`; header and compose stay panel). It is a per-device
@@ -281,12 +283,12 @@ not care.
 | Stroke | 2 px in theme `line` (PWA `border-line`; Cab `CabPalette.line` / `outlineVariant`). Not `panel`, not a shadow ring |
 | Empty / Google door | Stay the centered hero (PWA 64 px, Cab 72.dp). Those do not hang |
 
-PWA: `PhoneShell` header. Cab today: `ui/CabScreen.kt` `TopAppBar`
-`navigationIcon` is 40.dp and the bar **clips overflow** — that is the
-work. Pass 82.dp into `ui/KitAvatar.kt`, keep the 40×80 slot, nudge
-**-2.dp x / -4.dp y**, disable clip so the circle draws over `ChatScroll`,
-2.dp `line` border on the circle. `DocsShot.kt` `paintHeader` still
-stamps 40 px at (12, 12); match it or the coordinate asserts will lie.
+PWA: `PhoneShell` header. Cab already hangs the same way: 82.dp
+`KitAvatar`, 40×80 `navigationIcon` slot (empty — the circle is not
+inside the bar), nudge **-2.dp x / -4.dp y**, 2.dp `line` stroke. The
+avatar is a Scaffold overlay (`zIndex` above the bar) so `TopAppBar`
+clip never eats it. `DocsShot.kt` `paintHeader` uses the same 82 /
+80×40 / −2/−4 numbers.
 
 ---
 
