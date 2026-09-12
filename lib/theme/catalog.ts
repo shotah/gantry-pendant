@@ -1,7 +1,9 @@
 /** Room color themes. Boom / Inlay / Lamp hexes are shared with gantree — do not drift those three. */
 
-export type NightCore = {
-  scheme: "dark";
+export type ThemeScheme = "dark" | "light";
+
+export type ThemeCore = {
+  scheme: ThemeScheme;
   canvas: string;
   panel: string;
   track: string;
@@ -24,7 +26,7 @@ export type NightCore = {
   info: string;
 };
 
-export type ThemeTokens = NightCore & {
+export type ThemeTokens = ThemeCore & {
   you: string;
   kit: string;
 };
@@ -60,7 +62,7 @@ const BOOM = {
   dangerSoft: "#2a121c",
   ok: "#3db8a0",
   info: "#6ba8c9",
-} as const satisfies NightCore;
+} as const satisfies ThemeCore;
 
 const INLAY = {
   scheme: "dark",
@@ -84,7 +86,7 @@ const INLAY = {
   dangerSoft: "#2a1818",
   ok: "#6baf9a",
   info: "#7aa8b8",
-} as const satisfies NightCore;
+} as const satisfies ThemeCore;
 
 const LAMP = {
   scheme: "dark",
@@ -108,7 +110,7 @@ const LAMP = {
   dangerSoft: "#2a1218",
   ok: "#5ec8b0",
   info: "#8aa0e0",
-} as const satisfies NightCore;
+} as const satisfies ThemeCore;
 
 const NOIR = {
   scheme: "dark",
@@ -132,7 +134,7 @@ const NOIR = {
   dangerSoft: "#241018",
   ok: "#5cb8a8",
   info: "#7aa0c8",
-} as const satisfies NightCore;
+} as const satisfies ThemeCore;
 
 const EMBER = {
   scheme: "dark",
@@ -156,7 +158,7 @@ const EMBER = {
   dangerSoft: "#2a1014",
   ok: "#6bb090",
   info: "#7aa8c0",
-} as const satisfies NightCore;
+} as const satisfies ThemeCore;
 
 const TIDE = {
   scheme: "dark",
@@ -180,7 +182,7 @@ const TIDE = {
   dangerSoft: "#1c1018",
   ok: "#4cbc9c",
   info: "#6aa8c8",
-} as const satisfies NightCore;
+} as const satisfies ThemeCore;
 
 const BLOOM = {
   scheme: "dark",
@@ -204,7 +206,127 @@ const BLOOM = {
   dangerSoft: "#241018",
   ok: "#68b8a0",
   info: "#88a0d8",
-} as const satisfies NightCore;
+} as const satisfies ThemeCore;
+
+const PAPER = {
+  scheme: "light",
+  canvas: "#f6f1e8",
+  panel: "#efe8dc",
+  track: "#e4dccf",
+  line: "#8e8270",
+  edge: "#5a5248",
+  fg: "#1c1814",
+  body: "#2e2822",
+  muted: "#524a42",
+  dim: "#5c544c",
+  faint: "#6e665c",
+  accent: "#c24a28",
+  accentHover: "#a83c1c",
+  mark: "#8a2808",
+  accentLine: "#a83818",
+  accentSoft: "#f3d8cc",
+  danger: "#b42858",
+  dangerLine: "#8a1840",
+  dangerSoft: "#f8dce6",
+  ok: "#1a7a64",
+  info: "#24608c",
+} as const satisfies ThemeCore;
+
+const CHALK = {
+  scheme: "light",
+  canvas: "#f2f5f8",
+  panel: "#e6ecf2",
+  track: "#d8e0e8",
+  line: "#7a8a98",
+  edge: "#4a5a68",
+  fg: "#12161c",
+  body: "#1e2630",
+  muted: "#3a4856",
+  dim: "#465462",
+  faint: "#5a6876",
+  accent: "#1e5a8c",
+  accentHover: "#164a74",
+  mark: "#0e3a60",
+  accentLine: "#164a74",
+  accentSoft: "#d0e0f0",
+  danger: "#b42858",
+  dangerLine: "#8a1840",
+  dangerSoft: "#f4d8e4",
+  ok: "#1a7060",
+  info: "#24608c",
+} as const satisfies ThemeCore;
+
+const FOAM = {
+  scheme: "light",
+  canvas: "#eef6f5",
+  panel: "#e0eeec",
+  track: "#d0e4e0",
+  line: "#5e8884",
+  edge: "#3a5c58",
+  fg: "#102018",
+  body: "#1a2c2a",
+  muted: "#345250",
+  dim: "#425e5c",
+  faint: "#547470",
+  accent: "#0c6e68",
+  accentHover: "#0a5c58",
+  mark: "#064840",
+  accentLine: "#0a5c58",
+  accentSoft: "#c4e8e4",
+  danger: "#b42858",
+  dangerLine: "#8a1840",
+  dangerSoft: "#f4d8e4",
+  ok: "#1a7a64",
+  info: "#24608c",
+} as const satisfies ThemeCore;
+
+const PETAL = {
+  scheme: "light",
+  canvas: "#f7f1f6",
+  panel: "#efe4ee",
+  track: "#e6d8e6",
+  line: "#8e748e",
+  edge: "#5a485a",
+  fg: "#1a121c",
+  body: "#2a2030",
+  muted: "#4e3e56",
+  dim: "#5a4a62",
+  faint: "#6e5c76",
+  accent: "#a02080",
+  accentHover: "#881068",
+  mark: "#6e0858",
+  accentLine: "#881068",
+  accentSoft: "#f4d0e8",
+  danger: "#b42858",
+  dangerLine: "#8a1840",
+  dangerSoft: "#f8dce6",
+  ok: "#1a7a64",
+  info: "#3a508c",
+} as const satisfies ThemeCore;
+
+const INK = {
+  scheme: "dark",
+  canvas: "#050506",
+  panel: "#141416",
+  track: "#262628",
+  line: "#6a6a70",
+  edge: "#9a9aa0",
+  fg: "#fafafa",
+  body: "#e4e4e6",
+  muted: "#b0b0b6",
+  dim: "#c4c4ca",
+  faint: "#8a8a92",
+  accent: "#f0b020",
+  accentHover: "#f8c040",
+  mark: "#ffe08a",
+  accentLine: "#c88810",
+  accentSoft: "#2a220c",
+  danger: "#f07090",
+  dangerLine: "#c03858",
+  dangerSoft: "#2a1018",
+  ok: "#3cc8a8",
+  info: "#7ab0e0",
+} as const satisfies ThemeCore;
 
 export const THEMES = [
   {
@@ -248,6 +370,36 @@ export const THEMES = [
     label: "Bloom",
     mood: "dusk garden — violet dusk, magenta bloom",
     tokens: { ...BLOOM, you: "#241428", kit: BLOOM.track } satisfies ThemeTokens,
+  },
+  {
+    id: "paper",
+    label: "Paper",
+    mood: "day workshop — cream paper, rust-orange tools",
+    tokens: { ...PAPER, you: "#e4c4b0", kit: PAPER.track } satisfies ThemeTokens,
+  },
+  {
+    id: "chalk",
+    label: "Chalk",
+    mood: "daylight Gotham — newsprint, steel-blue ink",
+    tokens: { ...CHALK, you: "#c8d6e4", kit: CHALK.track } satisfies ThemeTokens,
+  },
+  {
+    id: "foam",
+    label: "Foam",
+    mood: "noon harbor — salt white, seafoam",
+    tokens: { ...FOAM, you: "#b8d8d4", kit: FOAM.track } satisfies ThemeTokens,
+  },
+  {
+    id: "petal",
+    label: "Petal",
+    mood: "morning garden — pale lilac, magenta bloom",
+    tokens: { ...PETAL, you: "#e4c0dc", kit: PETAL.track } satisfies ThemeTokens,
+  },
+  {
+    id: "ink",
+    label: "Ink",
+    mood: "high-contrast night — black floor, white type, amber lamp",
+    tokens: { ...INK, you: "#3a2410", kit: INK.track } satisfies ThemeTokens,
   },
 ] as const satisfies readonly ThemeDef[];
 

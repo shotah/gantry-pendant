@@ -41,6 +41,7 @@ before you call it done. A PWA-only paint is not enough.
 | Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Do not assume it needs the PWA CSS |
 | Photo caps, encode ladder, `error` tokens | Both mouths encode to the same budget and paint refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
 | Face / backdrop blobs and their notices | Cab refetches `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
+| Header face (size, hang, stroke) | Cab TopAppBar, not PWA-only — [Header face](#header-face) |
 | Room theme | Cab follows Kit when `followTheme` is on; GET `/api/theme` on connect — [Theme](#theme-what-every-mouth-must-do-the-same) |
 | PWA-only UI (font, Install) | Cab has its own Compose shell |
 
@@ -48,9 +49,11 @@ before you call it done. A PWA-only paint is not enough.
 `repos/gantry-cab/app/src/main/java/com/gantree/cab/mailbox/Wire.kt` and
 `Mouth.kt`; for caps, ladder, or photo size, `mailbox/Photo.kt` and
 `mailbox/SendError.kt`; for face / backdrop / room theme,
-`mailbox/Avatar.kt`, `mailbox/Look.kt`, `mailbox/ThemeApi.kt`. If Cab
-would paint wrong or drop a turn, file it there (or patch both). Do
-not wait for an iOS repo to exist before writing the contract down.
+`mailbox/Avatar.kt`, `mailbox/Look.kt`, `mailbox/ThemeApi.kt`; for the
+header circle itself, `ui/KitAvatar.kt` and `ui/CabScreen.kt`
+(`TopAppBar` `navigationIcon`). If Cab would paint wrong or drop a
+turn, file it there (or patch both). Do not wait for an iOS repo to
+exist before writing the contract down.
 
 ---
 
@@ -202,7 +205,7 @@ no `user_id`):
 | Do not move the `since` cursor; do not toast / HUN / haptic / badge | Not a turn |
 | `backdrop` and `theme` have **no `text`** | A mouth that predates them must drop them. Cab `Mouth.ingest` paints any frame with text as a bubble — a rev or theme id in the thread on every old APK. The face notice predates this rule; do not "fix" it |
 | `rev` is a safe integer ≥ 0; junk → ignore the frame | Same bar as `orderSeq` |
-| `theme` is a known catalog id, or JSON `null` to clear; junk → ignore | Catalog: boom, inlay, lamp, noir, ember, tide, bloom |
+| `theme` is a known catalog id, or JSON `null` to clear; junk → ignore | Catalog: boom, inlay, lamp, noir, ember, tide, bloom, paper, chalk, foam, petal, ink |
 
 **Paint.** On `face` → refetch `GET /api/avatar?slug&v=<rev>` and swap
 the header circle (PWA `KitAvatar`, Cab `ui/KitAvatar.kt`). On
@@ -231,6 +234,28 @@ returns `false`, `shouldSpeak` stays false, `movesCursor` excludes
 `face` / `backdrop` / `theme`. `Look.kt` `THEME_IDS` matches
 `lib/theme/catalog.ts` (hexes in `CabPalette.kt`). `ThemeApi` GETs the
 room; `AvatarApi.fetch(..., path="/api/backdrop")` GETs the wallpaper.
+
+### Header face
+
+Kit picks the picture; the header circle is the room's face, not a tiny
+chrome icon. A 40 px chip is easy to miss when the JPEG changes — the
+swap is the event. Same layout on every handheld mouth. Auto HUNs do
+not care.
+
+| | Value |
+| --- | --- |
+| Size | 82 px / 82.dp (PWA `KitAvatar` `xl`) |
+| Header row | Do **not** grow the bar. Layout slot is 40 px tall × 80 px wide so the name shifts right of the circle |
+| Hang | Align the circle to the **top** of that slot, then nudge **-2 px x / -4 px y** so it sits in the header padding. Overlaps the thread (~24 px). z-order above bubbles |
+| Stroke | 2 px in theme `line` (PWA `border-line`; Cab `CabPalette.line` / `outlineVariant`). Not `panel`, not a shadow ring |
+| Empty / Google door | Stay the centered hero (PWA 64 px, Cab 72.dp). Those do not hang |
+
+PWA: `PhoneShell` header. Cab today: `ui/CabScreen.kt` `TopAppBar`
+`navigationIcon` is 40.dp and the bar **clips overflow** — that is the
+work. Pass 82.dp into `ui/KitAvatar.kt`, keep the 40×80 slot, nudge
+**-2.dp x / -4.dp y**, disable clip so the circle draws over `ChatScroll`,
+2.dp `line` border on the circle. `DocsShot.kt` `paintHeader` still
+stamps 40 px at (12, 12); match it or the coordinate asserts will lie.
 
 ---
 
@@ -287,10 +312,10 @@ cache and fall back to `pendant.theme`. A human pick in Settings
 writes `pendant.theme` and sets follow **off**. `?theme=` for shots
 does the same.
 
-Catalog today: `boom` `inlay` `lamp` `noir` `ember` `tide` `bloom`.
-Boom / Inlay / Lamp hexes stay shared with gantree. New ids are
-additive; a mouth that does not know `noir` ignores the notice and
-keeps its current palette.
+Catalog today: `boom` `inlay` `lamp` `noir` `ember` `tide` `bloom`
+`paper` `chalk` `foam` `petal` `ink`. Boom / Inlay / Lamp hexes stay
+shared with gantree. New ids are additive; a mouth that does not know
+`paper` ignores the notice and keeps its current palette.
 
 **Cab.** `Look.kt` `THEME_IDS` matches the catalog (hexes in
 `CabPalette.kt`). `Mouth.roomTheme` plus `paintedTheme(follow, room, mine)`

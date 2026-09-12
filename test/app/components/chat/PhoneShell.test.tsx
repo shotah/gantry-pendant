@@ -180,6 +180,24 @@ describe("PhoneShell", () => {
     );
   });
 
+  it("lets the header face hang over the thread without growing the header", async () => {
+    window.history.replaceState({}, "", "/?sample=thread");
+    stubAuth(true);
+    const { container } = render(<PhoneShell />);
+    expect(await screen.findByText(SAMPLE_LINES.threadKit)).toBeTruthy();
+    const header = container.querySelector("header");
+    expect(header?.className.split(/\s+/)).toEqual(expect.arrayContaining(["relative", "z-20"]));
+    const slot = header?.querySelector(":scope > div > div");
+    expect(slot?.className.split(/\s+/)).toEqual(expect.arrayContaining(["relative", "h-10", "w-20"]));
+    const wrap = slot?.querySelector(":scope > div");
+    expect(wrap?.className.split(/\s+/)).toEqual(expect.arrayContaining(["absolute", "-left-0.5", "-top-1"]));
+    const face = header?.querySelector("img");
+    expect(face?.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(["h-[82px]", "w-[82px]", "border-2", "border-line"]),
+    );
+    expect(header?.querySelector(".ring-panel")).toBeNull();
+  });
+
   it("ignores sample query when not in dev", async () => {
     window.history.replaceState({}, "", "/?sample=thread");
     stubAuth(false);

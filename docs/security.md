@@ -217,7 +217,8 @@ from `ChatID` (Google `sub`).
   have no rate limit yet — [agent_ui_controls.md](agent_ui_controls.md).
 - Kit's theme (`POST` / `DELETE /api/theme`) is the same door. Body is
   a catalog id (`boom` / `inlay` / `lamp` / `noir` / `ember` / `tide` /
-  `bloom`), never raw hex. The human can unfollow (`pendant.followTheme`)
+  `bloom` / `paper` / `chalk` / `foam` / `petal` / `ink`), never raw hex.
+  The human can unfollow (`pendant.followTheme`)
   and keep their own palette.
 - Web Push subscriptions (endpoint + keys) live on the crane's Durable
   Object, keyed by Google `sub`. Yanking a person from the room list

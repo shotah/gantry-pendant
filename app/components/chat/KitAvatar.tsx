@@ -12,6 +12,7 @@ const DIM = {
   sm: "h-8 w-8",
   md: "h-10 w-10",
   lg: "h-16 w-16",
+  xl: "h-[82px] w-[82px]",
 } as const;
 
 export function KitAvatar({
@@ -21,6 +22,7 @@ export function KitAvatar({
   bearer,
   size = "md",
   editable,
+  className,
   onRev,
   onError,
 }: {
@@ -30,6 +32,7 @@ export function KitAvatar({
   bearer?: string;
   size?: keyof typeof DIM;
   editable?: boolean;
+  className?: string;
   onRev?: (rev: number) => void;
   onError?: (msg: string) => void;
 }) {
@@ -39,7 +42,7 @@ export function KitAvatar({
   const name = displaySlug(slug);
 
   const img = (
-    <img src={src} alt="" className={`${dim} shrink-0 rounded-full object-cover bg-track`} />
+    <img src={src} alt="" className={`${dim} shrink-0 rounded-full object-cover bg-track${className ? ` ${className}` : ""}`} />
   );
 
   if (!editable) {

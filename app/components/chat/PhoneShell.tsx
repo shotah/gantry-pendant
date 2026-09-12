@@ -1070,9 +1070,13 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
 
   return (
     <div ref={shellRef} className="flex h-dvh flex-col overflow-hidden bg-canvas pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]" data-shot={phone ? "phone" : "crane"}>
-      <header className="flex shrink-0 items-center gap-2 border-b border-line bg-panel px-3 py-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <KitAvatar {...faceProps} size="md" />
+      <header className="relative z-20 flex shrink-0 items-center gap-2 border-b border-line bg-panel px-3 py-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="relative z-20 h-10 w-20 shrink-0">
+            <div className="absolute -left-0.5 -top-1">
+              <KitAvatar {...faceProps} size="xl" className="border-2 border-line" />
+            </div>
+          </div>
           <div className="min-w-0">
             <p className="truncate text-chat font-medium text-fg">{title}</p>
             <p className="text-[11px] text-dim">

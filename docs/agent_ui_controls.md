@@ -206,9 +206,9 @@ Worker's `{ error }` body verbatim so the model can read them.
   = highlight). Pick one id, then call theme_update. Not for drawing a
   picture — that is image__photo_generate."
 - `theme_update`: "Set the phone app's color mood. Pass a `theme` id
-  from theme_list (boom, inlay, lamp, noir, ember, tide, bloom). Match
-  the mood line to how you feel; do not invent hex. Humans can unfollow
-  and keep their own theme."
+  from theme_list. Match the mood line to how you feel (daylight cards
+  are paper, chalk, foam, petal; ink is high-contrast night); do not
+  invent hex. Humans can unfollow and keep their own theme."
 
 Recipes live in the tool descriptions, not `PERSONA.md`
 (`repos/ai-gantry/docs/persona.md`).
@@ -266,8 +266,9 @@ Worker + PWA + contract. Done here unless unchecked.
       `test/phone/prefs.test.ts`, `test/app/lib/blobUrl.test.ts`,
       `test/app/components/chat/Backdrop.test.tsx`, `PhoneShell.test.tsx`
       (notice refetches, no bubble, off never fetches).
-- [x] `lib/theme/catalog.ts`: seven ids, mood + canvas/accent cards.
+- [x] `lib/theme/catalog.ts`: closed ids, mood + canvas/accent cards.
       Boom / Inlay / Lamp hexes unchanged. Contrast test on painted pairs.
+      Daylight cousins (paper, chalk, foam, petal) plus ink (high-contrast night).
 - [x] `lib/theme/store.ts`: textless `encodeThemeNotice`,
       `themeIdFromUnknown` (`null` theme = cleared), `parseThemeWrite`.
 - [x] `app/api/theme/route.ts`: GET / POST / DELETE.

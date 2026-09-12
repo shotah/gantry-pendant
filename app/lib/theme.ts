@@ -1,4 +1,4 @@
-/** Color themes — Boom, Inlay, Lamp (shared with gantree) plus Noir, Ember, Tide, Bloom. */
+/** Color themes — Boom, Inlay, Lamp (shared with gantree) plus night moods and daylight cousins. */
 
 import {
   DEFAULT_THEME,

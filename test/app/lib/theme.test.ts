@@ -29,21 +29,49 @@ describe("theme", () => {
     expect(themeFromQuery(null)).toBeNull();
   });
 
-  it("ships Boom, Inlay, Lamp, and the four mood palettes", () => {
-    expect(THEMES.map((t) => t.id)).toEqual(["boom", "inlay", "lamp", "noir", "ember", "tide", "bloom"]);
-    expect(THEMES.map((t) => t.label)).toEqual(["Boom", "Inlay", "Lamp", "Noir", "Ember", "Tide", "Bloom"]);
+  it("ships Boom, Inlay, Lamp, night moods, daylight cousins, and ink", () => {
+    expect(THEMES.map((t) => t.id)).toEqual([
+      "boom",
+      "inlay",
+      "lamp",
+      "noir",
+      "ember",
+      "tide",
+      "bloom",
+      "paper",
+      "chalk",
+      "foam",
+      "petal",
+      "ink",
+    ]);
+    expect(THEMES.map((t) => t.label)).toEqual([
+      "Boom",
+      "Inlay",
+      "Lamp",
+      "Noir",
+      "Ember",
+      "Tide",
+      "Bloom",
+      "Paper",
+      "Chalk",
+      "Foam",
+      "Petal",
+      "Ink",
+    ]);
     const css = themeCss();
     expect(css).toContain(':root,[data-theme="boom"]');
     expect(css).toContain("color-scheme:dark");
-    expect(css).not.toContain("color-scheme:light");
+    expect(css).toContain("color-scheme:light");
     const keys = Object.keys(THEMES[0].tokens).sort();
     for (const t of THEMES) {
-      expect(t.tokens.scheme).toBe("dark");
       expect(Object.keys(t.tokens).sort()).toEqual(keys);
       expect(css).toContain(`[data-theme="${t.id}"]`);
       expect(css).toContain(`--canvas:${t.tokens.canvas}`);
       expect(css).toContain(`--you:${t.tokens.you}`);
+      expect(css).toContain(`color-scheme:${t.tokens.scheme}`);
     }
+    expect(themeOf("paper").tokens.scheme).toBe("light");
+    expect(themeOf("ink").tokens.scheme).toBe("dark");
     expect(THEME_BOOT).toContain(THEME_KEY);
     expect(THEME_BOOT).toContain(ROOM_THEME_KEY);
     expect(THEME_BOOT).toContain(FOLLOW_THEME_PREF_KEY);
