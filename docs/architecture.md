@@ -35,6 +35,32 @@ That is the shape to copy. Slack Socket Mode is the closest sibling:
 crane dials a hub; the hub fans events; allowlist filters. A Durable
 Object is that hub on our Cloudflare account.
 
+## Household
+
+Four repos. Pitch and the same diagram:
+[root readme](../README.md#the-household).
+
+```mermaid
+flowchart LR
+  subgraph you ["You hold"]
+    PWA["Pendant PWA"]
+    Cab["gantry-cab"]
+  end
+  DO["Mailbox DO"]
+  Crane["ai-gantry"]
+  Yard["gantree"]
+  PWA -->|"cookie + wss"| DO
+  Cab -->|"JWE + wss"| DO
+  Crane -->|"outbound wss"| DO
+  Yard -->|"env + bearer"| Crane
+  Yard -.->|"Worker secrets"| DO
+```
+
+Gantree never grows a chat route. The wizard has another mouth the
+way it already has Discord and Slack: env + allowlist, then recreate.
+Settings → Pendant pushes Worker Google / session; Build mints the
+crane bearer. This repo only deploys Worker **code**.
+
 ## Target
 
 ```text
@@ -98,11 +124,6 @@ ai-gantry/                 harness — internal/channel/ sibling
 gantree/                   yard — CHANNEL in the build wizard
                            still Vinext-on-Node. Not this Worker.
 ```
-
-Gantree does not grow a chat route. The wizard has another mouth the
-way it already has Discord and Slack: env + allowlist, then recreate.
-Settings → Pendant pushes Worker Google / session; Build mints the
-crane bearer. This repo only deploys Worker **code**.
 
 ## Mailbox room
 
@@ -203,7 +224,9 @@ consumer of the Worker. Transcript hydrates on connect — not the unread
 queue, and not `sw.js`. Later HTTP can
 still serve media. Location uses the browser Geolocation API on send.
 The car mouth is **gantry-cab** (native Android Auto), not Expo wrapping
-this UI.
+this UI. Voice is a mouth skin: OS STT → the same `inbound` text,
+OS / Auto TTS of `reply` / `push`. The Completer never sees a clip —
+[voice.md](voice.md).
 
 Vinext is Next-shaped on Vite: `app/manifest.ts` is a metadata route
 (`/manifest.webmanifest`, `application/manifest+json`). Icons and

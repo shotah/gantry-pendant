@@ -44,6 +44,7 @@ before you call it done. A PWA-only paint is not enough.
 | Header face (size, hang, stroke) | Cab TopAppBar, not PWA-only — [Header face](#header-face) |
 | Room theme | Cab follows Kit when `followTheme` is on; GET `/api/theme` on connect — [Theme](#theme-what-every-mouth-must-do-the-same) |
 | PWA-only UI (font, Install) | Cab has its own Compose shell |
+| Voice (STT / TTS) | Mouth-local. No audio on the wire. Cab Auto already reads `reply` / `push` and stuffs spoken Reply into `inbound`. Handheld dictation is compose-only — [voice.md](voice.md) |
 
 **Cover:** after a mailbox frame change, read
 `repos/gantry-cab/app/src/main/java/com/gantree/cab/mailbox/Wire.kt` and

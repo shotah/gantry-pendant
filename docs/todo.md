@@ -9,8 +9,9 @@ Pitch: [README.md](../README.md). Why: [design.md](design.md). Wire:
 Other mouths: [frontends.md](frontends.md). Misses:
 [edgecases.md](edgecases.md). Sibling phones:
 [sibling_phones.md](sibling_phones.md). Typing:
-[agent_typing_response_todo.md](agent_typing_response_todo.md). Face /
-mood: [agent_ui_controls.md](agent_ui_controls.md). Bugs / security:
+[agent_typing_response_todo.md](agent_typing_response_todo.md). Voice:
+[voice.md](voice.md). Face / mood:
+[agent_ui_controls.md](agent_ui_controls.md). Bugs / security:
 [audit_todo.md](audit_todo.md).
 
 ## Fit gates
@@ -81,6 +82,8 @@ Same Durable Object. Do not fork the mailbox.
 - [ ] Walk sibling inbound after the Worker fans it
       ([sibling_phones.md](sibling_phones.md)). Cab already paints
       `inbound` as you; keep `MailboxClient.sweep`
+- [ ] Handheld mic → compose (`SpeechRecognizer`), no auto-send.
+      Auto stays host STT. Design: [voice.md](voice.md)
 
 Wire changes (`seq` / `at`, `replay`, new `kind`, auth) still need a
 look at `Wire.kt` / `Mouth.kt`. iOS native is later (Sign in with Apple
@@ -90,8 +93,10 @@ is a mailbox auth change). Do not start Expo to catch up Cab.
 
 ## This repo
 
-- [ ] **Voice into compose** — `SpeechRecognition`; fill the
-      textarea, do not auto-send
+- [ ] **Voice into compose** — `SpeechRecognition` when it exists;
+      fill the textarea, do not auto-send. Audio never hits the
+      mailbox or the Completer. Cab Auto already speaks. Design:
+      [voice.md](voice.md)
 - [ ] **Share target** — Android share sheet → compose (do not
       register `share_target` until the POST handler exists)
 - [ ] **Offline outbound queue** — page-side unsent frames; do not

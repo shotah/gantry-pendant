@@ -5,7 +5,8 @@ harness. Pitch: [root readme](../README.md). What it looks like:
 [screens.md](screens.md). Wire:
 [architecture.md](architecture.md). Other mouths:
 [frontends.md](frontends.md). Same human, two mouths:
-[sibling_phones.md](sibling_phones.md). Authn: [security.md](security.md).
+[sibling_phones.md](sibling_phones.md). Voice in / out:
+[voice.md](voice.md). Authn: [security.md](security.md).
 What's left: [todo.md](todo.md).
 
 ## Problem
@@ -208,9 +209,10 @@ Web Push (VAPID) when the phone socket is gone.
 **Later:** reverse-geocode is a maps **tool** on the crane, not a client
 field. Captioned photo (paste screenshot, do not send on attach), pin
 chip on the outbound bubble, timestamps, copy/retry, crane-up vs
-`live`, reload-keeps-the-thread, voice / share-target / Expo —
-[todo.md](todo.md). Motion / "home" labels stay Expo. Native APNs / FCM
-stay later.
+`live`, reload-keeps-the-thread, share-target / Expo —
+[todo.md](todo.md). Voice is mouth STT/TTS, not audio on the
+wire — [voice.md](voice.md). Motion / "home" labels stay Expo.
+Native APNs / FCM stay later.
 
 **Never on the wire:** SSID / BSSID, Bluetooth neighbors, clipboard,
 contacts dump. Fingerprinting, not chat.

@@ -11,11 +11,13 @@ canned Ada/Kit turns — not a live crane.
 
 ## Phone
 
-The product viewport is a pocket (390×844). Theme defaults to Boom.
-Chat type defaults to Small; Extra large is a shot. Kit’s face sits in
-the header (tap to replace it). Compose has emoji on the left, attach
-under it. Empty and unsigned screens use the same mark. Fallback is the
-pendant glyph until a JPEG is saved on the Durable Object.
+The product viewport is a pocket (390×844). Theme defaults to Boom
+(twelve ids; Paper is the light workshop). Chat type defaults to Small;
+Extra large is a shot. Kit’s face is an 82 px circle that hangs off the
+header (tap to replace it). Compose has emoji on the left, attach under
+it — photo sits on the draft until Send. Empty and unsigned screens use
+the same mark. Fallback is the pendant glyph until a JPEG is saved on
+the Durable Object.
 
 <p align="center">
   <img src="../assets/docs/login.png" alt="Sign in with Google" width="220">
@@ -46,6 +48,18 @@ pendant glyph until a JPEG is saved on the Durable Object.
   &nbsp;
   <img src="../assets/docs/thread-day.png" alt="Same thread in Lamp theme" width="220">
   &nbsp;
+  <img src="../assets/docs/thread-paper.png" alt="Same thread in Paper theme" width="220">
+</p>
+
+<p align="center">
+  <img src="../assets/docs/cmds.png" alt="Harness command picker" width="220">
+  &nbsp;
+  <img src="../assets/docs/attach.png" alt="Attach tray — photo, commands, GPS" width="220">
+  &nbsp;
+  <img src="../assets/docs/settings.png" alt="Settings — theme, font, photo size, backdrop" width="220">
+</p>
+
+<p align="center">
   <img src="../assets/docs/crane.png" alt="Crane stand-in tab" width="220">
 </p>
 
@@ -53,17 +67,19 @@ pendant glyph until a JPEG is saved on the Durable Object.
 | --- | --- | --- |
 | `login` | `/login` | Google door. The crane decides who may talk. |
 | `unsigned` | `/?sample=unsigned` | Same gate inside the shell. |
-| `empty` | `/?sample=empty` | Live, nothing said yet. Emoji + paperclip (photo, commands, GPS). |
+| `empty` | `/?sample=empty` | Live, nothing said yet. Emoji + paperclip. |
 | `cmds` | `/?sample=cmds` | Command picker. Live list is published by the crane (`cmds` frame); this sample paints a short stand-in. |
+| `attach` | `/?sample=empty` then paperclip | Camera, photo, commands, GPS, silent pin. |
 | `thread` | `/?sample=thread` | Ada ↔ Kit. Pin is this-send. |
 | `stream` | `/?sample=stream` | Crane typing + italic draft bubble (⏳). |
 | `emoji` | `/?sample=emoji` | Same thread with the emoji tray open. |
 | `ping` | `/?sample=ping` | Cron `Push` — labeled **ping**. |
 | `photo` | `/?sample=photo` | Inbound image + text. |
 | `down` | `/?sample=down` | Other side gone. Compose locked. |
-| `thread-day` | `/?sample=thread&theme=lamp` | Lamp theme. Boom / Inlay / Lamp live in the picker. |
+| `thread-day` | `/?sample=thread&theme=lamp` | Lamp theme. |
+| `thread-paper` | `/?sample=thread&theme=paper` | Paper (light). Boom / Inlay / Lamp stay shared with gantree. |
 | `thread-xl` | `/?sample=thread&font=xl` | Extra-large chat type. Small is the default. |
-| `settings` | `/?sample=empty` | Cog open — theme, font size, photo size, Install. |
+| `settings` | `/?sample=empty` | Cog — theme, follow Kit’s mood, font, photo size, backdrop, Install. |
 | `crane` | `/crane?sample=crane` | Loopback stand-in for the harness (`PENDANT_DEV`). |
 
 ---

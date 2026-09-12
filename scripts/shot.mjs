@@ -50,6 +50,22 @@ const SHOTS = {
     phone: true,
     theme: "lamp",
   },
+  "thread-paper": {
+    path: "/?sample=thread&theme=paper",
+    sel: "[data-shot=phone]",
+    text: "Leave-by 20:50",
+    phone: true,
+    theme: "paper",
+  },
+  attach: {
+    path: "/?sample=empty",
+    sel: "[aria-label=Attach]",
+    text: "Drop a silent pin",
+    phone: true,
+    click: "[aria-label=attach]",
+    ready: "[data-shot=phone]",
+    readyText: "Nothing yet",
+  },
   ping: {
     path: "/?sample=ping",
     sel: "[data-shot=phone]",
@@ -79,7 +95,7 @@ const SHOTS = {
   settings: {
     path: "/?sample=empty",
     sel: "[aria-label=Settings]",
-    text: "Font size",
+    text: "Backdrop",
     phone: true,
     click: "[aria-label=settings]",
     ready: "[data-shot=phone]",
@@ -257,9 +273,21 @@ try {
     await metrics(Boolean(spec.phone));
     const theme = spec.theme || "boom";
     const font = spec.font || "sm";
+    // Theme-query shots turn follow off in the app. Reset the rest so a
+    // later settings shot is not leftover from Lamp / Paper.
+    const follow = spec.theme ? "off" : "on";
     await evalJson(
       cdp,
-      `localStorage.setItem("pendant.theme", ${JSON.stringify(theme)}); document.documentElement.setAttribute("data-theme", ${JSON.stringify(theme)}); localStorage.setItem("pendant.font", ${JSON.stringify(font)}); document.documentElement.setAttribute("data-font", ${JSON.stringify(font)});`,
+      [
+        `localStorage.setItem("pendant.theme", ${JSON.stringify(theme)});`,
+        `document.documentElement.setAttribute("data-theme", ${JSON.stringify(theme)});`,
+        `localStorage.setItem("pendant.font", ${JSON.stringify(font)});`,
+        `document.documentElement.setAttribute("data-font", ${JSON.stringify(font)});`,
+        `localStorage.setItem("pendant.followTheme", ${JSON.stringify(follow)});`,
+        `localStorage.setItem("pendant.photo", "medium");`,
+        `localStorage.setItem("pendant.backdrop", "on");`,
+        `localStorage.setItem("pendant.geo", "on");`,
+      ].join(""),
     );
     await goto(base + spec.path);
     await waitSel(spec.ready || spec.sel, spec.readyText || spec.text);

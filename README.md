@@ -16,21 +16,26 @@
 > **pendant** *(n.)* — the handheld control on that crane. You walk the
 > floor with it. You do not sit in the yard office.
 
-A chat mouth for [ai-gantry](https://github.com/shotah/ai-gantry) that we
-own. Not the yard board. Not Telegram. Jewelry is the other English
-sense; the prefix is the crane.
+You talk to Kit. Kit is an
+[ai-gantry](https://github.com/shotah/ai-gantry) process: one persona,
+one model, tools you granted, memory you can `sqlite3`. Telegram is
+the mailbox *today* because Telegram is always on and the crane only
+dials **out**. Nothing on the Mini listens. That rule does not change.
 
-Today you message Kit on Telegram. The crane dials **out**; nothing
-listens. This repo is that loop on a phone we control: a Vinext app,
-a Durable Object mailbox, a new harness channel. Gantree still
-operates cranes. It does not sit in a chat turn.
+This repo is that loop on a phone we own. A Vinext PWA. A Durable
+Object room on Cloudflare. A new harness channel next to Telegram.
+[gantree](https://github.com/shotah/gantree) still operates the crane
+— build, grants, recreate. It never sits in a chat turn.
+[gantry-cab](https://github.com/shotah/gantry-cab) is the same room in
+the car. One Worker. Zero inbound ports.
 
 ```text
-phone  →  Vinext on Cloudflare Workers (Google login + Durable Object)  ←  crane (outbound)
+PWA / Cab  →  this Worker (Google + Durable Object)  ←  crane (outbound)
 ```
 
-The phone only needs HTTPS. The crane still opens **zero** inbound
-ports. The Mini does not have to be the mailbox.
+The handset only needs HTTPS. The Mini does not have to be the
+mailbox. Home internet can die and you can still leave a note; Kit
+thinks again when the crane has net.
 
 <p align="center">
   <img src="assets/docs/login.png" alt="Sign in with Google" width="180">
@@ -38,30 +43,77 @@ ports. The Mini does not have to be the mailbox.
   <img src="assets/docs/thread.png" alt="Ada talking to Kit" width="180">
   &nbsp;
   <img src="assets/docs/stream.png" alt="Kit typing with a live draft" width="180">
-  &nbsp;
-  <img src="assets/docs/emoji.png" alt="Emoji picker" width="180">
 </p>
 
-Every screen, Lamp, extra-large type, crane stand-in:
-[docs/screens.md](docs/screens.md).
+<p align="center">
+  <img src="assets/docs/photo.png" alt="Hatch photo on an inbound turn" width="180">
+  &nbsp;
+  <img src="assets/docs/ping.png" alt="Cron ping in the thread" width="180">
+  &nbsp;
+  <img src="assets/docs/settings.png" alt="Theme, font, photo size, backdrop" width="180">
+</p>
 
-**Docs (the plan lives here, not in chat):**
+Every screen, Lamp, Paper, extra-large type, crane stand-in:
+[docs/screens.md](docs/screens.md). Reshoot with `npm run shot`.
 
-| File | What it is |
+## The household
+
+Four checkouts. One product. Nested under gantree (`repos/…`), each
+with its own git remote — same pattern as `repos/ai-gantry`.
+
+```mermaid
+flowchart LR
+  subgraph you ["You hold"]
+    PWA["Pendant PWA"]
+    Cab["gantry-cab"]
+  end
+  DO["Mailbox DO"]
+  Crane["ai-gantry"]
+  Yard["gantree"]
+  PWA -->|"cookie + wss"| DO
+  Cab -->|"JWE + wss"| DO
+  Crane -->|"outbound wss"| DO
+  Yard -->|"env + bearer"| Crane
+  Yard -.->|"Worker secrets"| DO
+```
+
+| Repo | Job |
 | --- | --- |
-| [docs/todo.md](docs/todo.md) | Open work — prove it, other checkouts, mouth UI |
-| [docs/audit_todo.md](docs/audit_todo.md) | Bugs, nice-to-haves, security by phase (dev / before go-live / after) |
-| [docs/deployment.md](docs/deployment.md) | Cloudflare once, then `npm run release` |
-| [docs/screens.md](docs/screens.md) | What the mouth looks like (phone shots) |
-| [docs/setup.md](docs/setup.md) | Admin / user / connect — what you paste where |
-| [docs/edgecases.md](docs/edgecases.md) | Gotchas across pendant + gantree + ai-gantry |
-| [docs/frontends.md](docs/frontends.md) | Other mouths — Cab (Android + Auto), later iOS |
-| [docs/design.md](docs/design.md) | Why this shape, Worker vs Mini, phone context |
-| [docs/architecture.md](docs/architecture.md) | How the three pieces talk |
-| [docs/security.md](docs/security.md) | Two principals, Google OIDC vs Access vs MCP |
+| **this** (`app/` + `worker/`) | Chat UI, Google door, PWA. Durable Object room per crane slug. Deploys **code** only. |
+| [gantry-cab](https://github.com/shotah/gantry-cab) | Android + Auto mouth. Same frames, same room. Not a TWA wrapping this UI. |
+| [ai-gantry](https://github.com/shotah/ai-gantry) | The crane. Completer, PERSONA, MCP. `CHANNEL=pendant` is a sibling of Telegram. |
+| [gantree](https://github.com/shotah/gantree) | Operator board. Writes `.env`, mints the bearer, ticks who may talk. Never in the token path. |
 
-Nested checkout under gantree (`repos/gantry-pendant`), own git
-remote, same pattern as `repos/ai-gantry`.
+Gantree Settings → Pendant pushes Google / session onto the Worker.
+Build mints a bearer per crane. The crane publishes who may talk when
+it dials. The Worker is the room, not a second allowlist.
+
+Sister READMEs tell the same household from their side. Cab for the
+car. Gantree for the yard. This one for the handheld and the mailbox.
+
+Wire, queue, `ack` / `since` / `seq`:
+[docs/architecture.md](docs/architecture.md) ·
+[docs/frontends.md](docs/frontends.md). Voice is a mouth skin — OS STT
+in, OS / Auto TTS out. No audio on the wire:
+[docs/voice.md](docs/voice.md).
+
+## Docs
+
+The plan lives here, not in chat.
+
+| If you want… | Go here |
+| --- | --- |
+| Open work | [docs/todo.md](docs/todo.md) |
+| Bugs / security by phase | [docs/audit_todo.md](docs/audit_todo.md) |
+| What the mouth looks like | [docs/screens.md](docs/screens.md) |
+| What you paste where | [docs/setup.md](docs/setup.md) |
+| First `workers.dev` | [docs/deployment.md](docs/deployment.md) |
+| Cab, later iOS | [docs/frontends.md](docs/frontends.md) |
+| Why this shape | [docs/design.md](docs/design.md) |
+| How the sockets meet | [docs/architecture.md](docs/architecture.md) |
+| Two principals | [docs/security.md](docs/security.md) |
+| Cross-repo gotchas | [docs/edgecases.md](docs/edgecases.md) |
+| Dictate / hear Kit | [docs/voice.md](docs/voice.md) |
 
 ## Hello
 
@@ -90,20 +142,17 @@ npm run release                  # bump patch, tag, push (GitHub Release + Worke
 npm run release:dry              # print the next tag only
 ```
 
-Google login is a **new Web application** client on the same GCP
-project as google-mcp is fine. **APIs & Services → Credentials →
-OAuth client ID:** type Web application. JavaScript origin =
-this origin. Redirect =
-`https://<this-origin>/api/auth/callback/google`. Consent: `openid`
-`email` `profile` only. Not Desktop, not `oauth-catch`, not
-`localhost:4100`. Table: [docs/setup.md](docs/setup.md#once-before-any-person).
-
 **This repo deploys Worker code.** Google / `SESSION_SECRET` /
 `CRANE_BEARERS` are **Gantree Settings → Pendant** and Build (mint a
 bearer per crane). Bind KV `DIRECTORY`. `ALLOWED_SUBS` is optional
 break-glass. Empty crane list fails boot. The spike secret is rejected
 once Google is on. GitHub Actions deploys on `main` and `v*` tags; CI
 never sees Worker app secrets.
+
+Google is a **new Web application** client (`openid email profile`),
+same GCP project as google-mcp is fine. Not Desktop, not
+`oauth-catch`, not `localhost:4100`. Table:
+[docs/setup.md](docs/setup.md#once-before-any-person).
 
 Leftover, no yard: `.env` + `npm run secrets:push`. Do not mix that
 with Gantree after the yard owns `CRANE_BEARERS`.
@@ -133,13 +182,5 @@ Then [docs/setup.md](docs/setup.md).
 - A hosted SaaS or App Store listing.
 - google-mcp OAuth (Gmail/Drive). That is a tool grant, not phone login.
 
-## Three pieces
-
-| Piece | Repo | Job |
-| --- | --- | --- |
-| Client | **this repo** (Vinext `app/`) | Chat UI. Google sign-in. PWA. Same framework as Gantree, **Workers** target. |
-| Cab | **gantry-cab** (sister checkout) | Android Auto mouth. Same Worker. Native APK. |
-| Relay | same Worker (Durable Object) | Mailbox per crane. Phone and crane both dial **in**. |
-| Channel | **ai-gantry** `CHANNEL=pendant` | Same `Channel` / `Pusher` as Telegram. Allowlist. Cron can still ping you. |
-
-Telegram stays the production mouth until this path works on one crane.
+Telegram stays the production mouth until this path works on one
+crane.
