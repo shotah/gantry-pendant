@@ -6,6 +6,8 @@ export const CONTENT_SECURITY_POLICY = [
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
+  // Kit's voice: /api/tts MP3 plays from an object URL. 'self' never matches blob:.
+  "media-src 'self' blob:",
   // 'self' is https/http; the mailbox socket is ws/wss (loopback needs ws:).
   "connect-src 'self' ws: wss:",
   "font-src 'self'",

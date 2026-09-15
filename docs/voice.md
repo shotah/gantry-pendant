@@ -369,6 +369,12 @@ Worker unreachable, or the browser would not play. Nothing to say
 (a markdown-only reply) says nothing. `lib/phone/speaker.ts`,
 `app/lib/tts.ts` `onPhase`.
 
+"Would not play" with a good key is almost always policy, not the
+user: the clip plays from an object URL, so the CSP needs
+`media-src 'self' blob:` (`'self'` never matches `blob:`), and the
+page needs one prior gesture for autoplay (the hold is that gesture).
+No browser has a speaker permission to grant.
+
 ### No asterisk asterisk asterisk
 
 Two layers, because models emit markdown even when told not to:

@@ -15,6 +15,7 @@ describe("security headers", () => {
     expect(https.headers.get("Content-Security-Policy")).toBe(CONTENT_SECURITY_POLICY);
     expect(https.headers.get("Content-Security-Policy")).toContain("frame-ancestors 'none'");
     expect(https.headers.get("Content-Security-Policy")).toContain("connect-src 'self' ws: wss:");
+    expect(https.headers.get("Content-Security-Policy")).toContain("media-src 'self' blob:");
     expect(https.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(https.headers.get("Referrer-Policy")).toBe("no-referrer");
     expect(https.headers.get("X-Frame-Options")).toBe("DENY");

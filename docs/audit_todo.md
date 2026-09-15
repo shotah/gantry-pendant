@@ -286,7 +286,8 @@ off for a crane.
 
 - [x] **Response headers.** Worker wraps Vinext: CSP (`frame-ancestors
       'none'`, `connect-src 'self' ws: wss:`, `img-src 'self' data:
-      blob: https:`), HSTS on https, `nosniff`, `Referrer-Policy:
+      blob: https:`, `media-src 'self' blob:` for the TTS clip), HSTS
+      on https, `nosniff`, `Referrer-Policy:
       no-referrer`, `Permissions-Policy: geolocation=(self),
       camera=(self), microphone=(self), notifications=(self)`, API
       `Cache-Control: no-store`.
