@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { finalTranscript, listen, recognitionCtor, type Recognizer, type RecognizerResult } from "@/lib/phone/speech";
+import {
+  finalTranscript,
+  listen,
+  LISTEN_END_MS,
+  recognitionCtor,
+  spokenFrom,
+  type Recognizer,
+  type RecognizerResult,
+} from "@/lib/phone/speech";
 
 function result(transcript: string, isFinal = true): RecognizerResult {
   return { isFinal, length: 1, 0: { transcript } };
@@ -51,24 +59,77 @@ describe("finalTranscript", () => {
   });
 });
 
+describe("spokenFrom", () => {
+  it("keeps finals and the trailing interim so a hung stop still has words", () => {
+    expect(spokenFrom([
+      result("how is", true),
+      result("it going", false),
+    ])).toBe("how is it going");
+    expect(spokenFrom([result("guess", false)])).toBe("guess");
+    expect(spokenFrom([result("done", true), result("x", false), result("really", true)])).toBe("done really");
+    expect(spokenFrom([])).toBe("");
+  });
+});
+
 describe("listen", () => {
-  it("configures a one-shot recognizer and hands back the words once on end", () => {
+  it("configures a hold-to-talk recognizer and hands back the words once on end", () => {
     FakeRecognizer.instances = [];
     const onDone = vi.fn();
     const handle = listen(FakeRecognizer, { lang: "en-US", onDone });
     const rec = FakeRecognizer.instances[0]!;
     expect(rec.start).toHaveBeenCalledOnce();
     expect(rec.lang).toBe("en-US");
-    expect(rec.continuous).toBe(false);
-    expect(rec.interimResults).toBe(false);
+    expect(rec.continuous).toBe(true);
+    expect(rec.interimResults).toBe(true);
     expect(rec.maxAlternatives).toBe(1);
-    rec.hear(result("where is"));
-    rec.hear(result("the nearest gas"));
+    rec.hear(result("where is"), result("the nearest gas"));
     handle.stop();
     expect(rec.stop).toHaveBeenCalledOnce();
     expect(onDone).toHaveBeenCalledExactlyOnceWith("where is the nearest gas");
     rec.onend?.();
     expect(onDone).toHaveBeenCalledOnce();
+  });
+
+  it("still finishes with the words if Chrome never fires onend after stop", () => {
+    vi.useFakeTimers();
+    FakeRecognizer.instances = [];
+    class Quiet extends FakeRecognizer {
+      stop = vi.fn();
+    }
+    const onDone = vi.fn();
+    const handle = listen(Quiet, { onDone });
+    const rec = FakeRecognizer.instances[0]!;
+    rec.hear(result("how are you"));
+    handle.stop();
+    expect(onDone).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(LISTEN_END_MS - 1);
+    expect(onDone).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(onDone).toHaveBeenCalledExactlyOnceWith("how are you");
+    vi.useRealTimers();
+  });
+
+  it("finishes immediately when stop throws because start has not finished", () => {
+    FakeRecognizer.instances = [];
+    class ThrowsStop extends FakeRecognizer {
+      stop = vi.fn(() => {
+        throw new Error("InvalidStateError");
+      });
+    }
+    const onDone = vi.fn();
+    const handle = listen(ThrowsStop, { onDone });
+    FakeRecognizer.instances[0]!.hear(result("hi"));
+    handle.stop();
+    expect(onDone).toHaveBeenCalledExactlyOnceWith("hi");
+  });
+
+  it("sends the interim guess when a final never landed", () => {
+    FakeRecognizer.instances = [];
+    const onDone = vi.fn();
+    const handle = listen(FakeRecognizer, { onDone });
+    FakeRecognizer.instances[0]!.hear(result("how is it doing", false));
+    handle.stop();
+    expect(onDone).toHaveBeenCalledExactlyOnceWith("how is it doing");
   });
 
   it("leaves the browser default lang when none is passed", () => {

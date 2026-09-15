@@ -3,7 +3,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserRecognizer, HoldToTalk } from "@/app/components/chat/HoldToTalk";
-import type { Recognizer, RecognizerResult } from "@/lib/phone/speech";
+import { LISTEN_END_MS, type Recognizer, type RecognizerResult } from "@/lib/phone/speech";
 
 class FakeRecognizer implements Recognizer {
   static last: FakeRecognizer | null = null;
@@ -43,6 +43,7 @@ class FakeRecognizer implements Recognizer {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   FakeRecognizer.last = null;
 });
@@ -60,7 +61,7 @@ describe("HoldToTalk", () => {
     const btn = hold();
     const rec = FakeRecognizer.last!;
     expect(rec.start).toHaveBeenCalledOnce();
-    expect(rec.continuous).toBe(false);
+    expect(rec.continuous).toBe(true);
     expect(btn.getAttribute("aria-pressed")).toBe("true");
     expect(btn.textContent).toBe("Release to send");
     rec.hear("what time is the game");
@@ -73,6 +74,23 @@ describe("HoldToTalk", () => {
     expect(onText).toHaveBeenCalledExactlyOnceWith("what time is the game");
     expect(btn.textContent).toBe("Hold to talk");
     expect((btn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("unhangs the ellipsis if the recognizer never ends after release", () => {
+    vi.useFakeTimers();
+    const onText = vi.fn();
+    render(<HoldToTalk onText={onText} recognizer={FakeRecognizer} />);
+    const btn = hold();
+    FakeRecognizer.last!.hear("how is it doing");
+    fireEvent.pointerUp(btn, { pointerId: 1, clientX: 0, clientY: 0 });
+    expect(btn.textContent).toBe("…");
+    expect(onText).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(LISTEN_END_MS);
+    });
+    expect(onText).toHaveBeenCalledExactlyOnceWith("how is it doing");
+    expect(btn.textContent).toBe("Hold to talk");
+    vi.useRealTimers();
   });
 
   it("does not send when nothing was heard", () => {

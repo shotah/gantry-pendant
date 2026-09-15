@@ -51,6 +51,31 @@ export function finalTranscript(results: ArrayLike<RecognizerResult>): string {
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Best words in this result list: all finals, plus the trailing interim so a
+ * release that never gets `isFinal` (Chrome Android) still has something to send.
+ */
+export function spokenFrom(results: ArrayLike<RecognizerResult>): string {
+  const finals: string[] = [];
+  let interim = "";
+  for (let i = 0; i < results.length; i += 1) {
+    const r = results[i];
+    const t = r?.[0]?.transcript?.trim() ?? "";
+    if (!t) {
+      continue;
+    }
+    if (r.isFinal) {
+      finals.push(t);
+      interim = "";
+    } else {
+      interim = t;
+    }
+  }
+  return [...finals, interim].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+}
+
+export const LISTEN_END_MS = 2_000;
+
 export type ListenHandle = {
   /** Release: let the recognizer finish the utterance, then `onDone` fires with the words. */
   stop(): void;
@@ -66,39 +91,74 @@ export type ListenOpts = {
   onError?: (code: string) => void;
 };
 
-/** One-shot listen. `continuous` and interim results are the flaky half of the API; skip them. */
+/**
+ * Hold-to-talk listen. `continuous` so release is the commit (Chrome Android
+ * otherwise waits for end-of-utterance and often never fires `onend` after
+ * `stop()`). Interim results are kept as a fallback when a final never lands.
+ * `stop()` always reaches `onDone` — via `onend`, or a 2s watchdog, or if
+ * `stop()` throws because `start()` has not finished.
+ */
 export function listen(Ctor: RecognizerCtor, opts: ListenOpts): ListenHandle {
   const rec = new Ctor();
   if (opts.lang) {
     rec.lang = opts.lang;
   }
-  rec.continuous = false;
-  rec.interimResults = false;
+  rec.continuous = true;
+  rec.interimResults = true;
   rec.maxAlternatives = 1;
   let heard = "";
   let ended = false;
-  rec.onresult = (ev) => {
-    const t = finalTranscript(ev.results);
-    if (t) {
-      heard = heard ? `${heard} ${t}` : t;
-    }
-  };
-  rec.onerror = (ev) => {
-    opts.onError?.(ev.error);
-  };
-  rec.onend = () => {
+  let wait: ReturnType<typeof setTimeout> | undefined;
+  function finish(): void {
     if (ended) {
       return;
     }
     ended = true;
+    if (wait !== undefined) {
+      clearTimeout(wait);
+      wait = undefined;
+    }
+    rec.onresult = null;
+    rec.onerror = null;
+    rec.onend = null;
     opts.onDone(heard);
+  }
+  function waitForEnd(): void {
+    if (ended || wait !== undefined) {
+      return;
+    }
+    wait = setTimeout(finish, LISTEN_END_MS);
+  }
+  rec.onresult = (ev) => {
+    heard = spokenFrom(ev.results);
   };
+  rec.onerror = (ev) => {
+    opts.onError?.(ev.error);
+  };
+  rec.onend = () => finish();
   rec.start();
   return {
-    stop: () => rec.stop(),
+    stop: () => {
+      if (ended) {
+        return;
+      }
+      try {
+        rec.stop();
+      } catch {
+        finish();
+        return;
+      }
+      waitForEnd();
+    },
     abort: () => {
       heard = "";
-      rec.abort();
+      try {
+        rec.abort();
+      } catch {
+        finish();
+        return;
+      }
+      finish();
     },
   };
 }

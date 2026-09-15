@@ -47,8 +47,12 @@ export function HoldToTalk({
   const handle = useRef<ListenHandle | null>(null);
   const outside = useRef(false);
   const blocked = useRef(false);
+  const live = useRef(true);
 
-  useEffect(() => () => handle.current?.abort(), []);
+  useEffect(() => () => {
+    live.current = false;
+    handle.current?.abort();
+  }, []);
 
   function begin() {
     if (disabled || handle.current) {
@@ -62,6 +66,9 @@ export function HoldToTalk({
         lang,
         onDone: (text) => {
           handle.current = null;
+          if (!live.current) {
+            return;
+          }
           setState(blocked.current ? "blocked" : "idle");
           if (text) {
             onText(text);

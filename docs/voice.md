@@ -113,15 +113,21 @@ use, are **not** Cloud Speech-to-Text on our GCP bill.
 | --- | --- | --- |
 | Chrome `SpeechRecognition`, Android `SpeechRecognizer`, Auto host STT / TTS | The device / Google Speech Services. No key in the Worker. Same project as the OAuth client is **not** charged | **$0 to us** |
 | Cloud Speech-to-Text V2 (we POST a clip) | Our GCP | **$0.016 / min** (first 500k min/mo). V1 still has 60 min/mo free |
-| Cloud TTS WaveNet / Standard | Our GCP | 4M chars/mo free, then **$4 / 1M chars**. Neural2 $16, Chirp 3 HD $30 / 1M |
+| Cloud TTS **Standard / WaveNet** | Our GCP, same API, cheaper voice name | 4M chars/mo free, then **$4 / 1M chars**. Sounds like the computer we refused. |
+| Cloud TTS **Neural2** | Our GCP, same API | 1M chars/mo free, then **$16 / 1M**. Fine, not Chirp. |
+| Cloud TTS **Chirp 3 HD** (what we call) | Our GCP. Voice name `en-US-Chirp3-HD-*` on `texttospeech.googleapis.com/v1/text:synthesize` | 1M chars/mo free, then **$30 / 1M** (**$0.00003 / char**) |
+| **Gemini-TTS** (Flash) | Different product. Token bill, no free tier. Worker does **not** call this | **$10 / 1M audio tokens** out + $0.50 / 1M text tokens in. ≈ $0.015 / min of audio. Promptable LLM speech, not a named Kit voice |
 | Gemini audio **input** on a Completer turn (Flash-class) | Completer bill | ~**$1 / 1M audio tokens** ≈ **$0.0015 / min** (25 tok/s). Live Flash audio-in is published at **$0.005 / min**, audio-out **$0.018 / min** |
 | Gemini Live two-way | Completer bill | ~**$0.023 / min** audio traffic before tools / Search / context replay |
 
 Cloud STT is a **new** bill and we do not pay it: the browser already
 transcribed. Cloud TTS is the one line we chose to pay, for the
-pocket only. Reading a 300-character reply is ~$0.01 on Chirp 3 HD;
-twenty a day is ~$35 a year. Auto and CarPlay keep the host engine
-at $0.
+pocket only. The **API** is classic Cloud Text-to-Speech; the
+**voice name** is what picks the SKU. Leda is Chirp 3 HD, not
+Standard ($4) and not Gemini-TTS ($10 / 1M audio tokens). Reading a
+300-character reply is ~$0.01 on Chirp after the free 1M chars/mo;
+twenty a day (180k chars/mo) stays inside that free bucket. Auto
+and CarPlay keep the host engine at $0.
 
 ### Paid transcribe vs native audio vs Live
 
@@ -224,7 +230,7 @@ The PWA pays the Web Speech tax.
 | Surface | Voice in | Voice out | Effort | Notes |
 | --- | --- | --- | --- | --- |
 | **Cab Auto** | Host STT → inbound + `input: spoken`, auto-send | Auto reads the card | **Done** | Keep. Do not wrap the PWA. |
-| **PWA Chrome Android** | Hold-to-talk, `SpeechRecognition` one-shot → inbound `input: spoken`, auto-send | Worker `/api/tts` → Chirp 3 HD, reply to your own hold only | **Done** | First pocket target. Interim / `continuous` skipped — hold, not always-on. Button hidden when the API is missing. |
+| **PWA Chrome Android** | Hold-to-talk, `SpeechRecognition` until release → inbound `input: spoken`, auto-send | Worker `/api/tts` → Chirp 3 HD, reply to your own hold only | **Done** | First pocket target. `stop()` + 2s `onend` watchdog. Hidden without the API or when the Worker has not published voice. |
 | **Cab handheld** | `SpeechRecognizer` hold → same frame | Same `/api/tts` with the Bearer session, or Android `TextToSpeech` if we accept the robot | Medium | Parity. Do not run the recognizer on the Auto template. |
 | **PWA iOS A2HS** | Web Speech often dies in the standalone WebView | `<audio>.play()` needs a gesture; background kills it | High | Do not prove voice here. Helm is the iPhone mouth. |
 | **Helm CarPlay** | Host STT → inbound, auto-send | CarPlay reads the communication notification | **In Helm** | Same mailbox. `surface: carplay`. No second recognizer. |
@@ -253,22 +259,24 @@ button. The choice is remembered (`pendant.voice`, off unless it
 says `on`), so a voice person opens into voice and a typist never
 sees the bar.
 
-Press → one-shot `SpeechRecognition` starts → release → `stop()` →
-the final transcript goes straight out as `inbound` with
-`context.input: "spoken"`. Nothing lands in a textarea. Slide off
-the bar before release to abort ("that was the radio"). Pressing
-while Kit is talking hushes the speaker first so the mic does not
-hear Kit. Space bar works the same way on a desktop Chrome.
+Press → recognizer starts → release → `stop()` → words go out as
+`inbound` with `context.input: "spoken"`. Nothing lands in a
+textarea. Slide off the bar before release to abort ("that was the
+radio"). Pressing while Kit is talking hushes the speaker first so
+the mic does not hear Kit. Space bar works the same way on a
+desktop Chrome. If Chrome Android never fires `onend` after
+`stop()`, a 2s watchdog still commits (the `…` must not hang).
 
 Tap the mic again to type. Slash commands are typed. Web Speech has
 no idea what `/new` is. A photo staged before the flip keeps its chip
 above the bar and rides along with the words ("what is this?").
 
 PWA: `window.SpeechRecognition` / `webkitSpeechRecognition`, Chrome
-Android is the walk. `continuous: false`, no interim results — that
-is the half of the API that behaves. Detection runs after mount so
-the server paint and the hydrated paint agree. If the constructor is
-missing (Firefox, iOS A2HS) **or** the Worker has not published voice
+Android is the walk. Hold-to-talk uses `continuous` + interim so
+release is the commit; a 2s watchdog covers `stop()` with no
+`onend`. Detection runs after mount so the server paint and the
+hydrated paint agree. If the constructor is missing (Firefox, iOS
+A2HS) **or** the Worker has not published voice
 (`/api/auth/config` `voice: false` — no TTS key, or `VOICE=off`),
 neither the header mic nor the bar is rendered, and a remembered `on`
 still types — not a banner, not a Worker fallback in this version.
@@ -498,11 +506,17 @@ they grow a hold button.
 ### 1. GCP (same project as the OAuth client)
 
 1. Enable **Cloud Text-to-Speech API**
-   (APIs & Services → Library).
+   (APIs & Services → Library). That is
+   `texttospeech.googleapis.com`. Not Vertex AI, not Gemini-TTS,
+   not Cloud Speech-to-Text.
 2. APIs & Services → Credentials → **Create credentials → API key**.
 3. Restrict that key to **Cloud Text-to-Speech API** only.
 
 Do not reuse the OAuth client secret. This is a Cloud TTS API key.
+The $10 / 1M line in the pricing page is **Gemini-TTS audio tokens**
+— a different product. The $4 / 1M line is Standard/WaveNet on *this*
+API (robotic). Chirp 3 HD is the same API, billed by **voice name**,
+**$30 / 1M chars** after 1M free/mo. We want that one.
 
 ### 2. Loopback (`npm run dev`)
 
@@ -590,9 +604,10 @@ strips asterisks here.
 - [x] Voice on swaps the whole compose row for one wide hold-to-talk
       bar; off is the untouched typed row
       (`app/components/chat/HoldToTalk.tsx`, `Compose`)
-- [x] One-shot listen, release commits, slide-off aborts, space bar
-      works, disabled with the rest of compose while the socket is
-      down (`lib/phone/speech.ts`)
+- [x] Hold-to-talk listen, release commits, slide-off aborts, space
+      bar works, `onend` watchdog so `…` cannot hang, disabled with
+      the rest of compose while the socket is down
+      (`lib/phone/speech.ts`)
 - [x] Release auto-sends the words as `inbound` + `input: spoken`;
       nothing in the textarea (`PhoneShell.sendText`)
 - [x] `speakable()` + `clipForSpeech()`: markdown → words, code →
