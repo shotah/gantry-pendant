@@ -16,7 +16,8 @@ export const CONTENT_SECURITY_POLICY = [
   "frame-ancestors 'none'",
 ].join("; ");
 
-export const PERMISSIONS_POLICY = "geolocation=(self), camera=(self), microphone=()";
+/** Empty `feature=()` is a hard deny — Chrome/Firefox then report denied and never prompt. */
+export const PERMISSIONS_POLICY = "geolocation=(self), camera=(self), microphone=(self), notifications=(self)";
 
 export const HSTS = "max-age=31536000; includeSubDomains";
 

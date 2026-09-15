@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readDevicePermission, blockedHint } from "@/lib/phone/permit";
+import { readDevicePermission, blockedHint, micAskState } from "@/lib/phone/permit";
 
 describe("device permission", () => {
   it("keeps the three PermissionStatus names and treats junk as unsupported", () => {
@@ -15,5 +15,14 @@ describe("device permission", () => {
     expect(blockedHint("unsupported")).toBe("Not available in this browser.");
     expect(blockedHint("prompt")).toBe("");
     expect(blockedHint("granted")).toBe("");
+  });
+
+  it("does not treat a microphone query of denied as a stop until getUserMedia runs", () => {
+    expect(micAskState("denied", null)).toBe("prompt");
+    expect(micAskState("prompt", null)).toBe("prompt");
+    expect(micAskState("denied", "granted")).toBe("granted");
+    expect(micAskState("prompt", "denied")).toBe("denied");
+    expect(micAskState("granted", null)).toBe("granted");
+    expect(micAskState("prompt", "unsupported")).toBe("unsupported");
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   NOTIFY_ICON,
   NOTIFY_TEST,
+  notifyAskState,
   notifyBody,
   notifyHint,
   notifyNeedHomeScreen,
@@ -41,6 +42,14 @@ describe("notify", () => {
       "Blocked — enable in system settings.",
     );
     expect(notifyHint({ permission: "granted", needHomeScreen: false })).toBe("");
+  });
+
+  it("does not treat a notifications denied as a stop until requestPermission runs", () => {
+    expect(notifyAskState("denied", false)).toBe("default");
+    expect(notifyAskState("default", false)).toBe("default");
+    expect(notifyAskState("denied", true)).toBe("denied");
+    expect(notifyAskState("granted", false)).toBe("granted");
+    expect(notifyAskState("unsupported", false)).toBe("unsupported");
   });
 
   it("truncates the toast body", () => {

@@ -60,11 +60,6 @@ export function HoldToTalk({
     if (mic === "granted") {
       blocked.current = false;
       setState((s) => (s === "blocked" ? "idle" : s));
-      return;
-    }
-    if (mic === "denied") {
-      blocked.current = true;
-      setState((s) => (handle.current ? s : "blocked"));
     }
   }, [mic]);
 

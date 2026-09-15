@@ -18,3 +18,22 @@ export function blockedHint(permission: DevicePermission): string {
   }
   return "";
 }
+
+/**
+ * Chrome `permissions.query("microphone")` often says denied before this
+ * origin has been asked (absent from the allow list is still promptable).
+ * Only getUserMedia / Web Speech `not-allowed` is a real no. Query granted
+ * is real.
+ */
+export function micAskState(queried: DevicePermission, asked: DevicePermission | null): DevicePermission {
+  if (asked === "granted" || queried === "granted") {
+    return "granted";
+  }
+  if (asked === "unsupported") {
+    return "unsupported";
+  }
+  if (asked === "denied") {
+    return "denied";
+  }
+  return "prompt";
+}

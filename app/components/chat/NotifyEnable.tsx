@@ -6,6 +6,7 @@ import { isIos, isStandalone } from "@/app/lib/install";
 import { browserAskNotify, browserShowNotify, notifyPermission } from "@/app/lib/notify";
 import {
   NOTIFY_TEST,
+  notifyAskState,
   notifyHint,
   notifyNeedHomeScreen,
   type NotifyPermission,
@@ -16,7 +17,8 @@ export function NotifyEnable({
 }: {
   onGranted?: () => void | boolean | Promise<void | boolean>;
 }) {
-  const [permission, setPermission] = useState<NotifyPermission>("unsupported");
+  const [permission, setPermission] = useState<NotifyPermission>("default");
+  const [asked, setAsked] = useState(false);
   const [needHome, setNeedHome] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -51,12 +53,14 @@ export function NotifyEnable({
     };
   }, []);
 
-  const granted = permission === "granted";
-  const blocked = needHome || permission === "unsupported";
-  const hint = status || notifyHint({ permission, needHomeScreen: needHome });
+  const view = notifyAskState(permission, asked);
+  const granted = view === "granted";
+  const blocked = needHome || view === "unsupported";
+  const hint = status || notifyHint({ permission: view, needHomeScreen: needHome });
 
   async function enable() {
     setStatus("");
+    setAsked(true);
     const next = await browserAskNotify();
     setPermission(next);
     if (next !== "granted") {

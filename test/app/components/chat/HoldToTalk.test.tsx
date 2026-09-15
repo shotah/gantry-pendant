@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserRecognizer, HoldToTalk } from "@/app/components/chat/HoldToTalk";
 import { LISTEN_END_MS, type Recognizer, type RecognizerResult } from "@/lib/phone/speech";
@@ -140,7 +140,7 @@ describe("HoldToTalk", () => {
     expect(btn.textContent).toBe("Release to send");
   });
 
-  it("paints Mic blocked when the OS already denied, and clears it when granted", async () => {
+  it("does not treat a query denied as blocked, and clears a real refusal when granted", async () => {
     const status = { state: "denied" as PermissionState, onchange: null as (() => void) | null };
     Object.defineProperty(navigator, "permissions", {
       configurable: true,
@@ -148,8 +148,15 @@ describe("HoldToTalk", () => {
     });
     render(<HoldToTalk onText={vi.fn()} recognizer={FakeRecognizer} />);
     const btn = screen.getByRole("button", { name: "Hold to talk" });
-    await waitFor(() => expect(btn.textContent).toBe("Mic blocked"));
-    expect(btn.getAttribute("title")).toMatch(/Settings/);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(btn.textContent).toBe("Hold to talk");
+    fireEvent.pointerDown(btn, { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+    FakeRecognizer.last!.refuse();
+    fireEvent.pointerUp(btn, { pointerId: 1, clientX: 0, clientY: 0 });
+    FakeRecognizer.last!.end();
+    expect(btn.textContent).toBe("Mic blocked");
     await act(async () => {
       status.state = "granted";
       status.onchange?.();

@@ -287,8 +287,12 @@ stops the tracks so hold-to-talk is not the first prompt;
 **Enable location** is the OS geo prompt, then the same send-on-turns
 pref as the attach GPS chip (On/Off); notifications stay on that
 row, compact, label left and a small **Enable** / **Test** chip
-right. A denied permission is **Blocked** — Chrome/iOS site
-settings, not this cog.
+right. Enable still *asks* (getUserMedia / `requestPermission`) even
+when the Permissions API already says denied — Chrome and Firefox
+lie about that before the origin has been prompted. The blocked
+hint is only after a real refusal. `Permissions-Policy` must list
+`microphone=(self)` and `notifications=(self)`; an empty `=()` is a
+hard deny that never prompts.
 
 Cab handheld: `android.speech.SpeechRecognizer` (or the recognizer
 intent), `RECORD_AUDIO` in the manifest, the same hold button, the
@@ -610,8 +614,8 @@ strips asterisks here.
       remembered in `pendant.voice`; hidden without `SpeechRecognition`
       (`app/components/chat/VoiceToggle.tsx`, `lib/phone/prefs.ts`)
 - [x] Settings → Access: enable microphone (when voice is published),
-      enable location, compact notification Test; denied is Blocked
-      (`MicEnable`, `GeoEnable`, `NotifyEnable`)
+      enable location, compact notification Enable/Test; query denied
+      still asks (`MicEnable`, `GeoEnable`, `NotifyEnable`)
 - [x] Voice on swaps the whole compose row for one wide hold-to-talk
       bar; off is the untouched typed row
       (`app/components/chat/HoldToTalk.tsx`, `Compose`)

@@ -19,6 +19,8 @@ describe("security headers", () => {
     expect(https.headers.get("Referrer-Policy")).toBe("no-referrer");
     expect(https.headers.get("X-Frame-Options")).toBe("DENY");
     expect(https.headers.get("Permissions-Policy")).toBe(PERMISSIONS_POLICY);
+    expect(PERMISSIONS_POLICY).toContain("microphone=(self)");
+    expect(PERMISSIONS_POLICY).toContain("notifications=(self)");
     expect(https.headers.get("Strict-Transport-Security")).toBe(HSTS);
     expect(https.headers.get("Cache-Control")).toBeNull();
 

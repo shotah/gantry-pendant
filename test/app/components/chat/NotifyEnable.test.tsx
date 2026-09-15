@@ -60,14 +60,30 @@ describe("NotifyEnable", () => {
     expect(screen.getByText("Granted, but lock-screen push did not register.")).toBeTruthy();
   });
 
-  it("explains a blocked permission", async () => {
-    stubNotification("denied");
+  it("still asks when the OS says denied, then keeps the hint if the prompt fails", async () => {
+    const { request } = stubNotification("denied", vi.fn(async () => "denied" as const));
     render(<NotifyEnable />);
-    expect(screen.getByText("Blocked — enable in system settings.")).toBeTruthy();
+    expect(screen.queryByText("Blocked — enable in system settings.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Enable notifications" })).toBeTruthy();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Enable notifications" }));
     });
+    expect(request).toHaveBeenCalledOnce();
     expect(screen.getByText("Blocked — enable in system settings.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Enable notifications" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("prompts when the OS said denied but requestPermission grants", async () => {
+    const { FakeNotification, request } = stubNotification("denied", vi.fn(async () => {
+      FakeNotification.permission = "granted";
+      return "granted" as const;
+    }));
+    render(<NotifyEnable />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Enable notifications" }));
+    });
+    expect(request).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Test" })).toBeTruthy();
   });
 
   it("tells iPhone to install before enabling", () => {

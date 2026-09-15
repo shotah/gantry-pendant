@@ -288,7 +288,8 @@ off for a crane.
       'none'`, `connect-src 'self' ws: wss:`, `img-src 'self' data:
       blob: https:`), HSTS on https, `nosniff`, `Referrer-Policy:
       no-referrer`, `Permissions-Policy: geolocation=(self),
-      camera=(self), microphone=()`, API `Cache-Control: no-store`.
+      camera=(self), microphone=(self), notifications=(self)`, API
+      `Cache-Control: no-store`.
       101 upgrades are not wrapped. Leftover: script/style hashes for
       the two boot scripts — Vinext still needs `'unsafe-inline'`.
       `test/http/security.test.ts`.

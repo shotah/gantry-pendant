@@ -47,15 +47,24 @@ describe("MicEnable", () => {
     expect(screen.queryByRole("button", { name: "Enable microphone" })).toBeNull();
   });
 
-  it("shows Blocked and the system-settings hint when the OS already denied", async () => {
-    stubMic({ state: "denied" });
+  it("asks getUserMedia even when the query already says denied", async () => {
+    const stop = vi.fn();
+    const { gum } = stubMic({
+      state: "denied",
+      gum: vi.fn(async () => ({ getTracks: () => [{ stop }] })),
+    });
     render(<MicEnable />);
-    expect(await screen.findByText("Blocked")).toBeTruthy();
-    expect(screen.getByText("Blocked — enable in system settings.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Enable microphone" })).toBeNull();
+    expect(await screen.findByRole("button", { name: "Enable microphone" })).toBeTruthy();
+    expect(screen.queryByText("Blocked — enable in system settings.")).toBeNull();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Enable microphone" }));
+    });
+    expect(gum).toHaveBeenCalledExactlyOnceWith({ audio: true });
+    expect(stop).toHaveBeenCalledOnce();
+    expect(screen.getByText("On")).toBeTruthy();
   });
 
-  it("shows Blocked after getUserMedia is refused", async () => {
+  it("keeps Enable clickable after getUserMedia is refused", async () => {
     stubMic({
       gum: vi.fn(async () => {
         const err = new Error("no");
@@ -67,7 +76,8 @@ describe("MicEnable", () => {
     await act(async () => {
       fireEvent.click(await screen.findByRole("button", { name: "Enable microphone" }));
     });
-    expect(screen.getByText("Blocked")).toBeTruthy();
     expect(screen.getByText("Blocked — enable in system settings.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enable microphone" })).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Enable microphone" }) as HTMLButtonElement).disabled).toBe(false);
   });
 });
