@@ -7,6 +7,7 @@ import { RELEASE } from "@/app/lib/release";
 import { DEV_USER, MOCK_REPLIES, SAMPLE_LINES } from "@/lib/dev/samples";
 import { TYPING_TTL_MS } from "@/lib/mailbox/typing";
 import { clearGeoCache } from "@/lib/phone/geo";
+import type { SpeakEvent } from "@/lib/phone/speaker";
 import { browserSpeak } from "@/app/lib/tts";
 
 vi.mock("@/app/lib/tts", () => ({
@@ -709,12 +710,59 @@ describe("PhoneShell", () => {
     act(() => {
       ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "**Clear** and 62.", seq: 3, at: 30 }));
     });
-    expect(browserSpeak).toHaveBeenCalledExactlyOnceWith("**Clear** and 62.");
+    expect(browserSpeak).toHaveBeenCalledExactlyOnceWith("**Clear** and 62.", { onPhase: expect.any(Function) });
 
     act(() => {
       ws.deliver(JSON.stringify({ id: "r2", kind: "reply", text: "Anything else?", seq: 4, at: 40 }));
     });
     expect(browserSpeak).toHaveBeenCalledOnce();
+  });
+
+  it("shows Kit's voice in the header and on the bar, and says why a reply stayed silent", async () => {
+    vi.stubGlobal("webkitSpeechRecognition", FakeRecognizer);
+    vi.mocked(browserSpeak).mockClear();
+    let tell: ((ev: SpeakEvent) => void) | undefined;
+    const arm = () => vi.mocked(browserSpeak).mockImplementationOnce(async (_text, deps) => {
+      tell = deps?.onPhase;
+      tell?.({ phase: "fetching" });
+      return true;
+    });
+    const ws = await connectSpike({ voice: true });
+    act(() => {
+      ws.open();
+    });
+    voiceOn();
+    const banner = screen.getByRole("banner");
+    const bar = () => screen.getByRole("button", { name: "Hold to talk" });
+
+    arm();
+    holdAndSay("hello");
+    await waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1));
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "hi there", seq: 1, at: 10 }));
+    });
+    expect(banner.textContent).toContain("· voice…");
+    expect(bar().textContent).toBe("Fetching voice…");
+    act(() => tell?.({ phase: "playing" }));
+    expect(banner.textContent).toContain("· speaking");
+    expect(bar().textContent).toBe("Speaking · hold to cut in");
+    expect(screen.getByRole("button", { name: "Voice on" }).className).toContain("animate-pulse");
+    act(() => tell?.({ phase: "done" }));
+    expect(banner.textContent).not.toContain("speaking");
+    expect(bar().textContent).toBe("Hold to talk");
+    expect(screen.getByRole("button", { name: "Voice on" }).className).not.toContain("animate-pulse");
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    arm();
+    holdAndSay("again");
+    await waitFor(() => expect(ws.send).toHaveBeenCalledTimes(2));
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r2", kind: "reply", text: "still here", seq: 2, at: 20 }));
+    });
+    act(() => tell?.({ phase: "failed", reason: "vendor" }));
+    expect(banner.textContent).not.toContain("voice…");
+    expect(bar().textContent).toBe("Hold to talk");
+    expect(screen.getByRole("alert").textContent).toMatch(/Kit's voice failed at Google/);
   });
 
   it("a typed turn does not arm the speaker, and a refusal disarms it", async () => {

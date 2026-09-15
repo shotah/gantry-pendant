@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { browserSpeak, hushSpeaker, TTS_PATH } from "@/app/lib/tts";
+import type { SpeakEvent } from "@/lib/phone/speaker";
 
 type Listener = () => void;
 
@@ -112,10 +113,71 @@ describe("browserSpeak", () => {
     a.fire("ended");
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:kit/2");
   });
+
+  it("reports fetching, then playing, then done when the clip ends", async () => {
+    const phases: SpeakEvent[] = [];
+    const a = new FakeAudio();
+    const ok = await browserSpeak("hi", {
+      fetch: (async () => mp3()) as unknown as typeof fetch,
+      audio: a as unknown as HTMLAudioElement,
+      onPhase: (ev) => phases.push(ev),
+    });
+    expect(ok).toBe(true);
+    expect(phases).toEqual([{ phase: "fetching" }, { phase: "playing" }]);
+    a.fire("ended");
+    a.fire("error");
+    expect(phases.slice(2)).toEqual([{ phase: "done" }]);
+  });
+
+  it("says why it stayed quiet", async () => {
+    async function last(fetchFn: () => Promise<Response>): Promise<SpeakEvent | undefined> {
+      const phases: SpeakEvent[] = [];
+      await browserSpeak("hi", { fetch: fetchFn as unknown as typeof fetch, audio: audio(), onPhase: (ev) => phases.push(ev) });
+      return phases.at(-1);
+    }
+    expect(await last(async () => new Response(null, { status: 404 }))).toEqual({ phase: "failed", reason: "no-voice" });
+    expect(await last(async () => new Response(null, { status: 401 }))).toEqual({ phase: "failed", reason: "unauthorized" });
+    expect(await last(async () => new Response(null, { status: 429 }))).toEqual({ phase: "failed", reason: "busy" });
+    expect(await last(async () => new Response(null, { status: 502 }))).toEqual({ phase: "failed", reason: "vendor" });
+    expect(await last(async () => {
+      throw new TypeError("offline");
+    })).toEqual({ phase: "failed", reason: "offline" });
+
+    const empty: SpeakEvent[] = [];
+    await browserSpeak("---", { fetch: vi.fn() as unknown as typeof fetch, audio: audio(), onPhase: (ev) => empty.push(ev) });
+    expect(empty).toEqual([{ phase: "failed", reason: "empty" }]);
+
+    const refused = new FakeAudio();
+    refused.play = vi.fn(async () => {
+      throw new DOMException("gesture", "NotAllowedError");
+    });
+    const played: SpeakEvent[] = [];
+    await browserSpeak("hi", {
+      fetch: (async () => mp3()) as unknown as typeof fetch,
+      audio: refused as unknown as HTMLAudioElement,
+      onPhase: (ev) => played.push(ev),
+    });
+    expect(played).toEqual([{ phase: "fetching" }, { phase: "failed", reason: "play" }]);
+  });
 });
 
 describe("hushSpeaker", () => {
   it("is a no-op before anything has played", () => {
     expect(() => hushSpeaker()).not.toThrow();
+  });
+
+  it("tells the playing reply it is done, once", async () => {
+    const phases: SpeakEvent[] = [];
+    const a = new FakeAudio();
+    await browserSpeak("hi", {
+      fetch: (async () => mp3()) as unknown as typeof fetch,
+      audio: a as unknown as HTMLAudioElement,
+      onPhase: (ev) => phases.push(ev),
+    });
+    hushSpeaker();
+    expect(phases.at(-1)).toEqual({ phase: "done" });
+    hushSpeaker();
+    a.fire("ended");
+    expect(phases.filter((p) => p.phase === "done")).toHaveLength(1);
   });
 });

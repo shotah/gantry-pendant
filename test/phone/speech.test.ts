@@ -69,6 +69,21 @@ describe("spokenFrom", () => {
     expect(spokenFrom([result("done", true), result("x", false), result("really", true)])).toBe("done really");
     expect(spokenFrom([])).toBe("");
   });
+
+  it("collapses growing finals so a hold is one sentence, not a stutter", () => {
+    expect(spokenFrom([
+      result("well", true),
+      result("well I", true),
+      result("well I can send", true),
+      result("well I can send you a message but it's not reading it aloud back to me", true),
+    ])).toBe("well I can send you a message but it's not reading it aloud back to me");
+    expect(spokenFrom([
+      result("well", true),
+      result("well I can send you a message", false),
+    ])).toBe("well I can send you a message");
+    expect(spokenFrom([result("yes", true), result("yesterday", true)])).toBe("yes yesterday");
+    expect(spokenFrom([result("turn left", true), result("at the light", true)])).toBe("turn left at the light");
+  });
 });
 
 describe("listen", () => {

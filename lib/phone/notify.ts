@@ -45,8 +45,8 @@ export function notifyNeedHomeScreen(ios: boolean, standalone: boolean): boolean
 }
 
 /**
- * Firefox often reports `Notification.permission` denied before this origin
- * has been asked. Granted is real. Only `requestPermission` is a real no.
+ * Gecko (Zen) often reports `Notification.permission` denied before this
+ * origin has been asked. Granted is real. Only `requestPermission` is a real no.
  */
 export function notifyAskState(os: NotifyPermission, asked: boolean): NotifyPermission {
   if (os === "granted") {

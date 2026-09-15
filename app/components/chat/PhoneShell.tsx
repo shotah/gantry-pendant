@@ -66,6 +66,7 @@ import { buildContext, wireContext } from "@/lib/phone/context";
 import { GEO_TIMEOUT_MS, GEO_WARM_MS, cachedGeo, geoHint } from "@/lib/phone/geo";
 import { DEFAULT_PHOTO_SIZE, PHOTO_SIZES, parsePhotoSize, photoEdge, type PhotoSizeId } from "@/lib/phone/photo";
 import { describePhotoError, describeSendError } from "@/lib/phone/sendError";
+import { speakFailHint, speakPhaseAfter, speakStatus, type SpeakPhase } from "@/lib/phone/speaker";
 import { stripHarnessContext } from "@/lib/phone/text";
 import {
   shouldDropMailboxOnHide,
@@ -146,6 +147,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [followTheme, setFollowTheme] = useState(true);
   const [faceHint, setFaceHint] = useState("");
   const [sendHint, setSendHint] = useState("");
+  const [speakPhase, setSpeakPhase] = useState<SpeakPhase>("idle");
   const [copied, setCopied] = useState(false);
   const [meWait, setMeWait] = useState(false);
   const [googleHint, setGoogleHint] = useState("");
@@ -746,7 +748,17 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           // Finished turns only: not draft / typing, not hydrate, not a cron push, not a sibling's inbound.
           if (frame.kind === "reply" && awaitingVoice.current) {
             awaitingVoice.current = false;
-            void browserSpeak(frame.text ?? "");
+            void browserSpeak(frame.text ?? "", {
+              onPhase: (ev) => {
+                setSpeakPhase(speakPhaseAfter(ev));
+                if (ev.phase === "failed") {
+                  const why = speakFailHint(ev.reason);
+                  if (why) {
+                    setSendHint(why);
+                  }
+                }
+              },
+            });
           }
         }
       }
@@ -1181,6 +1193,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           voice={phone && voiceOn && Boolean(cfg?.voice)}
           recognizer={phone ? recognizer : null}
           onVoice={phone && cfg?.voice ? (t) => void sendText(t, stagedPhoto ?? undefined, { spoken: true }) : undefined}
+          speaking={speakPhase}
           onPhoto={phone ? (f) => void stagePhoto(f) : undefined}
           photo={phone ? stagedPhoto : undefined}
           onPhotoClear={phone ? () => setStagedPhoto(null) : undefined}
@@ -1207,6 +1220,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                 {status === "up" ? "live" : status === "down" ? "down" : "idle"}
               </span>
               {status === "up" && typing ? " · typing…" : null}
+              {speakStatus(speakPhase)
+                ? <span className="animate-pulse text-ok">{` · ${speakStatus(speakPhase)}`}</span>
+                : null}
               {cfg?.dev && !painting ? " · dev" : null}
               {phone ? null : " · stand-in"}
             </p>
@@ -1214,7 +1230,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <InstallApp placement="header" />
-          {phone && cfg?.voice && recognizer ? <VoiceToggle on={voiceOn} onToggle={toggleVoice} /> : null}
+          {phone && cfg?.voice && recognizer
+            ? <VoiceToggle on={voiceOn} speaking={speakPhase === "playing"} onToggle={toggleVoice} />
+            : null}
           <SettingsMenu>
             <div className="flex flex-col gap-2">
               <InstallApp placement="block" signInFirst={needGoogle} />

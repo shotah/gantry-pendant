@@ -266,6 +266,8 @@ radio"). Pressing while Kit is talking hushes the speaker first so
 the mic does not hear Kit. Space bar works the same way on a
 desktop Chrome. If Chrome Android never fires `onend` after
 `stop()`, a 2s watchdog still commits (the `…` must not hang).
+Growing hypotheses (`well`, then `well I can…`) collapse to one
+sentence; they are not joined into a stutter.
 
 Tap the mic again to type. Slash commands are typed. Web Speech has
 no idea what `/new` is. A photo staged before the flip keeps its chip
@@ -288,8 +290,8 @@ stops the tracks so hold-to-talk is not the first prompt;
 pref as the attach GPS chip (On/Off); notifications stay on that
 row, compact, label left and a small **Enable** / **Test** chip
 right. Enable still *asks* (getUserMedia / `requestPermission`) even
-when the Permissions API already says denied — Chrome and Firefox
-lie about that before the origin has been prompted. The blocked
+when the Permissions API already says denied — Chromium and Gecko
+(Zen) lie about that before the origin has been prompted. The blocked
 hint is only after a real refusal. `Permissions-Policy` must list
 `microphone=(self)` and `notifications=(self)`; an empty `=()` is a
 hard deny that never prompts.
@@ -355,6 +357,17 @@ OpenAI: one bill, and it won the listening test.
 
 `speechSynthesis` stays out even as a fallback. A silent reply is
 better than a reply that suddenly sounds like a 2012 GPS.
+
+Silent is not invisible. While the Worker synthesizes, the header
+reads `live · voice…` and the hold bar says **Fetching voice…**;
+while the clip plays it is `· speaking`, the bar says **Speaking ·
+hold to cut in**, and the header mic pulses. A reply that stays
+quiet leaves one line under the header naming why: no key /
+`VOICE=off` (404), sign in again (401), too many (429), Google
+refused (502 — check the Cloud TTS API and the key restriction),
+Worker unreachable, or the browser would not play. Nothing to say
+(a markdown-only reply) says nothing. `lib/phone/speaker.ts`,
+`app/lib/tts.ts` `onPhase`.
 
 ### No asterisk asterisk asterisk
 
@@ -620,8 +633,9 @@ strips asterisks here.
       bar; off is the untouched typed row
       (`app/components/chat/HoldToTalk.tsx`, `Compose`)
 - [x] Hold-to-talk listen, release commits, slide-off aborts, space
-      bar works, `onend` watchdog so `…` cannot hang, disabled with
-      the rest of compose while the socket is down
+      bar works, `onend` watchdog so `…` cannot hang, growing
+      hypotheses collapse to one sentence, disabled with compose
+      while the socket is down
       (`lib/phone/speech.ts`)
 - [x] Release auto-sends the words as `inbound` + `input: spoken`;
       nothing in the textarea (`PhoneShell.sendText`)
@@ -634,6 +648,10 @@ strips asterisks here.
       aloud, then disarm; `error` disarms; `push` / `replay` /
       drafts / typed turns never speak; a new hold hushes the
       speaker (`app/lib/tts.ts`, `PhoneShell`)
+- [x] Voice is visible: header `· voice…` / `· speaking`, hold bar
+      says the same, mic pulses; a silent reply names why (404 no
+      key, 401, 429, 502 Google, offline, autoplay)
+      (`lib/phone/speaker.ts`, `browserSpeak` `onPhase`)
 - [x] Tests under `test/phone/`, `test/tts/`, `test/app/`
 - [ ] Pocket voice: GCP Cloud TTS API key → `.dev.vars` /
       `npx wrangler secret put GOOGLE_TTS_API_KEY`. Optional

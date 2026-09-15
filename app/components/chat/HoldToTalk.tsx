@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDevicePermission } from "@/app/lib/permit";
 import { hushSpeaker } from "@/app/lib/tts";
+import { speakBarLabel, type SpeakPhase } from "@/lib/phone/speaker";
 import { listen, recognitionCtor, type ListenHandle, type RecognizerCtor } from "@/lib/phone/speech";
 
 export type HoldState = "idle" | "listening" | "finishing" | "blocked";
@@ -34,6 +35,7 @@ export function HoldToTalk({
   onText,
   recognizer,
   lang,
+  speaking = "idle",
   className = "shrink-0 self-stretch px-3 text-sm",
 }: {
   disabled?: boolean;
@@ -41,6 +43,8 @@ export function HoldToTalk({
   onText: (text: string) => void;
   recognizer: RecognizerCtor;
   lang?: string;
+  /** Kit's reply in flight: the idle bar says so. A press still hushes and listens. */
+  speaking?: SpeakPhase;
   /** Layout only. Default sits in the Send slot; voice mode passes a full-width bar. */
   className?: string;
 }) {
@@ -113,6 +117,8 @@ export function HoldToTalk({
     handle.current?.abort();
   }
 
+  const kitTalking = state === "idle" ? speakBarLabel(speaking) : "";
+
   return (
     <button
       type="button"
@@ -121,7 +127,7 @@ export function HoldToTalk({
       title={state === "blocked" ? "Enable the microphone in Settings." : "Hold, speak, release to send. Slide off to cancel."}
       disabled={disabled || state === "finishing"}
       className={`flex touch-none select-none items-center justify-center rounded-xl border bg-accent-soft text-mark disabled:opacity-40 ${
-        state === "listening" ? "animate-pulse border-ok" : "border-accent-line"
+        state === "listening" ? "animate-pulse border-ok" : kitTalking ? "border-ok text-ok" : "border-accent-line"
       } ${className}`}
       onPointerDown={(e) => {
         if (e.button !== 0) {
@@ -154,7 +160,7 @@ export function HoldToTalk({
       }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {HOLD_LABEL[state]}
+      {kitTalking || HOLD_LABEL[state]}
     </button>
   );
 }

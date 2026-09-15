@@ -197,6 +197,21 @@ describe("HoldToTalk", () => {
     expect(FakeRecognizer.last!.abort).toHaveBeenCalledOnce();
   });
 
+  it("says Kit is talking while idle, and a press still listens", () => {
+    const { rerender } = render(<HoldToTalk onText={vi.fn()} recognizer={FakeRecognizer} speaking="fetching" />);
+    const btn = screen.getByRole("button", { name: "Hold to talk" });
+    expect(btn.textContent).toBe("Fetching voice…");
+    rerender(<HoldToTalk onText={vi.fn()} recognizer={FakeRecognizer} speaking="playing" />);
+    expect(btn.textContent).toBe("Speaking · hold to cut in");
+    expect(btn.className).toContain("border-ok");
+    fireEvent.pointerDown(btn, { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+    expect(btn.textContent).toBe("Release to send");
+    rerender(<HoldToTalk onText={vi.fn()} recognizer={FakeRecognizer} speaking="idle" />);
+    fireEvent.pointerUp(btn, { pointerId: 1, clientX: 0, clientY: 0 });
+    FakeRecognizer.last!.end();
+    expect(btn.textContent).toBe("Hold to talk");
+  });
+
   it("marks the recognizer blocked when start throws", () => {
     class Throws extends FakeRecognizer {
       start = vi.fn(() => {

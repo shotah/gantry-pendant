@@ -45,10 +45,52 @@ export function finalTranscript(results: ArrayLike<RecognizerResult>): string {
     const r = results[i];
     const best = r?.isFinal ? r[0]?.transcript?.trim() : "";
     if (best) {
-      parts.push(best);
+      foldSpoken(parts, best);
     }
   }
   return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Chrome/Gecko `continuous` often reports each longer hypothesis as a *new*
+ * final (`well`, then `well I`, then `well I can send`…). Joining those is a
+ * stutter. A later result that grows the previous one replaces it; a new
+ * sentence still appends.
+ */
+function growsSpoken(earlier: string, later: string): boolean {
+  const a = earlier.trim().replace(/\s+/g, " ").toLowerCase();
+  const b = later.trim().replace(/\s+/g, " ").toLowerCase();
+  if (!a || !b) {
+    return false;
+  }
+  if (a === b) {
+    return true;
+  }
+  if (!b.startsWith(a)) {
+    return false;
+  }
+  const next = b.charAt(a.length);
+  return next === " " || /[.,!?;:'")\]]/.test(next);
+}
+
+function foldSpoken(parts: string[], next: string): void {
+  const t = next.trim().replace(/\s+/g, " ");
+  if (!t) {
+    return;
+  }
+  const last = parts[parts.length - 1];
+  if (!last) {
+    parts.push(t);
+    return;
+  }
+  if (growsSpoken(last, t)) {
+    parts[parts.length - 1] = t;
+    return;
+  }
+  if (growsSpoken(t, last)) {
+    return;
+  }
+  parts.push(t);
 }
 
 /**
@@ -56,7 +98,7 @@ export function finalTranscript(results: ArrayLike<RecognizerResult>): string {
  * release that never gets `isFinal` (Chrome Android) still has something to send.
  */
 export function spokenFrom(results: ArrayLike<RecognizerResult>): string {
-  const finals: string[] = [];
+  const parts: string[] = [];
   let interim = "";
   for (let i = 0; i < results.length; i += 1) {
     const r = results[i];
@@ -65,13 +107,16 @@ export function spokenFrom(results: ArrayLike<RecognizerResult>): string {
       continue;
     }
     if (r.isFinal) {
-      finals.push(t);
+      foldSpoken(parts, t);
       interim = "";
     } else {
       interim = t;
     }
   }
-  return [...finals, interim].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+  if (interim) {
+    foldSpoken(parts, interim);
+  }
+  return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
 export const LISTEN_END_MS = 2_000;

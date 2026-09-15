@@ -6,6 +6,7 @@ import { HoldToTalk } from "./HoldToTalk";
 import { applyEmoji } from "@/app/lib/emoji";
 import { fileFromClipboard } from "@/app/lib/photo";
 import { matchSlash, slashInsert, slashToken, type SlashCommand } from "@/app/lib/slash";
+import type { SpeakPhase } from "@/lib/phone/speaker";
 import type { RecognizerCtor } from "@/lib/phone/speech";
 
 function ClipIcon() {
@@ -214,6 +215,7 @@ export function Compose({
   voice = false,
   recognizer = null,
   onVoice,
+  speaking = "idle",
 }: {
   disabled?: boolean;
   placeholder?: string;
@@ -228,6 +230,8 @@ export function Compose({
   recognizer?: RecognizerCtor | null;
   /** Hold-to-talk words. Auto-sent by the owner as a spoken turn; nothing lands in the textarea. */
   onVoice?: (text: string) => void;
+  /** Kit's reply is being fetched or played; the hold bar says so. */
+  speaking?: SpeakPhase;
   /** Stage a pick, shot, or paste on the draft. Nothing goes on the wire until Send. */
   onPhoto?: (file: File) => void;
   /** Encoded data URL sitting on the draft; Send is live with no text while it is set. */
@@ -467,6 +471,7 @@ export function Compose({
               disabled={disabled}
               onText={onVoice}
               recognizer={recognizer}
+              speaking={speaking}
               className="min-h-11 w-full px-3 py-2 text-base"
             />
           )
