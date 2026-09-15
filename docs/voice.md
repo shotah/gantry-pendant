@@ -541,7 +541,22 @@ they grow a hold button.
    `texttospeech.googleapis.com`. Not Vertex AI, not Gemini-TTS,
    not Cloud Speech-to-Text.
 2. APIs & Services → Credentials → **Create credentials → API key**.
-3. Restrict that key to **Cloud Text-to-Speech API** only.
+   Name it for what it does (`Pendant TTS`), not "Speech to Text".
+3. Edit the key → **API restrictions → Restrict key** → in the
+   picker tick **Cloud Text-to-Speech API**. It sits one row *below*
+   **Cloud Speech-to-Text API** and the names are one swap apart;
+   the wrong row is the mistake that already happened once. If you
+   want both ticked, fine — the phone never needs Speech-to-Text
+   (hold-to-talk is the browser's Web Speech, no key), but it does
+   no harm. **Application restrictions** stay **None**: the Worker
+   calls Google with no Referer, so a *Websites* restriction blocks
+   it.
+4. Save, wait a minute or two for the key to propagate.
+
+Wrong API on the key → Google 403 `API_KEY_SERVICE_BLOCKED` → the
+Worker 502 → the phone says "Kit's voice failed at Google. Check the
+Cloud Text-to-Speech API and the key restriction." That line is
+this step.
 
 Do not reuse the OAuth client secret. This is a Cloud TTS API key.
 The $10 / 1M line in the pricing page is **Gemini-TTS audio tokens**

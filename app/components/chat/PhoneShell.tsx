@@ -1178,6 +1178,12 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             />
           </div>
         </div>
+        {faceHint
+          ? <p className="shrink-0 border-t border-danger-line bg-danger-soft px-3 py-1.5 text-xs text-danger">{faceHint}</p>
+          : null}
+        {sendHint
+          ? <p role="alert" className="shrink-0 border-t border-danger-line bg-danger-soft px-3 py-1.5 text-xs text-danger">{sendHint}</p>
+          : null}
         <Compose
           key={`${sampleId ?? "live"}:${draft}:${sampleEmoji ? "emoji" : ""}`}
           disabled={status !== "up"}
@@ -1394,12 +1400,6 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           </SettingsMenu>
         </div>
       </header>
-      {faceHint
-        ? <p className="shrink-0 border-b border-line px-3 py-1 text-[11px] text-danger">{faceHint}</p>
-        : null}
-      {sendHint
-        ? <p role="alert" className="shrink-0 border-b border-line px-3 py-1 text-[11px] text-danger">{sendHint}</p>
-        : null}
       {mouth}
     </div>
   );

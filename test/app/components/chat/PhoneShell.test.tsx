@@ -762,7 +762,12 @@ describe("PhoneShell", () => {
     act(() => tell?.({ phase: "failed", reason: "vendor" }));
     expect(banner.textContent).not.toContain("voice…");
     expect(bar().textContent).toBe("Hold to talk");
-    expect(screen.getByRole("alert").textContent).toMatch(/Kit's voice failed at Google/);
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toMatch(/Kit's voice failed at Google/);
+    // Under the thread, right above the bar — not tucked under the header.
+    expect(banner.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("still here").compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(alert.compareDocumentPosition(bar()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("a typed turn does not arm the speaker, and a refusal disarms it", async () => {

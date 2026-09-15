@@ -79,7 +79,7 @@ the Durable Object.
 | `thread-day` | `/?sample=thread&theme=lamp` | Lamp theme. |
 | `thread-paper` | `/?sample=thread&theme=paper` | Paper (light). Boom / Inlay / Lamp stay shared with gantree. |
 | `thread-xl` | `/?sample=thread&font=xl` | Extra-large chat type. Small is the default. |
-| `settings` | `/?sample=empty` | Cog — Access (mic when voice is on, location, notifications), theme, follow Kit’s mood, font, photo size, backdrop, Install. |
+| `settings` | `/?sample=empty` | Cog → right-hand drawer, scrolls on its own — Access (mic when voice is on, location, notifications), theme, follow Kit’s mood, font, photo size, backdrop, Install. Scrim, ×, Escape close it. |
 | `crane` | `/crane?sample=crane` | Loopback stand-in for the harness (`PENDANT_DEV`). |
 
 ---

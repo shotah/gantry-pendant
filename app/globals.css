@@ -23,6 +23,16 @@
   --color-info: var(--info);
   --color-you: var(--you);
   --color-kit: var(--kit);
+  --animate-drawer: drawer-in 180ms ease-out;
+
+  @keyframes drawer-in {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
 }
 
 :root {

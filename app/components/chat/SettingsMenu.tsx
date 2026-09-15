@@ -15,15 +15,22 @@ function CogIcon() {
   );
 }
 
+/**
+ * Cog in the header; the panel is a drawer that slides in from the right and
+ * scrolls on its own, so a long Settings never hangs off the bottom of a
+ * phone. Scrim, Escape, outside tap, or the × close it.
+ */
 export function SettingsMenu({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
   useEffect(() => {
     if (!open) {
       return;
     }
+    panel.current?.focus();
     function onPointer(e: MouseEvent) {
       if (!root.current?.contains(e.target as Node)) {
         setOpen(false);
@@ -58,14 +65,40 @@ export function SettingsMenu({ children }: { children: ReactNode }) {
       </button>
       {open
         ? (
-            <div
-              id={menuId}
-              role="dialog"
-              aria-label="Settings"
-              className="absolute right-0 top-full z-20 mt-1 w-64 rounded-xl border border-line bg-panel p-3 shadow-lg"
-            >
-              {children}
-            </div>
+            <>
+              <div
+                data-testid="settings-scrim"
+                aria-hidden
+                className="fixed inset-0 z-30 bg-black/40"
+                onClick={() => setOpen(false)}
+              />
+              <div
+                id={menuId}
+                ref={panel}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Settings"
+                tabIndex={-1}
+                className="fixed inset-y-0 right-0 z-30 flex w-72 max-w-[85vw] flex-col border-l border-line bg-panel pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-2xl outline-none animate-drawer motion-reduce:animate-none"
+              >
+                <div className="flex shrink-0 items-center justify-between border-b border-line px-3 py-2">
+                  <p className="text-sm font-medium text-fg">Settings</p>
+                  <button
+                    type="button"
+                    aria-label="Close settings"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-track hover:text-fg"
+                    onClick={() => setOpen(false)}
+                  >
+                    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden>
+                      <path fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" d="M5 5l10 10M15 5L5 15" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+                  {children}
+                </div>
+              </div>
+            </>
           )
         : null}
     </div>
