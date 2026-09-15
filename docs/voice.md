@@ -28,11 +28,21 @@ Same as [design.md](design.md#principles), plus:
 3. **Cab Auto already talks.** `MessagingStyle` + `RemoteInput` is
    the car mouth. Do not rebuild it as Web Speech, and do not wait
    on a Google Assistant Action.
-4. **Handheld dictation fills compose.** It does not auto-send.
-   Driving Auto is the exception (hands-free; the host already
-   commits the utterance).
-5. **Speak finished turns only.** `reply` / `push`, live, not
-   `replay`, not sibling `inbound`, not `typing` / draft / CoT.
+4. **Release is the commit.** Hold-to-talk auto-sends: you held the
+   button, you spoke, you let go. Slide off the button before you
+   let go to throw it away. The words paint as your own bubble so
+   you see what Kit heard. Dictation *into* compose (tap a mic,
+   edit, press Send) is a different control and not this version.
+5. **Speak finished turns only.** `reply`, live, not `replay`, not
+   sibling `inbound`, not `typing` / draft / CoT. On the handheld,
+   only the reply to **this device's** spoken turn; a cron `push`
+   does not start talking out of your pocket.
+6. **The pocket voice is neural, the car voice is the host's.**
+   Android Auto reads the card with the phone's engine and that is
+   fine at 60 mph. In your hand, next to ChatGPT Voice, the OS
+   engine sounds like a computer. Kit's handheld voice is Google
+   Chirp 3 HD through the Worker, on the same GCP bill as the
+   OAuth client.
 
 Photos are the sibling pattern: the mouth encodes HEIC → JPEG under
 budget and the wire carries the JPEG. Here the mouth encodes
@@ -43,22 +53,30 @@ speech → text and the wire carries `inbound.text`.
 ## The pick
 
 ```text
-you speak
-  → OS / browser STT          (Google speech, Siri, Auto host)
-  → compose text (handheld)   or inbound immediately (Auto)
-  → same inbound frame as typing
-  → crane Handle              (text Completer, as today)
-  → reply / push text
-  → OS / Auto TTS             (mouth plays it; mailbox never had audio)
+hold the button, speak, release
+  → OS / browser STT          (Chrome Web Speech, Auto host, Siri)
+  → inbound {text, context.input: "spoken"}   same frame as typing
+  → crane Handle              [input] spoken → prose, no markdown
+  → draft / typing paint      (not spoken)
+  → reply text lands
+  → handheld: speakable() → Worker /api/tts → Chirp 3 HD → play
+    car:      Auto / CarPlay host reads the card
 ```
 
 Three layers people mix up:
 
 | Layer | What it is | Ours? |
 | --- | --- | --- |
-| **Mouth I/O** | Mic → text, text → speaker | Yes. Per client. |
-| **Mailbox** | Frames, queue, hydrate | Unchanged. Text + photos. |
-| **Completer** | Persona + LLM + tools | Unchanged. Never an audio model. |
+| **Mouth I/O** | Mic → text, text → speaker | Yes. Per client. Handheld TTS is a Worker proxy with the key. |
+| **Mailbox** | Frames, queue, hydrate | Unchanged. Text + photos. One additive key. |
+| **Completer** | Persona + LLM + tools | Unchanged. Never an audio model. Reads `[input] spoken`. |
+
+The voice will sound like ChatGPT because it is a neural synth. The
+**turn-taking** will not. ChatGPT Voice and Gemini Live are realtime
+audio models with barge-in; Kit is a text+tools agent behind
+`channel.Handle`. After release: STT final ~0.5–1 s → Completer (same
+as typing) → TTS first byte ~0.5–1 s. A good walkie-talkie, not a
+phone call. Hold-to-talk is the honest metaphor for exactly that.
 
 Gemini Live / ChatGPT Voice send the waveform because the model
 *is* the ear. Kit is a text agent with MCP. Prosody is not a tool
@@ -99,9 +117,11 @@ use, are **not** Cloud Speech-to-Text on our GCP bill.
 | Gemini audio **input** on a Completer turn (Flash-class) | Completer bill | ~**$1 / 1M audio tokens** ≈ **$0.0015 / min** (25 tok/s). Live Flash audio-in is published at **$0.005 / min**, audio-out **$0.018 / min** |
 | Gemini Live two-way | Completer bill | ~**$0.023 / min** audio traffic before tools / Search / context replay |
 
-Cloud STT / Cloud TTS are a **new** bill. OS speech is not. Do not
-add Cloud Speech-to-Text to transcribe a PWA mic when the browser
-already did it.
+Cloud STT is a **new** bill and we do not pay it: the browser already
+transcribed. Cloud TTS is the one line we chose to pay, for the
+pocket only. Reading a 300-character reply is ~$0.01 on Chirp 3 HD;
+twenty a day is ~$35 a year. Auto and CarPlay keep the host engine
+at $0.
 
 ### Paid transcribe vs native audio vs Live
 
@@ -177,7 +197,9 @@ Android Auto is not a future idea. It is the spoken product today.
   Speech Services).
 - **Reply** on that card is Auto's host STT (`RemoteInput`). Cab
   `ReplyService` turns the string into `inbound` tagged
-  `surface: android_auto`. No `SpeechRecognizer` on the dash.
+  `surface: android_auto` and `input: spoken`
+  (`MailboxService.sendSpoken`; the in-dash thread's Reply takes the
+  same path). No `SpeechRecognizer` on the dash.
 - `shouldSpeak(kind, replay)` is true only for live `reply` /
   `push`. Hydrate (`replay: true`), `ack`, `inbound`, `typing`,
   `face` / `backdrop` / `theme` stay silent. Ship Cab with the
@@ -201,19 +223,19 @@ The PWA pays the Web Speech tax.
 
 | Surface | Voice in | Voice out | Effort | Notes |
 | --- | --- | --- | --- | --- |
-| **Cab Auto** | Host STT → inbound, auto-send | Auto reads the card | **Done** | Keep. Do not wrap the PWA. |
-| **Cab handheld** | `SpeechRecognizer` → compose | Optional `TextToSpeech`, off by default | Medium | Same Google stack as Auto. Reliable APIs. |
-| **PWA Chrome Android** | `SpeechRecognition` → compose | `speechSynthesis` later / skip | Medium | First PWA target. Interim / `continuous` are flaky — tap-to-talk, not always-on. Hide the mic when the API is missing. |
-| **PWA iOS A2HS** | Web Speech often dies in the standalone WebView | TTS needs a user gesture; background kills it | High | Do not prove voice here. Helm is the iPhone mouth. |
+| **Cab Auto** | Host STT → inbound + `input: spoken`, auto-send | Auto reads the card | **Done** | Keep. Do not wrap the PWA. |
+| **PWA Chrome Android** | Hold-to-talk, `SpeechRecognition` one-shot → inbound `input: spoken`, auto-send | Worker `/api/tts` → Chirp 3 HD, reply to your own hold only | **Done** | First pocket target. Interim / `continuous` skipped — hold, not always-on. Button hidden when the API is missing. |
+| **Cab handheld** | `SpeechRecognizer` hold → same frame | Same `/api/tts` with the Bearer session, or Android `TextToSpeech` if we accept the robot | Medium | Parity. Do not run the recognizer on the Auto template. |
+| **PWA iOS A2HS** | Web Speech often dies in the standalone WebView | `<audio>.play()` needs a gesture; background kills it | High | Do not prove voice here. Helm is the iPhone mouth. |
 | **Helm CarPlay** | Host STT → inbound, auto-send | CarPlay reads the communication notification | **In Helm** | Same mailbox. `surface: carplay`. No second recognizer. |
-| **PWA Firefox / desktop Safari** | STT missing or off | TTS ok-ish | — | Mic hidden. Typing stays. |
+| **PWA Firefox / desktop Safari** | STT missing or off | — | — | Hold button hidden. Typing stays. |
 | **Google Assistant Action** | Dead product (Conversational Actions ended 2023) | — | Don't | See [Assistant](#google-assistant-is-the-wrong-button). |
-| **Worker Whisper / cloud TTS** | POST clip, get text / audio | New media route | High | Fallback if Web Speech is unusable. Not v1. Still not the Completer. |
+| **Worker `/api/stt` (Whisper class)** | POST clip, get text | — | High | iOS-PWA polyfill if Helm does not cover those friends. Not v1. Still not the Completer. |
 
-**Handheld vs car.** On a phone you can read. In a car you cannot.
-Spend voice-out budget on Auto (already spent). Spend voice-in
-budget on dictation into compose for the pocket, and on keeping
-Auto's reply working.
+**Handheld vs car.** In a car the host already speaks and you cannot
+read, so Auto keeps its engine. In your hand you *can* read, so the
+voice has to earn its place by sounding like a person — that is why
+the pocket gets Chirp and the car does not need it.
 
 ---
 
@@ -221,26 +243,48 @@ Auto's reply working.
 
 ### Handheld (PWA + Cab)
 
-A mic on compose. Tap (or hold) → listen → drop words into the
-textarea → human edits → Send. Same as the existing todo:
-**do not auto-send.** Slash commands, photos sitting on the draft,
-and "wait that was the radio" all need a look.
+**Typing is the default.** A mic in the header, left of the settings
+cog (`app/components/chat/VoiceToggle.tsx`), flips the mode. Off:
+the compose row you already know — emoji, attach, textarea, Send.
+On: the whole row becomes one wide **Hold to talk** bar
+(`app/components/chat/HoldToTalk.tsx`, swapped in by `Compose`).
+Nothing else moves; the crowded left rail does not get a fourth
+button. The choice is remembered (`pendant.voice`, off unless it
+says `on`), so a voice person opens into voice and a typist never
+sees the bar.
 
-PWA: `window.SpeechRecognition` /
-`webkitSpeechRecognition`. Chrome Android is the walk. Require a
-user gesture. One-shot (`continuous: false`) is less cursed than
-always-on. If `SpeechRecognition` is missing, no mic — not a
-banner, not a Worker fallback in this version.
+Press → one-shot `SpeechRecognition` starts → release → `stop()` →
+the final transcript goes straight out as `inbound` with
+`context.input: "spoken"`. Nothing lands in a textarea. Slide off
+the bar before release to abort ("that was the radio"). Pressing
+while Kit is talking hushes the speaker first so the mic does not
+hear Kit. Space bar works the same way on a desktop Chrome.
 
-Cab handheld: `android.speech.SpeechRecognizer` (or the
-recognizer intent). `RECORD_AUDIO` in the manifest. Fill the same
-compose `TextField` Cab already has. Do **not** run this on the
-Auto template; the host already did STT.
+Tap the mic again to type. Slash commands are typed. Web Speech has
+no idea what `/new` is. A photo staged before the flip keeps its chip
+above the bar and rides along with the words ("what is this?").
+
+PWA: `window.SpeechRecognition` / `webkitSpeechRecognition`, Chrome
+Android is the walk. `continuous: false`, no interim results — that
+is the half of the API that behaves. Detection runs after mount so
+the server paint and the hydrated paint agree. If the constructor is
+missing (Firefox, iOS A2HS) **or** the Worker has not published voice
+(`/api/auth/config` `voice: false` — no TTS key, or `VOICE=off`),
+neither the header mic nor the bar is rendered, and a remembered `on`
+still types — not a banner, not a Worker fallback in this version.
+`not-allowed` paints "Mic blocked" until the next press.
+
+Cab handheld: `android.speech.SpeechRecognizer` (or the recognizer
+intent), `RECORD_AUDIO` in the manifest, the same hold button, the
+same frame with `input: spoken`. Do **not** run this on the Auto
+template; the host already did STT.
 
 ### Auto
 
-Unchanged. Spoken reply is inbound. `surface: android_auto` is
-already how the crane knows this mouth is the dash.
+Spoken reply is inbound. `surface: android_auto` is how the crane
+knows this mouth is the dash; Cab also tags it `input: spoken` so
+the wire says the words came from a mic, same as the pocket. Typed
+compose on the handheld (`sendTurn`) stays untagged.
 
 ### Do not put audio on the wire
 
@@ -268,30 +312,60 @@ to vibrate, badge, or speak.
 | Mouth | Speak | Skip |
 | --- | --- | --- |
 | Cab Auto | live `reply` / `push` via the HUN | `replay`, sibling `inbound`, controls |
-| Cab handheld | optional pref, off | same skip list; Auto is the default speaker |
-| PWA | skip this version | you are looking at the thread |
+| PWA | the live `reply` to **your own hold**, via `/api/tts` | everything else: `push`, `replay`, drafts, sibling `inbound`, replies to typed turns |
+| Cab handheld | parity with the PWA row, same route with the Bearer session | same |
 
-PWA `speechSynthesis` is the high-effort, low-value side. Voices
-differ by OS, iOS needs a tap before anything will talk, and a
-backgrounded PWA will not keep reading a cron ping — that is why
-Web Push exists. If we ever add it: a "Read replies" toggle next
-to mute, same skip list as `shouldSpeak`.
+### The pocket voice
+
+`POST /api/tts {text}` → Google Cloud Text-to-Speech
+`text:synthesize`, Chirp 3 HD, MP3 back, `Cache-Control: no-store`.
+The Worker holds `GOOGLE_TTS_API_KEY` (restrict it to that API in
+the GCP console) and the voice is the `TTS_VOICE` var
+(`en-US-Chirp3-HD-Leda` by default; Crystal picked Chirp over the
+OpenAI voices). Signed-in session, same rate bucket as `/api/push`,
+404 until the key exists so an unconfigured Worker just stays quiet.
+Nothing is stored, nothing touches the Durable Object, and the
+Worker never logs the text. Where the key actually lives:
+[Turn on the pocket voice](#turn-on-the-pocket-voice).
+
+Why Chirp over `speechSynthesis`: the browser engine is what your
+friends are calling "the Android Auto voice." Neural TTS is a
+commodity at this point; the cost is coffee. Why Google over
+OpenAI: one bill, and it won the listening test.
+
+`speechSynthesis` stays out even as a fallback. A silent reply is
+better than a reply that suddenly sounds like a 2012 GPS.
+
+### No asterisk asterisk asterisk
+
+Two layers, because models emit markdown even when told not to:
+
+1. **The prompt.** `context.input: "spoken"` → the crane stamps
+   `[input] spoken` next to `[surface]`, and the stamp asks for
+   conversational prose, a few sentences, no markdown, lists, code,
+   links, or emoji. This is the real fix and it also fixes the
+   *content* — nobody wants a bulleted answer read aloud.
+2. **The strip.** `speakable()` (`lib/phone/speakable.ts`) runs the
+   reply through the same remark the bubble paints with, plus
+   `strip-markdown`: bold / italic / headings / links keep their
+   words, a fenced block becomes "code", an image becomes "photo",
+   tables and raw HTML are dropped, emoji are dropped so the engine
+   does not say "red heart". `clipForSpeech()` keeps a long reply
+   under Chirp's 5 000-byte input at a sentence boundary.
 
 Do not speak:
 
-- hydrate / `replay` (Cab already gates this)
+- hydrate / `replay` (Cab already gates this; the PWA gate is the
+  same `replay !== true`)
 - your own `inbound` from the other mouth
 - `typing`, italic drafts, CoT
-- `error` tokens
-- markdown as markdown — strip or say "code" / "photo" if a
-  handheld TTS walk ever lands
+- `error` tokens — a refusal also **disarms** the PWA speaker
+- `push` on the handheld — a cron ping is a buzz and a badge, not a
+  voice from your pocket
+- any reply on the handheld that is not the answer to your own hold
 
-Mute pings ([todo.md](todo.md)) is the local pref that also covers
-spoken `push`. Socket still paints.
-
-Cloud TTS (ElevenLabs, Google Cloud, a Kit voice blob on the DO)
-is a new media path in the shape of the face JPEG. Cute. Not
-needed when the car already has a TTS engine.
+A backgrounded PWA will not keep reading — that is why Web Push
+exists. Mute pings ([todo.md](todo.md)) stays the pref for buzzes.
 
 ---
 
@@ -330,21 +404,53 @@ on-device `SFSpeechRecognizer`) is a later bar. Do not promise
 "the waveform never leaves the phone" for v1.
 
 Do not log utterances on the Worker. The Worker never sees them if
-we do not add `/api/stt`.
+we do not add `/api/stt`. It does see **Kit's reply text** pass
+through `/api/tts` on the way to Google — the same words that are
+already in the Durable Object transcript, never stored again, never
+logged, gone when the response is sent.
 
 ---
 
 ## Wire
 
-No new `kind`. No audio field. No lockstep APK.
+No new `kind`. No audio field. No lockstep APK. One additive key.
 
-`context.surface` is already `browser` | `android` |
-`android_auto`. PERSONA can already say "keep Auto answers short."
-Do not add `context.input: spoken` until a prompt actually uses
-it — stingy, same as GPS.
+```json
+{ "kind": "inbound", "text": "what's the weather tonight",
+  "context": { "input": "spoken" } }
+```
 
-If we ever add it, it is additive JSON. Old Cab drops unknown
-keys. The crane still only reads `Text`.
+`context.input` is a closed set of one: `spoken`. The mailbox
+`parseContext` keeps it and drops any other value
+(`lib/mailbox/frame.ts`). It rides beside `surface`, which still
+says *which device*; `input` says *how the human produced the
+turn*. Cab Auto sets it on spoken Reply (`inputOnWire` is the same
+closed set on the Kotlin side); the crane keeps that `[input]` line
+bare because `[surface] android_auto` already carries the hint.
+
+**Cab and Helm:** they drop unknown keys, so an old APK is fine —
+it just sends `surface` without `input`, and the dash still gets
+the hint from `[surface]`. Helm sends nothing new yet. If either
+adds a handheld hold button later it sends the same key and can
+reuse `/api/tts` with the Bearer session it already carries — the
+route takes `Authorization: Bearer` as well as the cookie.
+
+**Crane** (`ai-gantry`): `frameContext.Input` beside `Surface`, an
+`[input] spoken` stamp next to `[surface]` in `harness.go`. The car
+and the pocket share one hint (`spokenHint`) so the two mouths cannot
+drift:
+
+```text
+[surface] android_auto — driving; read aloud like a person:
+conversational prose, a few short sentences, no markdown, lists,
+code, links, or emoji
+[input] spoken — read aloud like a person: conversational prose,
+a few short sentences, no markdown, lists, code, links, or emoji
+```
+
+A driving surface that also sends `input: spoken` gets a bare
+`[input] spoken` — the dash already said it. `speakable()` still
+keeps any stray asterisks out of the speaker.
 
 ---
 
@@ -353,14 +459,100 @@ keys. The crane still only reads `Text`.
 Ada's PWA and Ada's Cab are one human. Live inbound fan-out is
 [sibling_phones.md](sibling_phones.md). Voice rules on top:
 
-- The mouth that **dictated** sends `inbound`. The other mouth
-  paints it as "you" and does **not** speak it (`shouldSpeak`
+- The mouth that **held the button** sends `inbound`. The other
+  mouth paints it as "you" and does **not** speak it (`shouldSpeak`
   already skips `inbound`).
-- Kit's `reply` fans to every socket tagged `sub:<ada>`. If Auto
-  is attached, **that** mouth speaks. A handheld TTS pref off
-  (default) avoids the phone talking over the dash.
-- Two speakers at once is a per-device pref failure, not a
-  mailbox bug.
+- Kit's `reply` fans to every socket tagged `sub:<ada>`. The PWA
+  speaks only if **it** armed the gate with a hold
+  (`awaitingVoice` in `PhoneShell`), then disarms. Ada's other
+  phone painted the same reply and stayed quiet.
+- Auto attached while the pocket held the button: both will speak
+  that one reply — the dash because it is a live `reply`, the
+  pocket because it asked. Acceptable; you are not in the car and
+  the pocket at once.
+
+---
+
+## Turn on the pocket voice
+
+Hold-to-talk **code** is this repo. The **key** is not. Gantree
+Settings does not push it (same leftover as VAPID).
+
+`/api/auth/config` carries additive `voice: true|false`. The header
+mic only paints when that is true **and** the browser has Web Speech.
+Default: `voice` follows `GOOGLE_TTS_API_KEY` — no key, no mic, so a
+rebuild that skips Chirp never publishes the control.
+
+| `VOICE` var | Key set | Mic | `/api/tts` |
+| --- | --- | --- | --- |
+| unset | no | hidden | 404 |
+| unset | yes | shown | Chirp |
+| `off` | either | hidden | 404 |
+| `on` | no | shown | 404 (dictate only) |
+| `on` | yes | shown | Chirp |
+
+`VOICE=off` is how an origin with a key still declines to publish
+(PWA and the route). Cab and Helm drop the unknown `voice` key until
+they grow a hold button.
+
+### 1. GCP (same project as the OAuth client)
+
+1. Enable **Cloud Text-to-Speech API**
+   (APIs & Services → Library).
+2. APIs & Services → Credentials → **Create credentials → API key**.
+3. Restrict that key to **Cloud Text-to-Speech API** only.
+
+Do not reuse the OAuth client secret. This is a Cloud TTS API key.
+
+### 2. Loopback (`npm run dev`)
+
+```bash
+cp .dev.vars.example .dev.vars
+```
+
+Uncomment and paste in `.dev.vars` (gitignored):
+
+```text
+GOOGLE_TTS_API_KEY=…
+# TTS_VOICE=en-US-Chirp3-HD-Leda
+# VOICE=off
+```
+
+`TTS_VOICE` is optional; unset is already `en-US-Chirp3-HD-Leda`
+(`lib/tts/http.ts`). `VOICE` is optional; unset follows the key.
+`VOICE=on` without a key shows the hold bar for dictation (replies
+stay on screen). Restart `npm run dev`.
+
+### 3. workers.dev
+
+Not Gantree Settings. From this checkout, after `npx wrangler login`:
+
+```bash
+npx wrangler secret put GOOGLE_TTS_API_KEY
+```
+
+Paste the same key. Optional voice is a Wrangler **var**, not a
+secret (leave unset for Leda):
+
+```bash
+npx wrangler vars put TTS_VOICE
+# value: en-US-Chirp3-HD-Leda
+npx wrangler vars put VOICE
+# value: off    # hide the mic even with a key
+```
+
+Leftover bulk path: `.env` `GOOGLE_TTS_API_KEY=` then
+`npm run secrets:push`. Do not mix that with Gantree after the yard
+owns `CRANE_BEARERS`.
+
+### 4. Walk
+
+Chrome Android (or desktop Chrome): sign in, header mic on, hold,
+release. You should hear Kit. Typed turns stay quiet.
+
+The crane prompt stamp `[input] spoken` is **ai-gantry**, not this
+checkout. Until that crane is rebuilt with it, `speakable()` still
+strips asterisks here.
 
 ---
 
@@ -370,6 +562,9 @@ Ada's PWA and Ada's Cab are one human. Live inbound fan-out is
 
 - [x] Auto HUN reads live `reply` / `push`
 - [x] Spoken Reply → `inbound` + `surface: android_auto`
+- [x] Spoken Reply (HUN and in-dash thread) also tagged
+      `input: spoken` (`MailboxService.sendSpoken`, `inputOnWire`
+      closed set; typed `sendTurn` untagged)
 - [x] `shouldSpeak` skips `replay` / `inbound` / controls
 - [ ] Ship the APK that honors `replay` with the hydrating Worker
       ([todo.md](todo.md#gantry-cab))
@@ -382,35 +577,75 @@ Ada's PWA and Ada's Cab are one human. Live inbound fan-out is
 - [ ] `shouldSpeak` skips `replay` / `inbound` / controls
       (Helm `docs/pendant_handoff.md`)
 
-### gantry-pendant (this repo) — pocket dictation
+### gantry-pendant (this repo) — hold to talk
 
-- [ ] Mic on compose when `SpeechRecognition` exists
-- [ ] One-shot listen, fill the textarea, do not auto-send
-- [ ] Hide the mic when the API is missing (iOS A2HS, Firefox)
-- [ ] Tests: helper that maps recognition events → compose text;
-      no auto-send; disabled while the socket is down
+- [x] `context.input: "spoken"` parsed and kept by the mailbox
+      (`lib/mailbox/frame.ts`, `lib/phone/context.ts`)
+- [x] PWA stamps `surface: browser` on every turn, so the crane's
+      `[surface]` line can tell the pocket from the dash
+      (`PhoneShell.phoneContext`)
+- [x] Header mic left of the cog toggles typing (default) ↔ voice,
+      remembered in `pendant.voice`; hidden without `SpeechRecognition`
+      (`app/components/chat/VoiceToggle.tsx`, `lib/phone/prefs.ts`)
+- [x] Voice on swaps the whole compose row for one wide hold-to-talk
+      bar; off is the untouched typed row
+      (`app/components/chat/HoldToTalk.tsx`, `Compose`)
+- [x] One-shot listen, release commits, slide-off aborts, space bar
+      works, disabled with the rest of compose while the socket is
+      down (`lib/phone/speech.ts`)
+- [x] Release auto-sends the words as `inbound` + `input: spoken`;
+      nothing in the textarea (`PhoneShell.sendText`)
+- [x] `speakable()` + `clipForSpeech()`: markdown → words, code →
+      "code", image → "photo", emoji dropped
+      (`lib/phone/speakable.ts`)
+- [x] `POST /api/tts` → Chirp 3 HD → MP3, session-gated, 404 without
+      the key, never logs (`lib/tts/http.ts`, `app/api/tts/route.ts`)
+- [x] Speaker gate: the next live `reply` after a hold is read
+      aloud, then disarm; `error` disarms; `push` / `replay` /
+      drafts / typed turns never speak; a new hold hushes the
+      speaker (`app/lib/tts.ts`, `PhoneShell`)
+- [x] Tests under `test/phone/`, `test/tts/`, `test/app/`
+- [ ] Pocket voice: GCP Cloud TTS API key → `.dev.vars` /
+      `npx wrangler secret put GOOGLE_TTS_API_KEY`. Optional
+      `TTS_VOICE` (default Leda). Optional `VOICE=off` to hide the
+      mic even with a key. [Turn on](#turn-on-the-pocket-voice)
 
-PWA-only paint. Cab does not need a mailbox change.
+### ai-gantry (crane) — one stamp
+
+- [x] `frameContext.Input` beside `Surface` in
+      `internal/channel/pendant/inbound.go`; closed set `spoken`
+- [x] `channel.Message.Input`, prompt-only, not persisted (same as
+      `Surface`)
+- [x] `inputStamp` next to `surfaceStamp` in
+      `internal/agent/harness.go`; `android_auto` / `carplay` and
+      `input: spoken` share one `spokenHint`: like a person, a few
+      short sentences, no markdown / lists / code / links / emoji
+- [x] Tests mirroring `surfaceStamp` / `frameSurface`, plus the
+      `inbound_pwa_spoken.json` → `completer_spoken.txt` payload golden
 
 ### gantry-cab (handheld) — parity
 
-- [ ] Mic on compose via `SpeechRecognizer` → same fill, no
-      auto-send
+- [ ] Hold button on compose via `SpeechRecognizer` → same frame,
+      same `input: spoken`, auto-send on release
 - [ ] Do not run that recognizer on the Auto template
-- [ ] Handheld "read replies" TTS stays off until someone wants
-      it; Auto remains the speaker
+- [ ] Reply to your own hold via `/api/tts` with the Bearer session
+      (or Android `TextToSpeech` if the robot is acceptable there)
+- [ ] Auto stays the speaker in the car
 
 ### Later, maybe
 
 - Worker `/api/stt` as an iOS-PWA polyfill (audio hits the Worker,
   text comes back, Completer still sees words)
-- PWA "Read replies" toggle
-- `context.input: spoken` if PERSONA wants it
-- Helm handheld dictation into compose (CarPlay already speaks)
+- Sentence-chunked TTS so the first sentence starts while the rest
+  synthesizes (streaming `synthesize` is gRPC-only today)
+- PWA "Read replies" toggle to widen the speaker gate past your own
+  hold
+- Helm handheld hold-to-talk (CarPlay already speaks)
 
 ### Not this version
 
 Hosted SaaS voice, audio frames, model-native audio, Assistant
-Actions, Gemini Live as a mouth, PWA auto-send, speaking drafts /
-CoT, cloud "Kit voice" blobs, on-device-only as a promise,
-Firefox polyfill, proving the walk on iPhone Add to Home Screen.
+Actions, Gemini Live as a mouth, dictation *into* compose, speaking
+drafts / CoT, `speechSynthesis` as a fallback, cloud "Kit voice"
+blobs on the DO, on-device-only as a promise, Firefox polyfill,
+proving the walk on iPhone Add to Home Screen.

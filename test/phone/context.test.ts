@@ -32,6 +32,13 @@ describe("phone context", () => {
     });
   });
 
+  it("stamps input spoken on a hold-to-talk turn and keeps it on the wire without geo", () => {
+    const spoken = buildContext({ geo: null, input: "spoken" });
+    expect(spoken).toEqual({ input: "spoken" });
+    expect(wireContext(spoken)).toEqual({ input: "spoken" });
+    expect(buildContext({ geo: { lat: 1, lon: 2 } })).not.toHaveProperty("input");
+  });
+
   it("maps a GeolocationPosition-shaped fix", () => {
     expect(geoFromPosition({
       coords: {

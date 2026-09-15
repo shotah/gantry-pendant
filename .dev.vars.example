@@ -1,6 +1,21 @@
-# Local `npm run dev` only. Cloudflare account login is `npx wrangler login`,
-# not this file. Production Worker secrets: `npx wrangler secret put`.
+# Local `npm run dev` only. Copy to `.dev.vars` (gitignored).
+# Cloudflare account login is `npx wrangler login`, not this file.
+# Production Worker secrets: `npx wrangler secret put` — see
+# docs/deployment.md and docs/voice.md#turn-on-the-pocket-voice.
 MAILBOX_SECRET=dev-mailbox-secret-change-me
 SESSION_SECRET=dev-session-secret-change-me
 # Loopback only. Mock Ada + ?sample= scenes. Ignored on workers.dev.
 PENDANT_DEV=1
+
+# Optional. Kit's pocket voice on hold-to-talk (POST /api/tts).
+# Same GCP project as the OAuth client. Enable Cloud Text-to-Speech,
+# then an API key restricted to that API. Without it, /api/tts is 404
+# and a spoken turn is read on screen only.
+# GOOGLE_TTS_API_KEY=
+# Optional. Default is already en-US-Chirp3-HD-Leda (lib/tts/http.ts).
+# Loopback can set it here; workers.dev uses a wrangler var, not a secret.
+# TTS_VOICE=en-US-Chirp3-HD-Leda
+# Pocket voice flag. Unset follows the key (no key = no header mic).
+# VOICE=off hides the mic even with a key. VOICE=on shows it without a key
+# (dictate only; /api/tts is still 404 until GOOGLE_TTS_API_KEY is set).
+# VOICE=off

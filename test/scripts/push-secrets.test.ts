@@ -26,6 +26,11 @@ describe("bearers", () => {
 });
 
 describe("collectSecrets", () => {
+  it("pushes the TTS key like the VAPID pair", () => {
+    const { secrets } = collectSecrets({ GOOGLE_TTS_API_KEY: "gcp", TTS_VOICE: "en-US-Chirp3-HD-Leda" });
+    expect(secrets).toEqual({ GOOGLE_TTS_API_KEY: "gcp" });
+  });
+
   it("folds CRANE_BEARER_* into CRANE_BEARERS and skips loopback keys", () => {
     const { secrets, skipped } = collectSecrets({
       GOOGLE_CLIENT_ID: "id",

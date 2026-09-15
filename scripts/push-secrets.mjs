@@ -26,6 +26,7 @@ const ALLOW = new Set([
   "VAPID_PUBLIC_KEY",
   "VAPID_PRIVATE_KEY",
   "VAPID_SUBJECT",
+  "GOOGLE_TTS_API_KEY",
 ]);
 
 const DENY = new Set(["MAILBOX_SECRET", "PENDANT_DEV", "DIRECTORY_KV_ID"]);

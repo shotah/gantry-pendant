@@ -15,7 +15,27 @@ function pasteBits(file: File) {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
+  FakeRecognizer.last = null;
 });
+
+class FakeRecognizer {
+  static last: FakeRecognizer | null = null;
+  lang = "";
+  continuous = true;
+  interimResults = true;
+  maxAlternatives = 3;
+  onresult: ((ev: { results: ArrayLike<{ isFinal: boolean } & ArrayLike<{ transcript: string }>> }) => void) | null = null;
+  onerror: ((ev: { error: string }) => void) | null = null;
+  onend: (() => void) | null = null;
+  start = vi.fn();
+  stop = vi.fn();
+  abort = vi.fn();
+
+  constructor() {
+    FakeRecognizer.last = this;
+  }
+}
 
 describe("Compose", () => {
   it("sends trimmed text and ignores blanks", () => {
@@ -212,6 +232,73 @@ describe("Compose", () => {
     render(<Compose onSend={vi.fn()} initialEmoji />);
     expect(screen.getByRole("dialog", { name: "Emoji" })).toBeTruthy();
     expect(screen.getByLabelText("Search emoji")).toBeTruthy();
+  });
+
+  it("types by default: no mic in the row even when Web Speech exists and voice is wired", () => {
+    render(<Compose onSend={vi.fn()} onVoice={vi.fn()} recognizer={FakeRecognizer} onPhoto={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Hold to talk" })).toBeNull();
+    expect(screen.getByPlaceholderText("Message")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "emoji" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "attach" })).toBeTruthy();
+  });
+
+  it("voice on swaps the whole row for one wide hold-to-talk bar and auto-sends the words", () => {
+    const onSend = vi.fn();
+    const onVoice = vi.fn();
+    const { rerender } = render(
+      <Compose onSend={onSend} onVoice={onVoice} onPhoto={vi.fn()} voice recognizer={FakeRecognizer} />,
+    );
+    const hold = screen.getByRole("button", { name: "Hold to talk" });
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+    expect(screen.queryByPlaceholderText("Message")).toBeNull();
+    expect(screen.queryByRole("button", { name: "emoji" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "attach" })).toBeNull();
+    expect(hold.className.split(/\s+/)).toEqual(expect.arrayContaining(["w-full", "min-h-11", "touch-none", "select-none"]));
+
+    fireEvent.pointerDown(hold, { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+    const rec = FakeRecognizer.last!;
+    rec.onresult?.({ results: [{ isFinal: true, length: 1, 0: { transcript: "on my way" } }] });
+    fireEvent.pointerUp(hold, { pointerId: 1, clientX: 0, clientY: 0 });
+    rec.onend?.();
+    expect(onVoice).toHaveBeenCalledExactlyOnceWith("on my way");
+    expect(onSend).not.toHaveBeenCalled();
+
+    rerender(<Compose onSend={onSend} onVoice={onVoice} onPhoto={vi.fn()} voice={false} recognizer={FakeRecognizer} />);
+    expect(screen.queryByRole("button", { name: "Hold to talk" })).toBeNull();
+    expect(screen.getByPlaceholderText("Message")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+  });
+
+  it("keeps the typed row when voice is on but the browser has no Web Speech", () => {
+    render(<Compose onSend={vi.fn()} onVoice={vi.fn()} voice recognizer={null} />);
+    expect(screen.queryByRole("button", { name: "Hold to talk" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+  });
+
+  it("keeps a staged photo chip above the hold bar so it rides along with the words", () => {
+    render(
+      <Compose
+        onSend={vi.fn()}
+        onVoice={vi.fn()}
+        onPhoto={vi.fn()}
+        onPhotoClear={vi.fn()}
+        photo="data:image/jpeg;base64,/9j/"
+        voice
+        recognizer={FakeRecognizer}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Hold to talk" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove photo" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  });
+
+  it("disables the hold bar with the rest of compose while the socket is down", () => {
+    render(<Compose onSend={vi.fn()} onVoice={vi.fn()} voice recognizer={FakeRecognizer} disabled />);
+    const hold = screen.getByRole("button", { name: "Hold to talk" }) as HTMLButtonElement;
+    expect(hold.disabled).toBe(true);
+    fireEvent.pointerDown(hold, { button: 0, pointerId: 1 });
+    expect(FakeRecognizer.last).toBeNull();
   });
 
   it("stacks emoji and attach on the left of the draft", () => {

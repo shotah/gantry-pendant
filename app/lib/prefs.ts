@@ -4,10 +4,12 @@ import {
   followThemePrefOn,
   geoPrefOn,
   photoSizePref,
+  voicePrefOn,
   writeBackdropPref,
   writeFollowThemePref,
   writeGeoPref,
   writePhotoSizePref,
+  writeVoicePref,
 } from "@/lib/phone/prefs";
 
 export function browserGeoPref(): boolean {
@@ -64,4 +66,18 @@ export function saveFollowThemePref(on: boolean): void {
     return;
   }
   writeFollowThemePref(window.localStorage, on);
+}
+
+export function browserVoicePref(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return voicePrefOn(window.localStorage);
+}
+
+export function saveVoicePref(on: boolean): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  writeVoicePref(window.localStorage, on);
 }

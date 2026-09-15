@@ -140,6 +140,15 @@ create those. Steps: [deployment.md](deployment.md).
    Without those keys the socket + queue still work; Enable
    notifications only toasts while the page is alive.
 
+   Kit's pocket voice is the same leftover path. Enable Cloud
+   Text-to-Speech in that GCP project, mint an API key restricted to
+   that API, then `npx wrangler secret put GOOGLE_TTS_API_KEY`
+   (loopback: `.dev.vars`). Optional `TTS_VOICE` is a wrangler var;
+   unset is `en-US-Chirp3-HD-Leda`. Without the key, the header mic
+   stays hidden (`/api/auth/config` `voice: false`) unless you set
+   `VOICE=on` to dictate anyway. `VOICE=off` hides it even with a
+   key. Walk: [voice.md](voice.md#turn-on-the-pocket-voice).
+
    The moment Google is on, `MAILBOX_SECRET` (two-tab spike) is
    rejected. Leave Worker-level Cloudflare Access **off**.
 
@@ -274,4 +283,7 @@ crane.
 - [ ] Gantree: Build channel pendant, tick humans, recreate (yard mints bearer)
 - [ ] Phone Google sign-in; crane list or “not on any crane yet”
 - [ ] Optional: `npm run vapid` + Worker VAPID secrets; Enable notifications
+- [ ] Optional: Cloud TTS API key → `GOOGLE_TTS_API_KEY` (`.dev.vars`
+      / `npx wrangler secret put`); header mic then shows. `VOICE=off`
+      to hide it. ([voice.md](voice.md#turn-on-the-pocket-voice))
 - [ ] Yard cookie never sent to the Worker

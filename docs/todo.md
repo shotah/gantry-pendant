@@ -109,10 +109,15 @@ start Expo to catch up Cab or Helm.
       and `encodeFrame`. Pasted `[current time]` does not land on the
       wire. `context` is `geo` only. Audit:
       [audit_todo.md §14](audit_todo.md#14-phone-send-path-fe).
-- [ ] **Voice into compose** — `SpeechRecognition` when it exists;
-      fill the textarea, do not auto-send. Audio never hits the
-      mailbox or the Completer. Cab Auto already speaks. Design:
-      [voice.md](voice.md)
+- [x] **Hold to talk** — header mic (left of the cog) flips typing
+      (default) to one wide hold bar; `SpeechRecognition` when it
+      exists, release
+      auto-sends `inbound` + `context.input: spoken`, the reply is
+      read back through `POST /api/tts` (Chirp 3 HD). Audio never
+      hits the mailbox or the Completer. Cab Auto already speaks.
+      Left: paste `GOOGLE_TTS_API_KEY` (`.dev.vars` / `wrangler secret
+      put`). `VOICE=off` hides the mic. Design and walk:
+      [voice.md](voice.md#turn-on-the-pocket-voice)
 - [ ] **Share target** — Android share sheet → compose (do not
       register `share_target` until the POST handler exists)
 - [ ] **Offline outbound queue** — page-side unsent frames; do not

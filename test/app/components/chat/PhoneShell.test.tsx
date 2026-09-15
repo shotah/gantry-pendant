@@ -7,12 +7,52 @@ import { RELEASE } from "@/app/lib/release";
 import { DEV_USER, MOCK_REPLIES, SAMPLE_LINES } from "@/lib/dev/samples";
 import { TYPING_TTL_MS } from "@/lib/mailbox/typing";
 import { clearGeoCache } from "@/lib/phone/geo";
+import { browserSpeak } from "@/app/lib/tts";
 
-function stubAuth(dev: boolean) {
+vi.mock("@/app/lib/tts", () => ({
+  browserSpeak: vi.fn(async () => true),
+  hushSpeaker: vi.fn(),
+}));
+
+class FakeRecognizer {
+  static last: FakeRecognizer | null = null;
+  lang = "";
+  continuous = true;
+  interimResults = true;
+  maxAlternatives = 3;
+  onresult: ((ev: { results: ArrayLike<{ isFinal: boolean } & ArrayLike<{ transcript: string }>> }) => void) | null = null;
+  onerror: ((ev: { error: string }) => void) | null = null;
+  onend: (() => void) | null = null;
+  start = vi.fn();
+  stop = vi.fn();
+  abort = vi.fn();
+
+  constructor() {
+    FakeRecognizer.last = this;
+  }
+}
+
+/** Tap the header mic from typing (default) into hold-to-talk. */
+function voiceOn() {
+  fireEvent.click(screen.getByRole("button", { name: "Voice off" }));
+  expect(screen.getByRole("button", { name: "Voice on" }).getAttribute("aria-pressed")).toBe("true");
+}
+
+/** Press, say the words, release, let the recognizer end — one spoken turn. */
+function holdAndSay(text: string) {
+  const hold = screen.getByRole("button", { name: "Hold to talk" });
+  fireEvent.pointerDown(hold, { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+  const rec = FakeRecognizer.last!;
+  rec.onresult?.({ results: [{ isFinal: true, length: 1, 0: { transcript: text } }] });
+  fireEvent.pointerUp(hold, { pointerId: 1, clientX: 0, clientY: 0 });
+  act(() => rec.onend?.());
+}
+
+function stubAuth(dev: boolean, extra: { voice?: boolean } = {}) {
   vi.stubGlobal("fetch", async (input: RequestInfo) => {
     const url = String(input);
     if (url.includes("/api/auth/config")) {
-      return Response.json({ mode: "spike", google: false, dev });
+      return Response.json({ mode: "spike", google: false, dev, voice: extra.voice === true });
     }
     if (url.includes("/api/auth/me")) {
       return dev ? Response.json(DEV_USER) : new Response(null, { status: 401 });
@@ -70,8 +110,8 @@ function liveSocket() {
   return ws as FakeSocket;
 }
 
-async function connectSpike() {
-  stubAuth(true);
+async function connectSpike(opts: { voice?: boolean } = {}) {
+  stubAuth(true, opts);
   stubSocket();
   render(<PhoneShell />);
   expect(await screen.findByText("live")).toBeTruthy();
@@ -113,6 +153,7 @@ function stubGeo(lat = 47.6, lon = -122.3, accuracy = 8) {
 beforeEach(() => {
   window.history.replaceState({}, "", "/");
   window.localStorage.removeItem("pendant.geo");
+  window.localStorage.removeItem("pendant.voice");
   window.localStorage.removeItem("pendant.font");
   window.localStorage.removeItem("pendant.photo");
   window.localStorage.removeItem("pendant.backdrop");
@@ -130,6 +171,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   window.history.replaceState({}, "", "/");
   window.localStorage.removeItem("pendant.geo");
+  window.localStorage.removeItem("pendant.voice");
   window.localStorage.removeItem("pendant.font");
   window.localStorage.removeItem("pendant.photo");
   window.localStorage.removeItem("pendant.backdrop");
@@ -386,7 +428,7 @@ describe("PhoneShell", () => {
     await waitFor(() => expect(ws.send).toHaveBeenCalled());
     const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as { text?: string; context?: unknown };
     expect(frame.text).toBe("hi");
-    expect(frame.context).toBeUndefined();
+    expect(frame.context).toEqual({ surface: "browser" });
   });
 
   it("attaches GPS on the inbound frame", async () => {
@@ -410,7 +452,7 @@ describe("PhoneShell", () => {
     expect(frame.kind).toBe("inbound");
     expect(frame.text).toBe("near me");
     expect(frame.text).not.toContain("[location]");
-    expect(frame.context).toEqual({ geo: { lat: 47.6, lon: -122.3, accuracy_m: 8 } });
+    expect(frame.context).toEqual({ geo: { lat: 47.6, lon: -122.3, accuracy_m: 8 }, surface: "browser" });
     expect(screen.getByRole("button", { name: "attach" }).getAttribute("title")).toBe("pin ±8m this send");
   });
 
@@ -455,7 +497,7 @@ describe("PhoneShell", () => {
     };
     expect(frame.kind).toBe("pin");
     expect(frame.text).toBeUndefined();
-    expect(frame.context).toEqual({ geo: { lat: 1, lon: 2, accuracy_m: 5 } });
+    expect(frame.context).toEqual({ geo: { lat: 1, lon: 2, accuracy_m: 5 }, surface: "browser" });
     expect(screen.getByText(/Nothing yet/)).toBeTruthy();
   });
 
@@ -552,6 +594,142 @@ describe("PhoneShell", () => {
     });
     const items = screen.getAllByRole("listitem");
     expect(items.map((el) => el.textContent)).toEqual(["first", "second"]);
+  });
+
+  it("Worker has not published voice: no header mic even when Web Speech exists", async () => {
+    vi.stubGlobal("webkitSpeechRecognition", FakeRecognizer);
+    window.localStorage.setItem("pendant.voice", "on");
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    expect(screen.queryByRole("button", { name: /^Voice (on|off)$/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Hold to talk" })).toBeNull();
+    expect(screen.getByPlaceholderText(/Message Kit/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+  });
+
+  it("header mic: typing by default, tap swaps the row for hold-to-talk, remembers, tap again types", async () => {
+    vi.stubGlobal("webkitSpeechRecognition", FakeRecognizer);
+    const ws = await connectSpike({ voice: true });
+    act(() => {
+      ws.open();
+    });
+    const header = screen.getByRole("banner");
+    const mic = screen.getByRole("button", { name: "Voice off" });
+    const cog = screen.getByRole("button", { name: "settings" });
+    expect(header.contains(mic)).toBe(true);
+    expect(mic.compareDocumentPosition(cog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(mic.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByPlaceholderText(/Message Kit/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Hold to talk" })).toBeNull();
+
+    voiceOn();
+    expect(window.localStorage.getItem("pendant.voice")).toBe("on");
+    expect(screen.getByRole("button", { name: "Hold to talk" })).toBeTruthy();
+    expect(screen.queryByPlaceholderText(/Message Kit/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "emoji" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "attach" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Voice on" }));
+    expect(window.localStorage.getItem("pendant.voice")).toBe("off");
+    expect(screen.getByRole("button", { name: "Voice off" })).toBeTruthy();
+    expect(screen.getByPlaceholderText(/Message Kit/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Hold to talk" })).toBeNull();
+  });
+
+  it("a remembered voice pref opens straight into hold-to-talk", async () => {
+    vi.stubGlobal("webkitSpeechRecognition", FakeRecognizer);
+    window.localStorage.setItem("pendant.voice", "on");
+    const ws = await connectSpike({ voice: true });
+    act(() => {
+      ws.open();
+    });
+    expect(screen.getByRole("button", { name: "Voice on" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Hold to talk" })).toBeTruthy();
+    expect(screen.queryByPlaceholderText(/Message Kit/)).toBeNull();
+  });
+
+  it("no Web Speech: no header mic, and a stale voice pref still types", async () => {
+    window.localStorage.setItem("pendant.voice", "on");
+    const ws = await connectSpike({ voice: true });
+    act(() => {
+      ws.open();
+    });
+    expect(screen.queryByRole("button", { name: /^Voice (on|off)$/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Hold to talk" })).toBeNull();
+    expect(screen.getByPlaceholderText(/Message Kit/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+  });
+
+  it("hold-to-talk auto-sends a spoken inbound and reads only the next live reply aloud", async () => {
+    vi.stubGlobal("webkitSpeechRecognition", FakeRecognizer);
+    vi.mocked(browserSpeak).mockClear();
+    const ws = await connectSpike({ voice: true });
+    act(() => {
+      ws.open();
+    });
+    voiceOn();
+    holdAndSay("what's the weather tonight");
+    expect(await screen.findByText("what's the weather tonight")).toBeTruthy();
+    await waitFor(() => expect(ws.send).toHaveBeenCalled());
+    const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as {
+      kind?: string;
+      text?: string;
+      context?: { input?: string; geo?: unknown };
+    };
+    expect(frame.kind).toBe("inbound");
+    expect(frame.text).toBe("what's the weather tonight");
+    expect(frame.context).toEqual({ surface: "browser", input: "spoken" });
+    expect(screen.queryByPlaceholderText(/Message Kit/)).toBeNull();
+
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "typing", user_id: "1182" }));
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "Looks like" }));
+      ws.deliver(JSON.stringify({ id: "old", kind: "reply", text: "yesterday", seq: 1, at: 10, replay: true }));
+      ws.deliver(JSON.stringify({ id: "ping", kind: "push", text: "gym in 10", seq: 2, at: 20 }));
+    });
+    expect(browserSpeak).not.toHaveBeenCalled();
+
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "**Clear** and 62.", seq: 3, at: 30 }));
+    });
+    expect(browserSpeak).toHaveBeenCalledExactlyOnceWith("**Clear** and 62.");
+
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r2", kind: "reply", text: "Anything else?", seq: 4, at: 40 }));
+    });
+    expect(browserSpeak).toHaveBeenCalledOnce();
+  });
+
+  it("a typed turn does not arm the speaker, and a refusal disarms it", async () => {
+    vi.stubGlobal("webkitSpeechRecognition", FakeRecognizer);
+    vi.mocked(browserSpeak).mockClear();
+    const ws = await connectSpike({ voice: true });
+    act(() => {
+      ws.open();
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Message Kit/), { target: { value: "typed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1));
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "read this", seq: 1, at: 10 }));
+    });
+    expect(browserSpeak).not.toHaveBeenCalled();
+    const typed = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as { context?: unknown };
+    expect(typed.context).toEqual({ surface: "browser" });
+
+    voiceOn();
+    holdAndSay("spoken");
+    await waitFor(() => expect(ws.send).toHaveBeenCalledTimes(2));
+    const spokenId = (JSON.parse(String(ws.send.mock.calls[1]?.[0])) as { id: string }).id;
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "error", id: spokenId, text: "rate" }));
+      ws.deliver(JSON.stringify({ id: "r2", kind: "reply", text: "later", seq: 2, at: 20 }));
+    });
+    expect(browserSpeak).not.toHaveBeenCalled();
   });
 
   it("paints transcript replay frames on connect", async () => {

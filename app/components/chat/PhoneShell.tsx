@@ -30,6 +30,7 @@ import { browserGeo } from "@/app/lib/geo";
 import { browserBuzzPush } from "@/app/lib/haptic";
 import { browserNotifyIncoming } from "@/app/lib/notify";
 import { browserSubscribePush } from "@/app/lib/push";
+import { browserSpeak } from "@/app/lib/tts";
 import { isIos, isStandalone, signInHint } from "@/app/lib/install";
 import { fileToPhoto } from "@/app/lib/photo";
 import {
@@ -37,10 +38,12 @@ import {
   browserFollowThemePref,
   browserGeoPref,
   browserPhotoSizePref,
+  browserVoicePref,
   saveBackdropPref,
   saveFollowThemePref,
   saveGeoPref,
   savePhotoSizePref,
+  saveVoicePref,
 } from "@/app/lib/prefs";
 import { applyFont, fontFromQuery } from "@/app/lib/font";
 import { RELEASE } from "@/app/lib/release";
@@ -53,7 +56,10 @@ import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
 import { backdropRevFromUnknown } from "@/lib/backdrop/store";
 import { themeIdFromUnknown, isThemeNotice } from "@/lib/theme/store";
 import { Backdrop } from "./Backdrop";
+import { browserRecognizer } from "./HoldToTalk";
+import { VoiceToggle } from "./VoiceToggle";
 import { parseSlug } from "@/lib/mailbox/slug";
+import type { RecognizerCtor } from "@/lib/phone/speech";
 import { buildContext, wireContext } from "@/lib/phone/context";
 import { GEO_TIMEOUT_MS, GEO_WARM_MS, cachedGeo, geoHint } from "@/lib/phone/geo";
 import { DEFAULT_PHOTO_SIZE, PHOTO_SIZES, parsePhotoSize, photoEdge, type PhotoSizeId } from "@/lib/phone/photo";
@@ -75,6 +81,8 @@ type AuthCfg = {
   google: boolean;
   dev?: boolean;
   gap?: ConfigGap | null;
+  /** Worker publishes pocket voice (header mic + `/api/tts`). Additive; missing is off. */
+  voice?: boolean;
 };
 type Me = { sub: string; email?: string; cranes?: string[] } | null;
 
@@ -162,6 +170,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const pinned = useRef(true);
   const [typing, setTyping] = useState(false);
   const typingTimer = useRef(0);
+  /** Armed by a hold-to-talk send; the next live `reply` is read aloud, then it disarms (docs/voice.md). */
+  const awaitingVoice = useRef(false);
+  /** Header mic. Off = typing (default). Detected after mount so SSR and hydration agree. */
+  const [voiceOn, setVoiceOn] = useState(false);
+  const [recognizer, setRecognizer] = useState<RecognizerCtor | null>(null);
   const gpsOnRef = useRef(true);
   const followThemeRef = useRef(true);
   const geoWarm = useRef(false);
@@ -308,8 +321,18 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     const follow = browserFollowThemePref();
     followThemeRef.current = follow;
     setFollowTheme(follow);
+    // Updater form: a constructor is a function, and setState would call it.
+    setRecognizer(() => browserRecognizer());
+    setVoiceOn(browserVoicePref());
     setPrefsReady(true);
   }, [phone]);
+
+  function toggleVoice() {
+    setVoiceOn((v) => {
+      saveVoicePref(!v);
+      return !v;
+    });
+  }
 
   useEffect(() => {
     return () => {
@@ -666,6 +689,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       }
       if (frame.kind === "error") {
         // Refusal, not a turn: mark our bubble and never paint it as Kit or move the cursor.
+        awaitingVoice.current = false;
         setMessages((prev) => failInThread(prev, id, describeSendError(frame.text)));
         return;
       }
@@ -717,6 +741,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             text: frame.text,
             photo: Boolean(frame.images?.[0]?.url),
           });
+          // Finished turns only: not draft / typing, not hydrate, not a cron push, not a sibling's inbound.
+          if (frame.kind === "reply" && awaitingVoice.current) {
+            awaitingVoice.current = false;
+            void browserSpeak(frame.text ?? "");
+          }
         }
       }
     };
@@ -835,7 +864,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     setGpsHint(geoHint(true, geo));
   }
 
-  async function phoneContext(wantGeo: boolean, opts?: { timeoutMs?: number; cachedOnly?: boolean }) {
+  async function phoneContext(wantGeo: boolean, opts?: { timeoutMs?: number; cachedOnly?: boolean; spoken?: boolean }) {
     const timeoutMs = opts?.timeoutMs ?? GEO_TIMEOUT_MS;
     let geo: Awaited<ReturnType<typeof browserGeo>>;
     if (!wantGeo) {
@@ -846,13 +875,19 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     } else {
       geo = await browserGeo(timeoutMs);
     }
+    // `surface: browser` on every PWA turn so the crane's `[surface]` stamp can tell the pocket from the dash.
     return {
       geo,
-      context: wireContext(buildContext({ geo: geo.ok ? geo.geo : null })),
+      context: wireContext(buildContext({
+        geo: geo.ok ? geo.geo : null,
+        surface: "browser",
+        input: opts?.spoken ? "spoken" : undefined,
+      })),
     };
   }
 
-  async function sendText(text: string, photo?: string) {
+  /** `spoken`: hold-to-talk words. Same inbound frame plus `context.input`, and the reply gets read aloud. */
+  async function sendText(text: string, photo?: string, send?: { spoken?: boolean }) {
     const wantGeo = phone && gpsOn;
     const trimmed = stripHarnessContext(text).trim();
     const waitAck = canSocket && !painting;
@@ -880,9 +915,13 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     if (phone) {
       recoverViewport(window);
     }
+    const spoken = Boolean(phone && outbound && send?.spoken);
     const { geo, context } = phone
-      ? await phoneContext(wantGeo, { cachedOnly: true })
+      ? await phoneContext(wantGeo, { cachedOnly: true, spoken })
       : { geo: { ok: false as const, reason: "unavailable" as const }, context: undefined };
+    if (spoken) {
+      awaitingVoice.current = true;
+    }
     if (phone) {
       if (!wantGeo || geo.ok || !geoWarm.current) {
         setGpsHint(geoHint(wantGeo, geo));
@@ -1137,6 +1176,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           initialText={draft}
           initialEmoji={sampleEmoji}
           onSend={(t) => void sendText(t, stagedPhoto ?? undefined)}
+          voice={phone && voiceOn && Boolean(cfg?.voice)}
+          recognizer={phone ? recognizer : null}
+          onVoice={phone && cfg?.voice ? (t) => void sendText(t, stagedPhoto ?? undefined, { spoken: true }) : undefined}
           onPhoto={phone ? (f) => void stagePhoto(f) : undefined}
           photo={phone ? stagedPhoto : undefined}
           onPhotoClear={phone ? () => setStagedPhoto(null) : undefined}
@@ -1168,157 +1210,160 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             </p>
           </div>
         </div>
-        <InstallApp placement="header" />
-        <SettingsMenu>
-          <div className="flex flex-col gap-2">
-            <InstallApp placement="block" signInFirst={needGoogle} />
-            {phone ? <NotifyEnable onGranted={() => browserSubscribePush(roomSlug)} /> : null}
-            {phone && cfg?.mode === "oidc" && cranes.length
-              ? (
-                  <label className="flex flex-col gap-1 text-xs text-muted">
-                    Agent
-                    <select
-                      className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
-                      value={slug}
-                      onChange={(e) => {
-                        setSlugTouched(true);
-                        setSlug(e.target.value);
-                      }}
-                    >
-                      {slug && !cranes.includes(slug)
-                        ? <option value={slug}>{displaySlug(slug)}</option>
-                        : null}
-                      {cranes.map((c) => (
-                        <option key={c} value={c}>{displaySlug(c)}</option>
-                      ))}
-                    </select>
-                  </label>
-                )
-              : null}
-            {mailboxGap || (phone && cfg?.mode === "oidc" && waitingForCrane)
-              ? null
-              : (
-                  <label className="flex flex-col gap-1 text-xs text-muted">
-                    Agent name
-                    <input
-                      className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
-                      value={slug}
-                      placeholder="the crane slug"
-                      spellCheck={false}
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      autoComplete="off"
-                      onChange={(e) => {
-                        setSlugTouched(true);
-                        setSlug(e.target.value.toLowerCase());
-                      }}
-                    />
-                  </label>
-                )}
-            {cfg?.mode === "spike" && !hideSecrets
-              ? (
-                  <label className="flex flex-col gap-1 text-xs text-muted">
-                    Agent access secret
-                    <input
-                      type="password"
-                      autoComplete="off"
-                      className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
-                      value={secret}
-                      onChange={(e) => setSecret(e.target.value)}
-                    />
-                  </label>
-                )
-              : null}
-            {!phone && cfg?.mode === "oidc" && !hideSecrets
-              ? (
-                  <label className="flex flex-col gap-1 text-xs text-muted">
-                    Agent access token
-                    <input
-                      type="password"
-                      autoComplete="off"
-                      className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
-                      value={bearer}
-                      onChange={(e) => setBearer(e.target.value)}
-                    />
-                  </label>
-                )
-              : null}
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted">Theme</span>
-              <ThemeSelect onHumanPick={phone ? pickHumanTheme : undefined} />
-            </div>
-            {phone
-              ? (
-                  <div className="flex flex-col gap-1">
-                    <label className="flex items-center gap-2 text-xs text-muted">
-                      <input type="checkbox" checked={followTheme} onChange={toggleFollowTheme} />
-                      Follow Kit&apos;s mood
-                    </label>
-                    <p className="text-[11px] text-dim">{`When on, ${title} picks the color theme. Off keeps the one you pick.`}</p>
-                  </div>
-                )
-              : null}
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted">Font size</span>
-              <FontSelect />
-            </div>
-            {phone
-              ? (
-                  <div className="flex flex-col gap-1">
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <InstallApp placement="header" />
+          {phone && cfg?.voice && recognizer ? <VoiceToggle on={voiceOn} onToggle={toggleVoice} /> : null}
+          <SettingsMenu>
+            <div className="flex flex-col gap-2">
+              <InstallApp placement="block" signInFirst={needGoogle} />
+              {phone ? <NotifyEnable onGranted={() => browserSubscribePush(roomSlug)} /> : null}
+              {phone && cfg?.mode === "oidc" && cranes.length
+                ? (
                     <label className="flex flex-col gap-1 text-xs text-muted">
-                      Photo size
+                      Agent
                       <select
                         className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
-                        value={photoSize}
-                        onChange={(e) => pickPhotoSize(e.target.value)}
+                        value={slug}
+                        onChange={(e) => {
+                          setSlugTouched(true);
+                          setSlug(e.target.value);
+                        }}
                       >
-                        {PHOTO_SIZES.map((s) => (
-                          <option key={s.id} value={s.id}>{`${s.label} · ${s.edge} px`}</option>
+                        {slug && !cranes.includes(slug)
+                          ? <option value={slug}>{displaySlug(slug)}</option>
+                          : null}
+                        {cranes.map((c) => (
+                          <option key={c} value={c}>{displaySlug(c)}</option>
                         ))}
                       </select>
                     </label>
-                    <p className="text-[11px] text-dim">Smaller sends faster and costs fewer tokens to look at.</p>
-                  </div>
-                )
-              : null}
-            {phone
-              ? (
-                  <div className="flex flex-col gap-1">
-                    <label className="flex items-center gap-2 text-xs text-muted">
-                      <input type="checkbox" checked={backdropOn} onChange={toggleBackdrop} />
-                      Backdrop
+                  )
+                : null}
+              {mailboxGap || (phone && cfg?.mode === "oidc" && waitingForCrane)
+                ? null
+                : (
+                    <label className="flex flex-col gap-1 text-xs text-muted">
+                      Agent name
+                      <input
+                        className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+                        value={slug}
+                        placeholder="the crane slug"
+                        spellCheck={false}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        autoComplete="off"
+                        onChange={(e) => {
+                          setSlugTouched(true);
+                          setSlug(e.target.value.toLowerCase());
+                        }}
+                      />
                     </label>
-                    <p className="text-[11px] text-dim">{`${title} can paint a wallpaper behind the thread. Off keeps the theme.`}</p>
-                  </div>
-                )
-              : null}
-            {(cfg?.dev || (cfg?.google && phone))
-              ? (
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2">
-                    {cfg?.dev
-                      ? phone
-                        ? <a className="text-xs text-dim underline" href="/crane">Open crane stand-in</a>
-                        : <a className="text-xs text-dim underline" href="/">Open phone</a>
-                      : null}
-                    {cfg?.google && phone && !cfg.gap
-                      ? (
-                          me
-                            ? (
-                                <form action="/api/auth/logout" method="post">
-                                  <button type="submit" className="text-xs text-dim underline">sign out</button>
-                                </form>
-                              )
-                            : <a className="text-xs text-mark underline" href="/login">sign in</a>
-                        )
-                      : null}
-                  </div>
-                )
-              : null}
-            <p className="border-t border-line pt-2 text-[11px] text-faint" title="Pendant version">
-              {RELEASE}
-            </p>
-          </div>
-        </SettingsMenu>
+                  )}
+              {cfg?.mode === "spike" && !hideSecrets
+                ? (
+                    <label className="flex flex-col gap-1 text-xs text-muted">
+                      Agent access secret
+                      <input
+                        type="password"
+                        autoComplete="off"
+                        className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+                        value={secret}
+                        onChange={(e) => setSecret(e.target.value)}
+                      />
+                    </label>
+                  )
+                : null}
+              {!phone && cfg?.mode === "oidc" && !hideSecrets
+                ? (
+                    <label className="flex flex-col gap-1 text-xs text-muted">
+                      Agent access token
+                      <input
+                        type="password"
+                        autoComplete="off"
+                        className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+                        value={bearer}
+                        onChange={(e) => setBearer(e.target.value)}
+                      />
+                    </label>
+                  )
+                : null}
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted">Theme</span>
+                <ThemeSelect onHumanPick={phone ? pickHumanTheme : undefined} />
+              </div>
+              {phone
+                ? (
+                    <div className="flex flex-col gap-1">
+                      <label className="flex items-center gap-2 text-xs text-muted">
+                        <input type="checkbox" checked={followTheme} onChange={toggleFollowTheme} />
+                        Follow Kit&apos;s mood
+                      </label>
+                      <p className="text-[11px] text-dim">{`When on, ${title} picks the color theme. Off keeps the one you pick.`}</p>
+                    </div>
+                  )
+                : null}
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted">Font size</span>
+                <FontSelect />
+              </div>
+              {phone
+                ? (
+                    <div className="flex flex-col gap-1">
+                      <label className="flex flex-col gap-1 text-xs text-muted">
+                        Photo size
+                        <select
+                          className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+                          value={photoSize}
+                          onChange={(e) => pickPhotoSize(e.target.value)}
+                        >
+                          {PHOTO_SIZES.map((s) => (
+                            <option key={s.id} value={s.id}>{`${s.label} · ${s.edge} px`}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <p className="text-[11px] text-dim">Smaller sends faster and costs fewer tokens to look at.</p>
+                    </div>
+                  )
+                : null}
+              {phone
+                ? (
+                    <div className="flex flex-col gap-1">
+                      <label className="flex items-center gap-2 text-xs text-muted">
+                        <input type="checkbox" checked={backdropOn} onChange={toggleBackdrop} />
+                        Backdrop
+                      </label>
+                      <p className="text-[11px] text-dim">{`${title} can paint a wallpaper behind the thread. Off keeps the theme.`}</p>
+                    </div>
+                  )
+                : null}
+              {(cfg?.dev || (cfg?.google && phone))
+                ? (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2">
+                      {cfg?.dev
+                        ? phone
+                          ? <a className="text-xs text-dim underline" href="/crane">Open crane stand-in</a>
+                          : <a className="text-xs text-dim underline" href="/">Open phone</a>
+                        : null}
+                      {cfg?.google && phone && !cfg.gap
+                        ? (
+                            me
+                              ? (
+                                  <form action="/api/auth/logout" method="post">
+                                    <button type="submit" className="text-xs text-dim underline">sign out</button>
+                                  </form>
+                                )
+                              : <a className="text-xs text-mark underline" href="/login">sign in</a>
+                          )
+                        : null}
+                    </div>
+                  )
+                : null}
+              <p className="border-t border-line pt-2 text-[11px] text-faint" title="Pendant version">
+                {RELEASE}
+              </p>
+            </div>
+          </SettingsMenu>
+        </div>
       </header>
       {faceHint
         ? <p className="shrink-0 border-b border-line px-3 py-1 text-[11px] text-danger">{faceHint}</p>

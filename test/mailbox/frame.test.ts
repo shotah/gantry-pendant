@@ -74,6 +74,17 @@ describe("frame", () => {
     expect(pendant.ok && pendant.frame.context?.surface).toBeUndefined();
   });
 
+  it("keeps context.input spoken as additive and drops other input names", () => {
+    const spoken = parseFrame(JSON.stringify({ text: "hi", context: { surface: "browser", input: "spoken" } }));
+    expect(spoken.ok && spoken.frame.context).toEqual({ surface: "browser", input: "spoken" });
+    const typed = parseFrame(JSON.stringify({ context: { input: "typed" } }));
+    expect(typed.ok && typed.frame.context?.input).toBeUndefined();
+    const junk = parseFrame(JSON.stringify({ context: { input: 1 } }));
+    expect(junk.ok && junk.frame.context?.input).toBeUndefined();
+    const absent = parseFrame(JSON.stringify({ text: "hi", context: { geo: { lat: 1, lon: 2 } } }));
+    expect(absent.ok && absent.frame.context?.input).toBeUndefined();
+  });
+
   it("rejects junk, oversize text, and bad images", () => {
     expect(parseFrame("nope").ok).toBe(false);
     expect(parseFrame("[]").ok).toBe(false);

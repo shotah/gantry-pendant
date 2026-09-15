@@ -17,6 +17,7 @@ export function buildContext(opts: {
   battery?: { pct: number; charging: boolean } | null;
   net?: PhoneContext["net"];
   surface?: PhoneContext["surface"];
+  input?: PhoneContext["input"];
 }): PhoneContext {
   const ctx: PhoneContext = {};
   if (opts.now) {
@@ -37,12 +38,15 @@ export function buildContext(opts: {
   if (opts.surface) {
     ctx.surface = opts.surface;
   }
+  if (opts.input) {
+    ctx.input = opts.input;
+  }
   return ctx;
 }
 
-/** Drop `{}` so GPS-off turns do not store an empty context blob. */
+/** Drop `{}` so a mouth that stamps nothing does not store an empty context blob. */
 export function wireContext(ctx: PhoneContext): PhoneContext | undefined {
-  if (ctx.geo || ctx.battery || ctx.net || ctx.at || ctx.tz || ctx.surface) {
+  if (ctx.geo || ctx.battery || ctx.net || ctx.at || ctx.tz || ctx.surface || ctx.input) {
     return ctx;
   }
   return undefined;

@@ -93,6 +93,10 @@ cp .dev.vars.example .dev.vars
 npm run dev                      # http://127.0.0.1:3000 (Chrome Install works on loopback)
 ```
 
+Optional `GOOGLE_TTS_API_KEY` in that file is Kit's pocket voice on
+hold-to-talk. Without it (and without `VOICE=on`) the header mic is
+hidden. Paste: [voice.md](voice.md#turn-on-the-pocket-voice).
+
 `PENDANT_DEV=1` on loopback:
 
 - `/api/auth/me` returns mock Ada (`1182…` / `ada@example.com`, `cranes: ["ada"]`). No Google.

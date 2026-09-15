@@ -40,7 +40,7 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | --- | --- |
 | Additive JSON (`seq`, `at`, extra `context`) | Old clients must keep working. Cab `parseFrame` and Helm `parseFrame` drop unknown keys — that is the bar |
 | New required field, new `kind`, or a required header | Cab and Helm must ship in lockstep, or the mailbox must tolerate the old client |
-| Auth (`/api/auth/*`, session JWE, 4401) | Cab and Helm POST the ID token and store the JWE. Spike query creds are PWA loopback only. Cookie CSRF is PWA-only — do not send `pendant_session` from OkHttp or URLSession. Additive `version` on `GET /api/auth/config` is dropped today (`AuthConfig` keeps `mode` / `google`). `GET /api/auth/nonce` is issued: both fetch it and mint locally on a failed GET (404 / junk / empty). Close `4401` / handshake 401 drops the stored JWE; 403 does not. Do not **require** stored nonces until those native builds are the sideload |
+| Auth (`/api/auth/*`, session JWE, 4401) | Cab and Helm POST the ID token and store the JWE. Spike query creds are PWA loopback only. Cookie CSRF is PWA-only — do not send `pendant_session` from OkHttp or URLSession. Additive `version` and `voice` on `GET /api/auth/config` are dropped today (`AuthConfig` keeps `mode` / `google`). `GET /api/auth/nonce` is issued: both fetch it and mint locally on a failed GET (404 / junk / empty). Close `4401` / handshake 401 drops the stored JWE; 403 does not. Do not **require** stored nonces until those native builds are the sideload |
 | Queue / `ack` / `since` / `seq` | Cab and Helm parse `seq` / `at`, insert like `placeInThread`, ack the highest seq. Transcript hydrate is the same frames plus `replay` — see below |
 | Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Helm pins the last bubble. Do not assume either needs the PWA CSS |
 | Draft→reply remount | PWA `live` React key, Cab / Helm `composeKey` (`kit-live`) so Markdown does not remount when `__draft__` becomes `r1`. Not on the wire. |
@@ -49,8 +49,9 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | Header face (size, hang, stroke) | Cab TopAppBar and Helm header overlay, not PWA-only — [Header face](#header-face) |
 | Room theme | Cab and Helm follow Kit when `followTheme` is on; GET `/api/theme` on connect — [Theme](#theme-what-every-mouth-must-do-the-same) |
 | PWA-only UI (font, Install) | Cab has Compose. Helm has SwiftUI. |
-| Voice (STT / TTS) | Mouth-local. No audio on the wire. Cab Auto / Helm CarPlay already read `reply` / `push` and stuff spoken Reply into `inbound`. Handheld dictation is compose-only — [voice.md](voice.md) |
-| `context.surface` | Closed set: `browser` \| `android` \| `android_auto` \| `ios` \| `carplay`. Unknown names (including Cab’s old `pendant`) are dropped. Additive; old APKs still send `android` / `android_auto` |
+| Voice (STT / TTS) | Mouth-local. No audio on the wire. Cab Auto / Helm CarPlay already read `reply` / `push` and stuff spoken Reply into `inbound`; Cab tags that inbound `context.input: spoken` (`MailboxService.sendSpoken`, HUN Reply and the in-dash thread). PWA hold-to-talk auto-sends `inbound` + `context.input: spoken` and reads the reply through `POST /api/tts` (Chirp 3 HD, session or Bearer). Cab / Helm may reuse the route — [voice.md](voice.md) |
+| `context.surface` | Closed set: `browser` \| `android` \| `android_auto` \| `ios` \| `carplay`. Unknown names (including Cab’s old `pendant`) are dropped. Additive; old APKs still send `android` / `android_auto`. The crane gives `android_auto` / `carplay` the read-aloud hint on `[surface]` |
+| `context.input` | Closed set of one: `spoken`. How the human produced the turn (PWA hold-to-talk, Cab Auto host STT); `surface` still says which device. Additive — old APKs and Helm drop it unread; the crane stamps `[input] spoken` with the same read-aloud hint (bare when `surface` is already driving) — [voice.md](voice.md#wire) |
 
 **Cover:** after a mailbox frame change, read
 `repos/gantry-cab/app/src/main/java/com/gantree/cab/mailbox/Wire.kt` and

@@ -34,4 +34,7 @@
   ]
   // Optional wrangler var (not a secret): LOCATION_HINT=wnam|enam|weur|eeur|apac|…
   // First MAILBOX.get() pins the Durable Object. Set near the Mini.
+  // Optional wrangler var (not a secret): TTS_VOICE=en-US-Chirp3-HD-Leda
+  // Kit's Chirp 3 HD voice for hold-to-talk. The key is the GOOGLE_TTS_API_KEY secret.
+  // Optional wrangler var: VOICE=on|off — pocket voice flag. Unset follows the key.
 }

@@ -8,10 +8,13 @@ import {
   geoPrefOn,
   PHOTO_PREF_KEY,
   photoSizePref,
+  VOICE_PREF_KEY,
+  voicePrefOn,
   writeBackdropPref,
   writeFollowThemePref,
   writeGeoPref,
   writePhotoSizePref,
+  writeVoicePref,
 } from "@/lib/phone/prefs";
 
 function memStorage() {
@@ -78,5 +81,21 @@ describe("follow theme pref", () => {
     writeFollowThemePref(storage, true);
     expect(followThemePrefOn(storage)).toBe(true);
     expect(FOLLOW_THEME_PREF_KEY).toBe("pendant.followTheme");
+  });
+});
+
+describe("voice pref", () => {
+  it("defaults off (typing is the default) and only on swaps to hold-to-talk", () => {
+    const { mem, storage } = memStorage();
+    expect(voicePrefOn(null)).toBe(false);
+    expect(voicePrefOn(storage)).toBe(false);
+    writeVoicePref(storage, true);
+    expect(mem.get(VOICE_PREF_KEY)).toBe("on");
+    expect(voicePrefOn(storage)).toBe(true);
+    writeVoicePref(storage, false);
+    expect(voicePrefOn(storage)).toBe(false);
+    mem.set(VOICE_PREF_KEY, "yes");
+    expect(voicePrefOn(storage)).toBe(false);
+    expect(VOICE_PREF_KEY).toBe("pendant.voice");
   });
 });

@@ -15,6 +15,9 @@ export type Geo = {
 
 export type Surface = "browser" | "android" | "android_auto" | "ios" | "carplay";
 
+/** How the human produced this turn. `spoken` = hold-to-talk; the reply will be read aloud. */
+export type InputMode = "spoken";
+
 export type PhoneContext = {
   at?: string;
   tz?: string;
@@ -22,6 +25,7 @@ export type PhoneContext = {
   battery?: { pct: number; charging: boolean };
   net?: "wifi" | "cellular" | "unknown";
   surface?: Surface;
+  input?: InputMode;
 };
 
 export type FrameImage = { url: string };
@@ -121,6 +125,9 @@ function parseContext(raw: unknown): PhoneContext | undefined {
     || o.surface === "carplay"
   ) {
     ctx.surface = o.surface;
+  }
+  if (o.input === "spoken") {
+    ctx.input = o.input;
   }
   return ctx;
 }

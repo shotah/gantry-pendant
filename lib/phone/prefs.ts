@@ -4,6 +4,7 @@ export const GEO_PREF_KEY = "pendant.geo";
 export const PHOTO_PREF_KEY = "pendant.photo";
 export const BACKDROP_PREF_KEY = "pendant.backdrop";
 export const FOLLOW_THEME_PREF_KEY = "pendant.followTheme";
+export const VOICE_PREF_KEY = "pendant.voice";
 
 type Getter = { getItem(key: string): string | null };
 type Setter = { setItem(key: string, value: string): void };
@@ -42,4 +43,13 @@ export function followThemePrefOn(storage: Getter | null | undefined): boolean {
 
 export function writeFollowThemePref(storage: Setter, on: boolean): void {
   storage.setItem(FOLLOW_THEME_PREF_KEY, on ? "on" : "off");
+}
+
+/** Header mic → hold-to-talk compose. Default **off**: typing is the default; only `"on"` swaps. */
+export function voicePrefOn(storage: Getter | null | undefined): boolean {
+  return storage?.getItem(VOICE_PREF_KEY) === "on";
+}
+
+export function writeVoicePref(storage: Setter, on: boolean): void {
+  storage.setItem(VOICE_PREF_KEY, on ? "on" : "off");
 }

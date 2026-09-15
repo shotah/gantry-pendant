@@ -2,9 +2,11 @@
 
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { EmojiButton, EmojiPanel } from "./EmojiPicker";
+import { HoldToTalk } from "./HoldToTalk";
 import { applyEmoji } from "@/app/lib/emoji";
 import { fileFromClipboard } from "@/app/lib/photo";
 import { matchSlash, slashInsert, slashToken, type SlashCommand } from "@/app/lib/slash";
+import type { RecognizerCtor } from "@/lib/phone/speech";
 
 function ClipIcon() {
   return (
@@ -209,11 +211,23 @@ export function Compose({
   catalog = [],
   initialText = "",
   initialEmoji = false,
+  voice = false,
+  recognizer = null,
+  onVoice,
 }: {
   disabled?: boolean;
   placeholder?: string;
   /** Text only; the staged `photo` rides along on the same turn from the owner. */
   onSend: (text: string) => void;
+  /**
+   * Header mic is on: the whole input row becomes one hold-to-talk bar. Typing is
+   * the default; the owner flips this from `VoiceToggle` (docs/voice.md).
+   */
+  voice?: boolean;
+  /** Web Speech constructor the owner detected after mount. Null keeps the typed row even when `voice` is on. */
+  recognizer?: RecognizerCtor | null;
+  /** Hold-to-talk words. Auto-sent by the owner as a spoken turn; nothing lands in the textarea. */
+  onVoice?: (text: string) => void;
   /** Stage a pick, shot, or paste on the draft. Nothing goes on the wire until Send. */
   onPhoto?: (file: File) => void;
   /** Encoded data URL sitting on the draft; Send is live with no text while it is set. */
@@ -248,6 +262,7 @@ export function Compose({
   const open = Boolean(commands && !disabled && !dismissed && !emojiOpen && (matches.length > 0 || waiting));
   const highlight = matches[Math.min(active, Math.max(0, matches.length - 1))];
   const attach = Boolean(onPhoto || commands || onGpsToggle || onPin);
+  const holdToTalk = Boolean(voice && onVoice && recognizer);
 
   useLayoutEffect(() => {
     const box = boxRef.current;
@@ -446,88 +461,99 @@ export function Compose({
             </div>
           )
         : null}
-      <div className="flex items-stretch gap-2">
-        <div className="flex min-h-11 min-w-0 flex-1 items-stretch rounded-xl border border-edge bg-canvas">
-          <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 py-0.5 pl-0.5">
-            <EmojiButton
+      {holdToTalk && onVoice && recognizer
+        ? (
+            <HoldToTalk
               disabled={disabled}
-              open={emojiOpen}
-              onToggle={toggleEmoji}
+              onText={onVoice}
+              recognizer={recognizer}
+              className="min-h-11 w-full px-3 py-2 text-base"
             />
-            {attach
-              ? (
-                  <AttachChip
-                    gpsOn={Boolean(onGpsToggle || onPin) && gpsOn}
-                    gpsHint={gpsHint}
+          )
+        : (
+            <div className="flex items-stretch gap-2">
+              <div className="flex min-h-11 min-w-0 flex-1 items-stretch rounded-xl border border-edge bg-canvas">
+                <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 py-0.5 pl-0.5">
+                  <EmojiButton
                     disabled={disabled}
-                    onCamera={onPhoto ? () => cameraRef.current?.click() : undefined}
-                    onPhoto={onPhoto ? () => fileRef.current?.click() : undefined}
-                    onCommands={commands ? toggleCommands : undefined}
-                    onToggle={onGpsToggle}
-                    onPin={onPin}
+                    open={emojiOpen}
+                    onToggle={toggleEmoji}
                   />
-                )
-              : null}
-          </div>
-          <textarea
-            ref={boxRef}
-            id="compose"
-            className="block min-h-11 min-w-0 flex-1 resize-none border-0 bg-transparent py-2 pl-1 pr-3 text-chat text-fg outline-none"
-            rows={2}
-            value={text}
-            placeholder={placeholder ?? "Message"}
-            disabled={disabled}
-            role="combobox"
-            aria-autocomplete="list"
-            aria-expanded={open}
-            aria-controls={open ? listId : undefined}
-            onChange={(e) => writeDraft(e.target.value, e.target.selectionStart ?? e.target.value.length)}
-            onFocus={() => onEngage?.()}
-            onCompositionStart={() => {
-              composing.current = true;
-            }}
-            onCompositionEnd={(e) => {
-              composing.current = false;
-              writeDraft(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length);
-            }}
-            onKeyDown={(e) => {
-              if (open && highlight) {
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setActive((i) => (i + 1) % matches.length);
-                  return;
-                }
-                if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setActive((i) => (i - 1 + matches.length) % matches.length);
-                  return;
-                }
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  pick(highlight);
-                  return;
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  setDismissed(true);
-                  return;
-                }
-              }
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submit(e);
-              }
-            }}
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={disabled || (!text.trim() && !photo)}
-          className="flex shrink-0 items-center justify-center self-stretch rounded-xl border border-accent-line bg-accent-soft px-3 text-sm text-mark disabled:opacity-40"
-        >
-          Send
-        </button>
-      </div>
+                  {attach
+                    ? (
+                        <AttachChip
+                          gpsOn={Boolean(onGpsToggle || onPin) && gpsOn}
+                          gpsHint={gpsHint}
+                          disabled={disabled}
+                          onCamera={onPhoto ? () => cameraRef.current?.click() : undefined}
+                          onPhoto={onPhoto ? () => fileRef.current?.click() : undefined}
+                          onCommands={commands ? toggleCommands : undefined}
+                          onToggle={onGpsToggle}
+                          onPin={onPin}
+                        />
+                      )
+                    : null}
+                </div>
+                <textarea
+                  ref={boxRef}
+                  id="compose"
+                  className="block min-h-11 min-w-0 flex-1 resize-none border-0 bg-transparent py-2 pl-1 pr-3 text-chat text-fg outline-none"
+                  rows={2}
+                  value={text}
+                  placeholder={placeholder ?? "Message"}
+                  disabled={disabled}
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={open}
+                  aria-controls={open ? listId : undefined}
+                  onChange={(e) => writeDraft(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+                  onFocus={() => onEngage?.()}
+                  onCompositionStart={() => {
+                    composing.current = true;
+                  }}
+                  onCompositionEnd={(e) => {
+                    composing.current = false;
+                    writeDraft(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length);
+                  }}
+                  onKeyDown={(e) => {
+                    if (open && highlight) {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setActive((i) => (i + 1) % matches.length);
+                        return;
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setActive((i) => (i - 1 + matches.length) % matches.length);
+                        return;
+                      }
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        pick(highlight);
+                        return;
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setDismissed(true);
+                        return;
+                      }
+                    }
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      submit(e);
+                    }
+                  }}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={disabled || (!text.trim() && !photo)}
+                className="flex shrink-0 items-center justify-center self-stretch rounded-xl border border-accent-line bg-accent-soft px-3 text-sm text-mark disabled:opacity-40"
+              >
+                Send
+              </button>
+            </div>
+          )}
     </form>
   );
 }

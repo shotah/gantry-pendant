@@ -14,12 +14,13 @@ describe("auth config route", () => {
   it("echoes package.json version as additive JSON", async () => {
     const res = GET(new Request("https://pendant.example/api/auth/config"));
     expect(res.status).toBe(200);
-    const body = await res.json() as { mode: string; google: boolean; version: string; dev: boolean };
+    const body = await res.json() as { mode: string; google: boolean; version: string; dev: boolean; voice: boolean };
     expect(body).toMatchObject({
       mode: "oidc",
       google: true,
       version: PACKAGE_VERSION,
       dev: false,
+      voice: false,
     });
     expect(body.version).toMatch(/^\d+\.\d+\.\d+$/);
   });

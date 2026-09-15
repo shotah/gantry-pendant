@@ -99,8 +99,8 @@ the handheld and the mailbox.
 Wire, queue, `ack` / `since` / `seq`:
 [docs/architecture.md](docs/architecture.md) ·
 [docs/frontends.md](docs/frontends.md). Voice is a mouth skin — OS STT
-in, OS / Auto TTS out. No audio on the wire:
-[docs/voice.md](docs/voice.md).
+in, Chirp through the Worker out in your hand, the Auto host out in
+the car. No audio on the wire: [docs/voice.md](docs/voice.md).
 
 ## Docs
 
@@ -119,12 +119,13 @@ The plan lives here, not in chat.
 | How the sockets meet | [docs/architecture.md](docs/architecture.md) |
 | Two principals | [docs/security.md](docs/security.md) |
 | Cross-repo gotchas | [docs/edgecases.md](docs/edgecases.md) |
-| Dictate / hear Kit | [docs/voice.md](docs/voice.md) |
+| Dictate / hear Kit | [docs/voice.md](docs/voice.md) — key paste: [turn on](docs/voice.md#turn-on-the-pocket-voice) |
 
 ## Hello
 
 ```bash
 cp .dev.vars.example .dev.vars   # MAILBOX_SECRET + PENDANT_DEV
+# optional: GOOGLE_TTS_API_KEY in that file so hold-to-talk can speak
 npm install
 npm test
 npm run lint                     # ESLint + markdownlint, writes fixes
@@ -162,6 +163,12 @@ same GCP project as google-mcp is fine. Not Desktop, not
 
 Leftover, no yard: `.env` + `npm run secrets:push`. Do not mix that
 with Gantree after the yard owns `CRANE_BEARERS`.
+
+Kit's pocket voice and lock-screen Web Push are **not** in Gantree
+Settings. `GOOGLE_TTS_API_KEY` and `VAPID_*` go on the Worker with
+`npx wrangler secret put` (loopback: `.dev.vars`). No TTS key (or
+`VOICE=off`) hides the header mic; `/api/tts` is 404. Mint and paste:
+[docs/voice.md](docs/voice.md#turn-on-the-pocket-voice).
 
 Crane env (`CHANNEL=pendant`) is written by Gantree:
 

@@ -157,6 +157,28 @@ Walk: [setup.md](setup.md). Gantree
 `MAILBOX_SECRET` and `PENDANT_DEV` stay in `.env` / `.dev.vars` for
 loopback. Never put them on `workers.dev`.
 
+### 5b. Leftover Worker secrets (not Gantree)
+
+Gantree Settings pushes Google / session / `CRANE_BEARERS`. These are
+still `npx wrangler secret put` from this checkout (or leftover
+`npm run secrets:push` from `.env`):
+
+| Name | Kind | Where | Without it |
+| --- | --- | --- | --- |
+| `VAPID_*` | secret | `npm run vapid`, then `wrangler secret put` | socket + queue still work; Enable notifications only toasts while the page is open |
+| `GOOGLE_TTS_API_KEY` | secret | GCP Cloud TTS API key (restricted to that API); loopback `.dev.vars`; workers.dev `npx wrangler secret put GOOGLE_TTS_API_KEY` | hold-to-talk still sends text; `POST /api/tts` is 404 |
+| `TTS_VOICE` | var | optional; loopback `.dev.vars`; workers.dev `npx wrangler vars put TTS_VOICE` | default `en-US-Chirp3-HD-Leda` |
+| `VOICE` | var | optional; `on` / `off`; loopback `.dev.vars`; workers.dev `npx wrangler vars put VOICE` | unset follows the key: no key → no header mic; `off` hides it even with a key |
+
+```bash
+npx wrangler secret put GOOGLE_TTS_API_KEY
+```
+
+Mint the key: same GCP project as the OAuth client → enable Cloud
+Text-to-Speech → API key restricted to that API. Full walk:
+[voice.md](voice.md#turn-on-the-pocket-voice). `.dev.vars.example`
+is the loopback copy.
+
 ### 6. Google OAuth client
 
 GCP → **APIs & Services → Credentials → Create credentials → OAuth
