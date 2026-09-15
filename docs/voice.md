@@ -280,7 +280,15 @@ A2HS) **or** the Worker has not published voice
 (`/api/auth/config` `voice: false` — no TTS key, or `VOICE=off`),
 neither the header mic nor the bar is rendered, and a remembered `on`
 still types — not a banner, not a Worker fallback in this version.
-`not-allowed` paints "Mic blocked" until the next press.
+`not-allowed` paints "Mic blocked" (title: enable it in Settings).
+The cog's **Access** block is the UI: **Enable microphone** (hidden
+when the Worker has not published voice) asks `getUserMedia` then
+stops the tracks so hold-to-talk is not the first prompt;
+**Enable location** is the OS geo prompt, then the same send-on-turns
+pref as the attach GPS chip (On/Off); notifications stay on that
+row, compact, label left and a small **Enable** / **Test** chip
+right. A denied permission is **Blocked** — Chrome/iOS site
+settings, not this cog.
 
 Cab handheld: `android.speech.SpeechRecognizer` (or the recognizer
 intent), `RECORD_AUDIO` in the manifest, the same hold button, the
@@ -601,6 +609,9 @@ strips asterisks here.
 - [x] Header mic left of the cog toggles typing (default) ↔ voice,
       remembered in `pendant.voice`; hidden without `SpeechRecognition`
       (`app/components/chat/VoiceToggle.tsx`, `lib/phone/prefs.ts`)
+- [x] Settings → Access: enable microphone (when voice is published),
+      enable location, compact notification Test; denied is Blocked
+      (`MicEnable`, `GeoEnable`, `NotifyEnable`)
 - [x] Voice on swaps the whole compose row for one wide hold-to-talk
       bar; off is the untouched typed row
       (`app/components/chat/HoldToTalk.tsx`, `Compose`)

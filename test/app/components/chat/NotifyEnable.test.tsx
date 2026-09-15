@@ -37,12 +37,12 @@ describe("NotifyEnable", () => {
     });
     expect(request).toHaveBeenCalledOnce();
     expect(onGranted).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "Send test ping" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Test" })).toBeTruthy();
     expect(screen.getByText("Sent a test ping.")).toBeTruthy();
     expect(constructed).toHaveLength(1);
     constructed.length = 0;
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Send test ping" }));
+      fireEvent.click(screen.getByRole("button", { name: "Test" }));
     });
     expect(constructed).toHaveLength(1);
   });

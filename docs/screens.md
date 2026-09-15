@@ -56,7 +56,7 @@ the Durable Object.
   &nbsp;
   <img src="../assets/docs/attach.png" alt="Attach tray — photo, commands, GPS" width="220">
   &nbsp;
-  <img src="../assets/docs/settings.png" alt="Settings — theme, font, photo size, backdrop" width="220">
+  <img src="../assets/docs/settings.png" alt="Settings — Access, theme, font, photo size, backdrop" width="220">
 </p>
 
 <p align="center">
@@ -79,7 +79,7 @@ the Durable Object.
 | `thread-day` | `/?sample=thread&theme=lamp` | Lamp theme. |
 | `thread-paper` | `/?sample=thread&theme=paper` | Paper (light). Boom / Inlay / Lamp stay shared with gantree. |
 | `thread-xl` | `/?sample=thread&font=xl` | Extra-large chat type. Small is the default. |
-| `settings` | `/?sample=empty` | Cog — theme, follow Kit’s mood, font, photo size, backdrop, Install. |
+| `settings` | `/?sample=empty` | Cog — Access (mic when voice is on, location, notifications), theme, follow Kit’s mood, font, photo size, backdrop, Install. |
 | `crane` | `/crane?sample=crane` | Loopback stand-in for the harness (`PENDANT_DEV`). |
 
 ---

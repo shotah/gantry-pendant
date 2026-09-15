@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useDevicePermission } from "@/app/lib/permit";
 import { hushSpeaker } from "@/app/lib/tts";
 import { listen, recognitionCtor, type ListenHandle, type RecognizerCtor } from "@/lib/phone/speech";
 
@@ -48,11 +49,24 @@ export function HoldToTalk({
   const outside = useRef(false);
   const blocked = useRef(false);
   const live = useRef(true);
+  const mic = useDevicePermission("microphone");
 
   useEffect(() => () => {
     live.current = false;
     handle.current?.abort();
   }, []);
+
+  useEffect(() => {
+    if (mic === "granted") {
+      blocked.current = false;
+      setState((s) => (s === "blocked" ? "idle" : s));
+      return;
+    }
+    if (mic === "denied") {
+      blocked.current = true;
+      setState((s) => (handle.current ? s : "blocked"));
+    }
+  }, [mic]);
 
   function begin() {
     if (disabled || handle.current) {
@@ -109,7 +123,7 @@ export function HoldToTalk({
       type="button"
       aria-label="Hold to talk"
       aria-pressed={state === "listening"}
-      title="Hold, speak, release to send. Slide off to cancel."
+      title={state === "blocked" ? "Enable the microphone in Settings." : "Hold, speak, release to send. Slide off to cancel."}
       disabled={disabled || state === "finishing"}
       className={`flex touch-none select-none items-center justify-center rounded-xl border bg-accent-soft text-mark disabled:opacity-40 ${
         state === "listening" ? "animate-pulse border-ok" : "border-accent-line"

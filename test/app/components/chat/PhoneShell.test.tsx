@@ -180,6 +180,7 @@ afterEach(() => {
   window.localStorage.removeItem("pendant.theme");
   document.documentElement.removeAttribute("data-font");
   document.documentElement.removeAttribute("data-theme");
+  Reflect.deleteProperty(navigator, "permissions");
   Reflect.deleteProperty(navigator, "geolocation");
   Reflect.deleteProperty(navigator, "clipboard");
   Reflect.deleteProperty(navigator, "userAgent");
@@ -353,6 +354,9 @@ describe("PhoneShell", () => {
     expect(screen.getByRole("radiogroup", { name: "Font size" })).toBeTruthy();
     expect(screen.getByRole("radio", { name: "Small" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("button", { name: "Enable notifications" })).toBeTruthy();
+    expect(screen.getByText("Access")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enable location" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Enable microphone" })).toBeNull();
     expect(screen.getByRole("link", { name: "Open crane stand-in" })).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Agent name"), { target: { value: "Ada" } });
     expect((screen.getByLabelText("Agent name") as HTMLInputElement).value).toBe("ada");
@@ -638,6 +642,15 @@ describe("PhoneShell", () => {
     expect(screen.getByRole("button", { name: "Voice off" })).toBeTruthy();
     expect(screen.getByPlaceholderText(/Message Kit/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Hold to talk" })).toBeNull();
+  });
+
+  it("settings Access asks for the microphone when voice is published", async () => {
+    vi.stubGlobal("webkitSpeechRecognition", FakeRecognizer);
+    await connectSpike({ voice: true });
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    expect(await screen.findByRole("button", { name: "Enable microphone" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enable location" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enable notifications" })).toBeTruthy();
   });
 
   it("a remembered voice pref opens straight into hold-to-talk", async () => {

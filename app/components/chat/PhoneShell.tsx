@@ -6,8 +6,10 @@ import { ThemeSelect } from "../shared/ThemeSelect";
 import type { SlashCommand } from "@/app/lib/slash";
 import { Compose } from "./Compose";
 import { ConfigGapNote } from "./ConfigGapNote";
+import { GeoEnable } from "./GeoEnable";
 import { InstallApp } from "./InstallApp";
 import { KitAvatar } from "./KitAvatar";
+import { MicEnable } from "./MicEnable";
 import { NotifyEnable } from "./NotifyEnable";
 import { SettingsMenu } from "./SettingsMenu";
 import { bubbleFrom, Thread, type ChatBubble } from "./Thread";
@@ -1216,7 +1218,16 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           <SettingsMenu>
             <div className="flex flex-col gap-2">
               <InstallApp placement="block" signInFirst={needGoogle} />
-              {phone ? <NotifyEnable onGranted={() => browserSubscribePush(roomSlug)} /> : null}
+              {phone
+                ? (
+                    <div className="flex flex-col gap-1.5 border-b border-line pb-2">
+                      <span className="text-xs text-muted">Access</span>
+                      {cfg?.voice ? <MicEnable /> : null}
+                      <GeoEnable sending={gpsOn} onToggle={toggleGps} />
+                      <NotifyEnable onGranted={() => browserSubscribePush(roomSlug)} />
+                    </div>
+                  )
+                : null}
               {phone && cfg?.mode === "oidc" && cranes.length
                 ? (
                     <label className="flex flex-col gap-1 text-xs text-muted">

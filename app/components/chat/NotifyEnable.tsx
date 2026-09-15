@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PermitRow } from "./PermitRow";
 import { isIos, isStandalone } from "@/app/lib/install";
 import { browserAskNotify, browserShowNotify, notifyPermission } from "@/app/lib/notify";
 import {
@@ -75,32 +76,23 @@ export function NotifyEnable({
     setStatus(ok ? "Sent a test ping." : "The toast did not appear.");
   }
 
+  if (granted) {
+    return (
+      <PermitRow
+        name="Notifications"
+        action="Test"
+        hint={hint}
+        onClick={() => void test()}
+      />
+    );
+  }
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs text-muted">Notifications</span>
-      {granted
-        ? (
-            <button
-              type="button"
-              className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark"
-              onClick={() => void test()}
-            >
-              Send test ping
-            </button>
-          )
-        : (
-            <button
-              type="button"
-              className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm text-mark disabled:opacity-50"
-              disabled={blocked}
-              onClick={() => void enable()}
-            >
-              Enable notifications
-            </button>
-          )}
-      {hint
-        ? <p className="text-xs text-dim">{hint}</p>
-        : null}
-    </div>
+    <PermitRow
+      name="Notifications"
+      action="Enable notifications"
+      hint={hint}
+      disabled={blocked}
+      onClick={() => void enable()}
+    />
   );
 }
