@@ -53,6 +53,14 @@ list (last `allow` frame) at handshake **and** on every later frame.
 Optional `ALLOWED_SUBS` is a yard-wide extra, not a requirement.
 The crane allowlists too (fail closed if the Worker is mis-set).
 
+Sign-in is the same door. A Google account that no crane lists gets
+**no session**: the Worker checks the KV directory, then every slug in
+`CRANE_BEARERS` (its Durable Object room), then `ALLOWED_SUBS`, before
+minting. The PWA callback bounces to `/?auth=denied` and the shell says
+the account is not on any crane's list; `POST /api/auth/token` answers
+`403 { "error": "unauthorized" }`. Email matches only when Google
+verified it. See `lib/auth/door.ts`.
+
 Real crane: header only. `?bearer=` / `?secret=` are **spike mode**
 (two tabs). An oidc-mode upgrade with a query token is 401. `/crane`
 is the loopback stand-in under `PENDANT_DEV`, not production.

@@ -34,6 +34,7 @@ describe("native cab token", () => {
     expect(session).toMatchObject({
       sub: "1182",
       email: "ada@x.com",
+      emailVerified: true,
       exp: now + 7 * 24 * 60 * 60 * 1000,
     });
     expect(session?.token.length).toBeGreaterThan(20);

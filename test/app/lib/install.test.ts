@@ -58,6 +58,12 @@ describe("install", () => {
     );
   });
 
+  it("names the real reason when Google signed them in but no crane lists the account", () => {
+    const want = "That Google account isn't on any crane's list. Ask the operator to add it, then sign in again.";
+    expect(signInHint({ ios: false, standalone: false, retry: false, denied: true })).toBe(want);
+    expect(signInHint({ ios: true, standalone: true, retry: true, denied: true })).toBe(want);
+  });
+
   it("defaults the header hint on and only treats off as dismissed", () => {
     const mem = new Map<string, string>();
     const storage = {

@@ -7,6 +7,7 @@ export type NativeSession = {
   token: string;
   sub: string;
   email?: string;
+  emailVerified: boolean;
   exp: number;
 };
 
@@ -58,6 +59,7 @@ export async function mintNativeSession(opts: MintNativeOpts): Promise<NativeSes
     token,
     sub: claims.sub,
     email: claims.email,
+    emailVerified: claims.emailVerified === true,
     exp: claims.exp,
   };
 }

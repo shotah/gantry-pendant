@@ -51,7 +51,7 @@ import { applyFont, fontFromQuery } from "@/app/lib/font";
 import { RELEASE } from "@/app/lib/release";
 import { applyTheme, cacheRoomTheme, cachedRoomTheme, paintTheme, parseTheme, THEME_KEY, themeFromQuery } from "@/app/lib/theme";
 import { browserWakeLock, releaseScreenWake, type WakeLockSentinel } from "@/app/lib/wake";
-import { authRetryFromQuery } from "@/lib/auth/bounce";
+import { authDeniedFromQuery, authRetryFromQuery } from "@/lib/auth/bounce";
 import type { ConfigGap } from "@/lib/auth/mode";
 import { googleStartHref } from "@/lib/auth/returnTo";
 import { displaySlug, faceRevFromUnknown } from "@/lib/avatar/store";
@@ -239,6 +239,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       ios: isIos(navigator),
       standalone: isStandalone(window, navigator),
       retry: authRetryFromQuery(q),
+      denied: authDeniedFromQuery(q),
     }));
   }, []);
 

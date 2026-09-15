@@ -281,6 +281,15 @@ describe("PhoneShell", () => {
     expect(screen.getByText("Google didn't finish. Try again.")).toBeTruthy();
   });
 
+  it("tells an unlisted Google account why it was turned away from ?auth=denied", async () => {
+    window.history.replaceState({}, "", "/?auth=denied");
+    stubOidc(null);
+    render(<PhoneShell />);
+    expect(await screen.findByRole("link", { name: "Continue with Google" })).toBeTruthy();
+    expect(screen.getByText(/isn't on any crane's list/)).toBeTruthy();
+    expect(screen.queryByText(/Google didn't finish/)).toBeNull();
+  });
+
   it("carries a typed slug through the Google start link", async () => {
     window.history.replaceState({}, "", "/?slug=kit");
     stubOidc(null);

@@ -11,6 +11,14 @@ export const AUTH_RETRY_QUERY = "auth";
 export const AUTH_RETRY_VALUE = "retry";
 export const AUTH_RETRY_LOCATION = `/?${AUTH_RETRY_QUERY}=${AUTH_RETRY_VALUE}`;
 
+/** Google signed them in, but no crane lists the account. No session was minted. */
+export const AUTH_DENIED_VALUE = "denied";
+export const AUTH_DENIED_LOCATION = `/?${AUTH_RETRY_QUERY}=${AUTH_DENIED_VALUE}`;
+
 export function authRetryFromQuery(q: { get(name: string): string | null }): boolean {
   return q.get(AUTH_RETRY_QUERY) === AUTH_RETRY_VALUE;
+}
+
+export function authDeniedFromQuery(q: { get(name: string): string | null }): boolean {
+  return q.get(AUTH_RETRY_QUERY) === AUTH_DENIED_VALUE;
 }

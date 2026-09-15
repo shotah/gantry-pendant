@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
-import { AUTH_RETRY_LOCATION } from "@/lib/auth/bounce";
+import { AUTH_DENIED_LOCATION, AUTH_RETRY_LOCATION } from "@/lib/auth/bounce";
 import { unauthorized, tooMany } from "@/lib/auth/deny";
+import { onSomeCrane } from "@/lib/auth/door";
 import { decodeOAuthBind, exchangeCode, verifyIdToken } from "@/lib/auth/google";
 import { limitAuthIp, limitAuthSub } from "@/lib/auth/limit";
 import { googleCallbackLocation } from "@/lib/auth/returnTo";
@@ -9,11 +10,11 @@ import { clearCookie, mintSession, parseCookie, sessionCookie, STATE_COOKIE } fr
 export const dynamic = "force-dynamic";
 
 /** No session minted. iOS delivers this callback twice; the loser goes home, not to a 401. */
-function bounce(secure: boolean): Response {
+function bounce(secure: boolean, location: string = AUTH_RETRY_LOCATION): Response {
   return new Response(null, {
     status: 302,
     headers: {
-      Location: AUTH_RETRY_LOCATION,
+      Location: location,
       "Set-Cookie": clearCookie(STATE_COOKIE, secure),
     },
   });
@@ -53,6 +54,9 @@ export async function GET(req: Request) {
   }
   if (!limitAuthSub(identity.sub)) {
     return tooMany();
+  }
+  if (!(await onSomeCrane(env, identity))) {
+    return bounce(secure, AUTH_DENIED_LOCATION);
   }
   const token = await mintSession(sessionSecret, {
     sub: identity.sub,

@@ -56,9 +56,13 @@ export function isIos(nav: Pick<Navigator, "userAgent">): boolean {
  * Under "Continue with Google". iOS 16.7+ copies Safari's cookies into a new
  * Home Screen app, so on an iPhone the order is sign in, then add. `retry` is
  * the callback bounce (`/?auth=retry`): the Home Screen app got the loser of
- * iOS's twin callback delivery, or Google really did fail.
+ * iOS's twin callback delivery, or Google really did fail. `denied`
+ * (`/?auth=denied`) is a real Google account that no crane lists.
  */
-export function signInHint(opts: { ios: boolean; standalone: boolean; retry: boolean }): string {
+export function signInHint(opts: { ios: boolean; standalone: boolean; retry: boolean; denied?: boolean }): string {
+  if (opts.denied) {
+    return "That Google account isn't on any crane's list. Ask the operator to add it, then sign in again.";
+  }
   if (opts.retry) {
     return opts.ios && opts.standalone
       ? "Google didn't finish. Try again, or open pendant in Safari, sign in there, then Add to Home Screen again."

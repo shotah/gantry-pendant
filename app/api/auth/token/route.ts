@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
-import { configError, tooMany, unauthorized } from "@/lib/auth/deny";
+import { configError, forbidden, tooMany, unauthorized } from "@/lib/auth/deny";
+import { onSomeCrane } from "@/lib/auth/door";
 import { limitAuthIp, limitAuthSub } from "@/lib/auth/limit";
 import { resolveAuthMode } from "@/lib/auth/mode";
 import { mintNativeSession, parseNativeTokenBody } from "@/lib/auth/native";
@@ -51,6 +52,13 @@ export async function POST(req: Request) {
   }
   if (!limitAuthSub(session.sub)) {
     return tooMany();
+  }
+  if (!(await onSomeCrane(env, {
+    sub: session.sub,
+    email: session.email,
+    emailVerified: session.emailVerified,
+  }))) {
+    return forbidden();
   }
   return Response.json({
     token: session.token,
