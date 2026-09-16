@@ -8,6 +8,7 @@ import {
   synthesizeRequest,
   TTS_ENDPOINT,
   TTS_VOICE_DEFAULT,
+  voiceFor,
   voiceOffered,
 } from "@/lib/tts/http";
 
@@ -69,6 +70,38 @@ describe("parseTtsBody", () => {
     expect(parseTtsBody({ text: "a".repeat(SPEAK_BYTES_MAX) }).ok).toBe(true);
     expect(parseTtsBody({ text: "a".repeat(SPEAK_BYTES_MAX + 1) })).toEqual({ ok: false, error: "too large" });
     expect(parseTtsBody({ text: "é".repeat(SPEAK_BYTES_MAX / 2 + 1) })).toEqual({ ok: false, error: "too large" });
+  });
+
+  it("keeps a known lang and drops junk instead of refusing the turn", () => {
+    expect(parseTtsBody({ text: "こんにちは", lang: "ja" })).toEqual({ ok: true, text: "こんにちは", lang: "ja" });
+    expect(parseTtsBody({ text: "你好", lang: "zh" })).toEqual({ ok: true, text: "你好", lang: "zh" });
+    expect(parseTtsBody({ text: "hi", lang: "en" })).toEqual({ ok: true, text: "hi", lang: "en" });
+    // An old mouth sends `{ text }`; a confused one sends BCP-47. Both still speak in the Worker's voice.
+    expect(parseTtsBody({ text: "hi" })).toEqual({ ok: true, text: "hi" });
+    expect(parseTtsBody({ text: "hi", lang: "ja-JP" })).toEqual({ ok: true, text: "hi" });
+    expect(parseTtsBody({ text: "hi", lang: 7 })).toEqual({ ok: true, text: "hi" });
+  });
+});
+
+describe("voiceFor", () => {
+  it("keeps the speaker and swaps the locale for another language", () => {
+    expect(voiceFor(cfg, "ja")).toEqual({ apiKey: "k", voice: "ja-JP-Chirp3-HD-Leda", languageCode: "ja-JP" });
+    expect(voiceFor(cfg, "zh")).toEqual({ apiKey: "k", voice: "cmn-CN-Chirp3-HD-Leda", languageCode: "cmn-CN" });
+    const puck = { apiKey: "k", voice: "en-GB-Chirp3-HD-Puck", languageCode: "en-GB" };
+    expect(voiceFor(puck, "ja").voice).toBe("ja-JP-Chirp3-HD-Puck");
+  });
+
+  it("leaves a voice that already speaks that language alone, accent included", () => {
+    expect(voiceFor(cfg, "en")).toBe(cfg);
+    const puck = { apiKey: "k", voice: "en-GB-Chirp3-HD-Puck", languageCode: "en-GB" };
+    expect(voiceFor(puck, "en")).toBe(puck);
+    const aoede = { apiKey: "k", voice: "cmn-CN-Chirp3-HD-Aoede", languageCode: "cmn-CN" };
+    expect(voiceFor(aoede, "zh")).toBe(aoede);
+  });
+
+  it("falls back to Leda in the asked-for locale when TTS_VOICE is not locale-shaped", () => {
+    const odd = { apiKey: "k", voice: "nonsense", languageCode: "en-US" };
+    expect(voiceFor(odd, "ja")).toEqual({ apiKey: "k", voice: "ja-JP-Chirp3-HD-Leda", languageCode: "ja-JP" });
   });
 });
 

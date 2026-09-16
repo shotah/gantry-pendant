@@ -73,6 +73,13 @@ describe("browserSpeak", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:kit/1");
   });
 
+  it("tells the Worker which language to speak when Settings picked one", async () => {
+    const fetchFn = vi.fn(async () => mp3());
+    await browserSpeak("今夜は**雨**です。", { fetch: fetchFn as unknown as typeof fetch, audio: audio(), lang: "ja" });
+    const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ text: "今夜は雨です。", lang: "ja" });
+  });
+
   it("says nothing for markdown-only or blank replies and never hits the Worker", async () => {
     const fetchFn = vi.fn();
     expect(await browserSpeak("---", { fetch: fetchFn as unknown as typeof fetch, audio: audio() })).toBe(false);

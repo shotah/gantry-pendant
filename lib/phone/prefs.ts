@@ -1,3 +1,4 @@
+import { parseLang, type LangId } from "./lang";
 import { parsePhotoSize, type PhotoSizeId } from "./photo";
 
 export const GEO_PREF_KEY = "pendant.geo";
@@ -5,6 +6,7 @@ export const PHOTO_PREF_KEY = "pendant.photo";
 export const BACKDROP_PREF_KEY = "pendant.backdrop";
 export const FOLLOW_THEME_PREF_KEY = "pendant.followTheme";
 export const VOICE_PREF_KEY = "pendant.voice";
+export const LANG_PREF_KEY = "pendant.lang";
 
 type Getter = { getItem(key: string): string | null };
 type Setter = { setItem(key: string, value: string): void };
@@ -52,4 +54,13 @@ export function voicePrefOn(storage: Getter | null | undefined): boolean {
 
 export function writeVoicePref(storage: Setter, on: boolean): void {
   storage.setItem(VOICE_PREF_KEY, on ? "on" : "off");
+}
+
+/** Settings → Language for hold-to-talk and Kit's voice. Junk or missing → English. */
+export function langPref(storage: Getter | null | undefined): LangId {
+  return parseLang(storage?.getItem(LANG_PREF_KEY));
+}
+
+export function writeLangPref(storage: Setter, id: LangId): void {
+  storage.setItem(LANG_PREF_KEY, id);
 }

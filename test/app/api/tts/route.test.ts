@@ -95,6 +95,31 @@ describe("tts route", () => {
     expect(await sent.json()).toMatchObject({ voice: { languageCode: "en-GB", name: "en-GB-Chirp3-HD-Puck" } });
   });
 
+  it("speaks the phone's Settings → Language with the same speaker in that locale", async () => {
+    const c = await cookie();
+    const res = await POST(ttsReq(JSON.stringify({ text: "今夜は雨です。", lang: "ja" }), { Cookie: c }));
+    expect(res.status).toBe(200);
+    let sent = googleFetch.mock.calls[0]?.[0] as Request;
+    expect(await sent.json()).toMatchObject({
+      input: { text: "今夜は雨です。" },
+      voice: { languageCode: "ja-JP", name: "ja-JP-Chirp3-HD-Leda" },
+    });
+    await POST(ttsReq(JSON.stringify({ text: "今晚有雨。", lang: "zh" }), { Cookie: c }));
+    sent = googleFetch.mock.calls[1]?.[0] as Request;
+    expect(await sent.json()).toMatchObject({ voice: { languageCode: "cmn-CN", name: "cmn-CN-Chirp3-HD-Leda" } });
+  });
+
+  it("keeps a TTS_VOICE that already speaks the asked-for language, and ignores junk lang", async () => {
+    mockEnv.TTS_VOICE = "en-GB-Chirp3-HD-Puck";
+    const c = await cookie();
+    await POST(ttsReq(JSON.stringify({ text: "hi", lang: "en" }), { Cookie: c }));
+    let sent = googleFetch.mock.calls[0]?.[0] as Request;
+    expect(await sent.json()).toMatchObject({ voice: { languageCode: "en-GB", name: "en-GB-Chirp3-HD-Puck" } });
+    await POST(ttsReq(JSON.stringify({ text: "hi", lang: "ja-JP" }), { Cookie: c }));
+    sent = googleFetch.mock.calls[1]?.[0] as Request;
+    expect(await sent.json()).toMatchObject({ voice: { languageCode: "en-GB", name: "en-GB-Chirp3-HD-Puck" } });
+  });
+
   it("refuses junk, blanks, and oversize before spending a Google call", async () => {
     const c = await cookie();
     expect((await POST(ttsReq("not json", { Cookie: c }))).status).toBe(400);

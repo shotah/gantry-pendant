@@ -6,11 +6,14 @@
  */
 
 import { utf8Bytes } from "../mailbox/caps";
+import { langIdOf, ttsLocale, type LangId } from "../phone/lang";
 import { SPEAK_BYTES_MAX } from "../phone/speakable";
 
 export const TTS_ENDPOINT = "https://texttospeech.googleapis.com/v1/text:synthesize";
+/** Chirp 3 HD, `<locale>-<model>-<voice>`. Every Chirp 3 HD speaker exists in every locale. */
+const CHIRP_DEFAULT_SPEAKER = "Chirp3-HD-Leda";
 /** Chirp 3 HD, `<locale>-Chirp3-HD-<voice>`. Override with the `TTS_VOICE` var. */
-export const TTS_VOICE_DEFAULT = "en-US-Chirp3-HD-Leda";
+export const TTS_VOICE_DEFAULT = `en-US-${CHIRP_DEFAULT_SPEAKER}`;
 /** Request JSON cap; the text inside is capped tighter by `SPEAK_BYTES_MAX`. */
 export const TTS_JSON_MAX = 16_384;
 
@@ -60,14 +63,19 @@ export function readTts(env: TtsEnv): TtsConfig | null {
   return { apiKey, voice, languageCode: languageOf(voice) };
 }
 
-export type TtsBody = { ok: true; text: string } | { ok: false; error: "bad frame" | "too large" };
+export type TtsBody = { ok: true; text: string; lang?: LangId } | { ok: false; error: "bad frame" | "too large" };
 
-/** `{ text }` only. Blank is a bad frame, not a silent 200. */
+/**
+ * `{ text, lang? }`. Blank is a bad frame, not a silent 200. `lang` is the
+ * phone's Settings → Language (`en` | `ja` | `zh`); unknown or missing is
+ * dropped, not refused, so an old mouth that sends `{ text }` still speaks.
+ */
 export function parseTtsBody(raw: unknown): TtsBody {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return { ok: false, error: "bad frame" };
   }
-  const text = (raw as Record<string, unknown>).text;
+  const o = raw as Record<string, unknown>;
+  const text = o.text;
   if (typeof text !== "string") {
     return { ok: false, error: "bad frame" };
   }
@@ -78,7 +86,30 @@ export function parseTtsBody(raw: unknown): TtsBody {
   if (utf8Bytes(trimmed) > SPEAK_BYTES_MAX) {
     return { ok: false, error: "too large" };
   }
-  return { ok: true, text: trimmed };
+  const lang = langIdOf(o.lang);
+  return lang ? { ok: true, text: trimmed, lang } : { ok: true, text: trimmed };
+}
+
+/**
+ * Same speaker, other tongue: `en-US-Chirp3-HD-Leda` + `ja` → `ja-JP-Chirp3-HD-Leda`.
+ * `TTS_VOICE` still picks *who* talks; the phone picks *what language*. A voice
+ * already in that language (`en-GB-…` for `en`) is kept, so a deployer's accent
+ * wins inside its own language. A `TTS_VOICE` that is not `<locale>-…` shaped
+ * falls back to Leda in the asked-for locale.
+ */
+export function voiceFor(cfg: TtsConfig, lang: LangId): TtsConfig {
+  const locale = ttsLocale(lang);
+  if (primaryTag(cfg.languageCode) === primaryTag(locale)) {
+    return cfg;
+  }
+  const prefix = `${cfg.languageCode}-`;
+  const speaker = cfg.voice.startsWith(prefix) ? cfg.voice.slice(prefix.length) : CHIRP_DEFAULT_SPEAKER;
+  return { ...cfg, voice: `${locale}-${speaker}`, languageCode: locale };
+}
+
+/** `en-GB` → `en`, `cmn-CN` → `cmn`. */
+function primaryTag(locale: string): string {
+  return locale.split("-")[0] ?? locale;
 }
 
 /** Plain `text` input. Chirp 3 HD reads punctuation as pauses; the mouth already stripped markdown. */

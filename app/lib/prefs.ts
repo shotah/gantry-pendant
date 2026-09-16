@@ -1,13 +1,16 @@
+import type { LangId } from "@/lib/phone/lang";
 import type { PhotoSizeId } from "@/lib/phone/photo";
 import {
   backdropPrefOn,
   followThemePrefOn,
   geoPrefOn,
+  langPref,
   photoSizePref,
   voicePrefOn,
   writeBackdropPref,
   writeFollowThemePref,
   writeGeoPref,
+  writeLangPref,
   writePhotoSizePref,
   writeVoicePref,
 } from "@/lib/phone/prefs";
@@ -80,4 +83,18 @@ export function saveVoicePref(on: boolean): void {
     return;
   }
   writeVoicePref(window.localStorage, on);
+}
+
+export function browserLangPref(): LangId {
+  if (typeof window === "undefined") {
+    return langPref(null);
+  }
+  return langPref(window.localStorage);
+}
+
+export function saveLangPref(id: LangId): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  writeLangPref(window.localStorage, id);
 }

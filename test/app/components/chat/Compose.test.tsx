@@ -270,6 +270,12 @@ describe("Compose", () => {
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
   });
 
+  it("hands Settings → Language to the recognizer so a hold is heard in that tongue", () => {
+    render(<Compose onSend={vi.fn()} onVoice={vi.fn()} voice recognizer={FakeRecognizer} lang="ja-JP" />);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Hold to talk" }), { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+    expect(FakeRecognizer.last?.lang).toBe("ja-JP");
+  });
+
   it("keeps the typed row when voice is on but the browser has no Web Speech", () => {
     render(<Compose onSend={vi.fn()} onVoice={vi.fn()} voice recognizer={null} />);
     expect(screen.queryByRole("button", { name: "Hold to talk" })).toBeNull();

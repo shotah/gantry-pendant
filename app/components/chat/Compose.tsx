@@ -214,6 +214,7 @@ export function Compose({
   initialEmoji = false,
   voice = false,
   recognizer = null,
+  lang,
   onVoice,
   speaking = "idle",
 }: {
@@ -228,6 +229,8 @@ export function Compose({
   voice?: boolean;
   /** Web Speech constructor the owner detected after mount. Null keeps the typed row even when `voice` is on. */
   recognizer?: RecognizerCtor | null;
+  /** BCP-47 the recognizer should listen in (Settings → Language). Unset leaves the browser default. */
+  lang?: string;
   /** Hold-to-talk words. Auto-sent by the owner as a spoken turn; nothing lands in the textarea. */
   onVoice?: (text: string) => void;
   /** Kit's reply is being fetched or played; the hold bar says so. */
@@ -471,6 +474,7 @@ export function Compose({
               disabled={disabled}
               onText={onVoice}
               recognizer={recognizer}
+              lang={lang}
               speaking={speaking}
               className="min-h-11 w-full px-3 py-2 text-base"
             />

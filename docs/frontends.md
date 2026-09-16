@@ -50,6 +50,7 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | Room theme | Cab and Helm follow Kit when `followTheme` is on; GET `/api/theme` on connect — [Theme](#theme-what-every-mouth-must-do-the-same) |
 | PWA-only UI (font, Install) | Cab has Compose. Helm has SwiftUI. |
 | Voice (STT / TTS) | Mouth-local. No audio on the wire. Cab Auto / Helm CarPlay already read `reply` / `push` and stuff spoken Reply into `inbound`; Cab tags that inbound `context.input: spoken` (`MailboxService.sendSpoken`, HUN Reply and the in-dash thread). PWA hold-to-talk auto-sends `inbound` + `context.input: spoken` and reads the reply through `POST /api/tts` (Chirp 3 HD, session or Bearer). Cab / Helm may reuse the route — [voice.md](voice.md) |
+| Language (Settings → Language) | Per device, **not on the mailbox wire**. Closed set `en` \| `ja` \| `zh`, default `en`. Sets the recognizer locale and rides on `POST /api/tts` as additive `lang`; the Worker swaps the Chirp locale and keeps the speaker. Old mouths that post `{ text }` still speak — [Language](#language-what-every-mouth-must-do-the-same) |
 | `context.surface` | Closed set: `browser` \| `android` \| `android_auto` \| `ios` \| `carplay`. Unknown names (including Cab’s old `pendant`) are dropped. Additive; old APKs still send `android` / `android_auto`. The crane gives `android_auto` / `carplay` the read-aloud hint on `[surface]` |
 | `context.input` | Closed set of one: `spoken`. How the human produced the turn (PWA hold-to-talk, Cab Auto host STT); `surface` still says which device. Additive — old APKs and Helm drop it unread; the crane stamps `[input] spoken` with the same read-aloud hint (bare when `surface` is already driving) — [voice.md](voice.md#wire) |
 
@@ -191,6 +192,69 @@ JSON.parse (`too large` image, extra image, bad kind), then `rate` and
 the post-parse `bad frame` checks. Junk that never parses (oversize
 whole frame, not JSON) still has no id — mouths fall back to newest
 pending.
+
+---
+
+## Language (what every mouth must do the same)
+
+Source of truth: `lib/phone/lang.ts` (`LANGUAGES`), `lib/phone/prefs.ts`
+(`pendant.lang`), `lib/tts/http.ts` (`parseTtsBody`, `voiceFor`),
+`app/api/tts/route.ts`. Why voice is mouth-local: [voice.md](voice.md).
+
+One dropdown in Settings. It answers two questions on the device —
+what the hold-to-talk recognizer listens for, and what language Kit's
+voice speaks — and nothing else. It is **not** a `context` key, not a
+frame, and the Durable Object never sees it. The crane answers in
+whatever language it was spoken to (persona `language` on Gantree is
+free text and separate); this knob only makes the mouth hear and say
+those words correctly.
+
+| Id | Label | Recognizer (BCP-47) | Google TTS locale |
+| --- | --- | --- | --- |
+| `en` | English | `en-US` | `en-US` |
+| `ja` | 日本語 · Japanese | `ja-JP` | `ja-JP` |
+| `zh` | 中文 · Mandarin | `zh-CN` | `cmn-CN` |
+
+**Default `en`.** Junk or missing in storage is `en`. Chirp 3 HD spells
+Mandarin `cmn-CN`; every recognizer wants `zh-CN`. That is why the row
+carries both — do not send the recognizer tag to the Worker.
+
+**Pref.** PWA `localStorage["pendant.lang"]` = the id. Cab should store
+the same id at `SharedPreferences("cab")["lang"]`, Helm at UserDefaults
+`helm` / `lang` — same three ids, same labels, same table, like
+`pendant.photo`. Only shown when the Worker publishes voice
+(`/api/auth/config` `voice: true`); without voice the dropdown has
+nothing to drive.
+
+**Voice in.** PWA `HoldToTalk` → `listen(..., { lang })` →
+`SpeechRecognition.lang = "ja-JP"`. Cab handheld: the same BCP-47 on
+`RecognizerIntent.EXTRA_LANGUAGE` (and `EXTRA_LANGUAGE_PREFERENCE`).
+Helm: `SFSpeechRecognizer(locale: Locale(identifier: "ja-JP"))`.
+Auto / CarPlay already did host STT; this does not touch the car.
+
+**Voice out.** `POST /api/tts` body grows one **additive** key:
+
+```json
+{ "text": "今夜は雨です。", "lang": "ja" }
+```
+
+The Worker keeps `TTS_VOICE` as *who* talks and swaps the locale for
+*what language*: `en-US-Chirp3-HD-Leda` + `ja` → `ja-JP-Chirp3-HD-Leda`;
+`zh` → `cmn-CN-Chirp3-HD-Leda`. Chirp 3 HD ships every speaker in every
+locale, so the same voice follows the human across languages. A
+`TTS_VOICE` already in that language is kept (`en-GB-…-Puck` stays
+British for `en`). Missing or unknown `lang` (`"ja-JP"`, a number, an
+old mouth that posts `{ text }`) is **dropped, not refused** — the
+reply still speaks in the Worker's configured voice. Cab and Helm
+reuse the route with their Bearer session and send the id they
+stored; nothing else changes on their side of `/api/tts`.
+
+**Not this walk.** `context.lang` on the frame so the crane sees the
+pick — additive if ever wanted, and then Cab / Helm would send it too.
+Today the crane already answers in the language it was addressed in.
+Growing the set is one row in `LANGUAGES` here plus the same row in
+Cab / Helm; the Worker side needs nothing new as long as the locale is
+one Chirp 3 HD ships.
 
 ---
 

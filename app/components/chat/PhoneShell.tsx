@@ -39,11 +39,13 @@ import {
   browserBackdropPref,
   browserFollowThemePref,
   browserGeoPref,
+  browserLangPref,
   browserPhotoSizePref,
   browserVoicePref,
   saveBackdropPref,
   saveFollowThemePref,
   saveGeoPref,
+  saveLangPref,
   savePhotoSizePref,
   saveVoicePref,
 } from "@/app/lib/prefs";
@@ -64,6 +66,7 @@ import { parseSlug } from "@/lib/mailbox/slug";
 import type { RecognizerCtor } from "@/lib/phone/speech";
 import { buildContext, wireContext } from "@/lib/phone/context";
 import { GEO_TIMEOUT_MS, GEO_WARM_MS, cachedGeo, geoHint } from "@/lib/phone/geo";
+import { DEFAULT_LANG, LANGUAGES, parseLang, speechLang, type LangId } from "@/lib/phone/lang";
 import { DEFAULT_PHOTO_SIZE, PHOTO_SIZES, parsePhotoSize, photoEdge, type PhotoSizeId } from "@/lib/phone/photo";
 import { describePhotoError, describeSendError } from "@/lib/phone/sendError";
 import { speakFailHint, speakPhaseAfter, speakStatus, type SpeakPhase } from "@/lib/phone/speaker";
@@ -179,6 +182,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   /** Header mic. Off = typing (default). Detected after mount so SSR and hydration agree. */
   const [voiceOn, setVoiceOn] = useState(false);
   const [recognizer, setRecognizer] = useState<RecognizerCtor | null>(null);
+  /** Settings → Language: what hold-to-talk hears and what Kit's voice speaks. The ref is for the socket closure. */
+  const [lang, setLang] = useState<LangId>(DEFAULT_LANG);
+  const langRef = useRef<LangId>(DEFAULT_LANG);
   const gpsOnRef = useRef(true);
   const followThemeRef = useRef(true);
   const geoWarm = useRef(false);
@@ -329,8 +335,18 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     // Updater form: a constructor is a function, and setState would call it.
     setRecognizer(() => browserRecognizer());
     setVoiceOn(browserVoicePref());
+    const tongue = browserLangPref();
+    langRef.current = tongue;
+    setLang(tongue);
     setPrefsReady(true);
   }, [phone]);
+
+  function pickLang(raw: string) {
+    const next = parseLang(raw);
+    saveLangPref(next);
+    langRef.current = next;
+    setLang(next);
+  }
 
   function toggleVoice() {
     setVoiceOn((v) => {
@@ -750,6 +766,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           if (frame.kind === "reply" && awaitingVoice.current) {
             awaitingVoice.current = false;
             void browserSpeak(frame.text ?? "", {
+              lang: langRef.current,
               onPhase: (ev) => {
                 setSpeakPhase(speakPhaseAfter(ev));
                 if (ev.phase === "failed") {
@@ -1199,6 +1216,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           onSend={(t) => void sendText(t, stagedPhoto ?? undefined)}
           voice={phone && voiceOn && Boolean(cfg?.voice)}
           recognizer={phone ? recognizer : null}
+          lang={phone ? speechLang(lang) : undefined}
           onVoice={phone && cfg?.voice ? (t) => void sendText(t, stagedPhoto ?? undefined, { spoken: true }) : undefined}
           speaking={speakPhase}
           onPhoto={phone ? (f) => void stagePhoto(f) : undefined}
@@ -1342,6 +1360,25 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                 <span className="text-xs text-muted">Font size</span>
                 <FontSelect />
               </div>
+              {phone && cfg?.voice
+                ? (
+                    <div className="flex flex-col gap-1">
+                      <label className="flex flex-col gap-1 text-xs text-muted">
+                        Language
+                        <select
+                          className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
+                          value={lang}
+                          onChange={(e) => pickLang(e.target.value)}
+                        >
+                          {LANGUAGES.map((l) => (
+                            <option key={l.id} value={l.id}>{l.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <p className="text-[11px] text-dim">{`Hold to talk listens, and ${title} speaks, in this language.`}</p>
+                    </div>
+                  )
+                : null}
               {phone
                 ? (
                     <div className="flex flex-col gap-1">

@@ -6,6 +6,8 @@ import {
   followThemePrefOn,
   GEO_PREF_KEY,
   geoPrefOn,
+  LANG_PREF_KEY,
+  langPref,
   PHOTO_PREF_KEY,
   photoSizePref,
   VOICE_PREF_KEY,
@@ -13,6 +15,7 @@ import {
   writeBackdropPref,
   writeFollowThemePref,
   writeGeoPref,
+  writeLangPref,
   writePhotoSizePref,
   writeVoicePref,
 } from "@/lib/phone/prefs";
@@ -97,5 +100,21 @@ describe("voice pref", () => {
     mem.set(VOICE_PREF_KEY, "yes");
     expect(voicePrefOn(storage)).toBe(false);
     expect(VOICE_PREF_KEY).toBe("pendant.voice");
+  });
+});
+
+describe("language pref", () => {
+  it("defaults English, round-trips, and shrugs off junk", () => {
+    const { mem, storage } = memStorage();
+    expect(langPref(null)).toBe("en");
+    expect(langPref(storage)).toBe("en");
+    writeLangPref(storage, "ja");
+    expect(mem.get(LANG_PREF_KEY)).toBe("ja");
+    expect(langPref(storage)).toBe("ja");
+    writeLangPref(storage, "zh");
+    expect(langPref(storage)).toBe("zh");
+    mem.set(LANG_PREF_KEY, "ja-JP");
+    expect(langPref(storage)).toBe("en");
+    expect(LANG_PREF_KEY).toBe("pendant.lang");
   });
 });

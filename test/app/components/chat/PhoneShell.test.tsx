@@ -155,6 +155,7 @@ beforeEach(() => {
   window.history.replaceState({}, "", "/");
   window.localStorage.removeItem("pendant.geo");
   window.localStorage.removeItem("pendant.voice");
+  window.localStorage.removeItem("pendant.lang");
   window.localStorage.removeItem("pendant.font");
   window.localStorage.removeItem("pendant.photo");
   window.localStorage.removeItem("pendant.backdrop");
@@ -173,6 +174,7 @@ afterEach(() => {
   window.history.replaceState({}, "", "/");
   window.localStorage.removeItem("pendant.geo");
   window.localStorage.removeItem("pendant.voice");
+  window.localStorage.removeItem("pendant.lang");
   window.localStorage.removeItem("pendant.font");
   window.localStorage.removeItem("pendant.photo");
   window.localStorage.removeItem("pendant.backdrop");
@@ -675,6 +677,63 @@ describe("PhoneShell", () => {
     expect(screen.queryByPlaceholderText(/Message Kit/)).toBeNull();
   });
 
+  it("Settings → Language: English by default; picking Japanese is remembered, heard, and spoken", async () => {
+    vi.stubGlobal("webkitSpeechRecognition", FakeRecognizer);
+    vi.mocked(browserSpeak).mockClear();
+    const ws = await connectSpike({ voice: true });
+    act(() => {
+      ws.open();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    const picker = screen.getByLabelText("Language") as HTMLSelectElement;
+    expect(picker.value).toBe("en");
+    expect([...picker.options].map((o) => o.textContent)).toEqual(["English", "日本語 · Japanese", "中文 · Mandarin"]);
+    fireEvent.change(picker, { target: { value: "ja" } });
+    expect(picker.value).toBe("ja");
+    expect(window.localStorage.getItem("pendant.lang")).toBe("ja");
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+
+    voiceOn();
+    holdAndSay("今夜の天気は");
+    expect(FakeRecognizer.last?.lang).toBe("ja-JP");
+    await waitFor(() => expect(ws.send).toHaveBeenCalled());
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "雨です。", seq: 1, at: 10 }));
+    });
+    expect(browserSpeak).toHaveBeenCalledExactlyOnceWith("雨です。", { lang: "ja", onPhase: expect.any(Function) });
+  });
+
+  it("reads Settings → Language back from storage on load and shrugs off junk", async () => {
+    vi.stubGlobal("webkitSpeechRecognition", FakeRecognizer);
+    window.localStorage.setItem("pendant.lang", "zh");
+    const ws = await connectSpike({ voice: true });
+    act(() => {
+      ws.open();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    expect((screen.getByLabelText("Language") as HTMLSelectElement).value).toBe("zh");
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    voiceOn();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Hold to talk" }), { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+    expect(FakeRecognizer.last?.lang).toBe("zh-CN");
+    cleanup();
+
+    window.localStorage.setItem("pendant.lang", "klingon");
+    stubAuth(true, { voice: true });
+    render(<PhoneShell />);
+    expect(await screen.findByText("live")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    expect((screen.getByLabelText("Language") as HTMLSelectElement).value).toBe("en");
+  });
+
+  it("hides Settings → Language when the Worker has not published voice", async () => {
+    vi.stubGlobal("webkitSpeechRecognition", FakeRecognizer);
+    await connectSpike();
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    expect(screen.getByLabelText("Photo size")).toBeTruthy();
+    expect(screen.queryByLabelText("Language")).toBeNull();
+  });
+
   it("no Web Speech: no header mic, and a stale voice pref still types", async () => {
     window.localStorage.setItem("pendant.voice", "on");
     const ws = await connectSpike({ voice: true });
@@ -719,7 +778,7 @@ describe("PhoneShell", () => {
     act(() => {
       ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "**Clear** and 62.", seq: 3, at: 30 }));
     });
-    expect(browserSpeak).toHaveBeenCalledExactlyOnceWith("**Clear** and 62.", { onPhase: expect.any(Function) });
+    expect(browserSpeak).toHaveBeenCalledExactlyOnceWith("**Clear** and 62.", { lang: "en", onPhase: expect.any(Function) });
 
     act(() => {
       ws.deliver(JSON.stringify({ id: "r2", kind: "reply", text: "Anything else?", seq: 4, at: 40 }));

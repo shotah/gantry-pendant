@@ -276,8 +276,11 @@ above the bar and rides along with the words ("what is this?").
 PWA: `window.SpeechRecognition` / `webkitSpeechRecognition`, Chrome
 Android is the walk. Hold-to-talk uses `continuous` + interim so
 release is the commit; a 2s watchdog covers `stop()` with no
-`onend`. Detection runs after mount so the server paint and the
-hydrated paint agree. If the constructor is missing (Firefox, iOS
+`onend`. The recognizer listens in Settings → Language
+(`pendant.lang`, `en` default; `ja` → `ja-JP`, `zh` → `zh-CN`,
+`lib/phone/lang.ts`) — without it Chrome guesses from the UI locale
+and Japanese comes back as noise. Detection runs after mount so the
+server paint and the hydrated paint agree. If the constructor is missing (Firefox, iOS
 A2HS) **or** the Worker has not published voice
 (`/api/auth/config` `voice: false` — no TTS key, or `VOICE=off`),
 neither the header mic nor the bar is rendered, and a remembered `on`
@@ -339,12 +342,17 @@ to vibrate, badge, or speak.
 
 ### The pocket voice
 
-`POST /api/tts {text}` → Google Cloud Text-to-Speech
+`POST /api/tts {text, lang?}` → Google Cloud Text-to-Speech
 `text:synthesize`, Chirp 3 HD, MP3 back, `Cache-Control: no-store`.
 The Worker holds `GOOGLE_TTS_API_KEY` (restrict it to that API in
 the GCP console) and the voice is the `TTS_VOICE` var
 (`en-US-Chirp3-HD-Leda` by default; Crystal picked Chirp over the
-OpenAI voices). Signed-in session, same rate bucket as `/api/push`,
+OpenAI voices). `lang` is the phone's Settings → Language (`en` |
+`ja` | `zh`): the Worker keeps the speaker and swaps the locale
+(`ja-JP-Chirp3-HD-Leda`, `cmn-CN-Chirp3-HD-Leda`); missing or junk
+keeps `TTS_VOICE` as is
+([frontends.md](frontends.md#language-what-every-mouth-must-do-the-same)).
+Signed-in session, same rate bucket as `/api/push`,
 404 until the key exists so an unconfigured Worker just stays quiet.
 Nothing is stored, nothing touches the Durable Object, and the
 Worker never logs the text. Where the key actually lives:
@@ -673,6 +681,10 @@ strips asterisks here.
       says the same, mic pulses; a silent reply names why (404 no
       key, 401, 429, 502 Google, offline, autoplay)
       (`lib/phone/speaker.ts`, `browserSpeak` `onPhase`)
+- [x] Settings → Language (`en` / `ja` / `zh`, `pendant.lang`): the
+      recognizer hears it and `/api/tts` speaks it — additive `lang`
+      on the body, Worker swaps the Chirp locale and keeps the
+      speaker (`lib/phone/lang.ts`, `lib/tts/http.ts` `voiceFor`)
 - [x] Tests under `test/phone/`, `test/tts/`, `test/app/`
 - [ ] Pocket voice: GCP Cloud TTS API key → `.dev.vars` /
       `npx wrangler secret put GOOGLE_TTS_API_KEY`. Optional
@@ -699,6 +711,9 @@ strips asterisks here.
 - [ ] Do not run that recognizer on the Auto template
 - [ ] Reply to your own hold via `/api/tts` with the Bearer session
       (or Android `TextToSpeech` if the robot is acceptable there)
+- [ ] Settings → Language with the same three ids (`cab` / `lang`):
+      `EXTRA_LANGUAGE` on the recognizer, `lang` on the `/api/tts`
+      body — [frontends.md](frontends.md#language-what-every-mouth-must-do-the-same)
 - [ ] Auto stays the speaker in the car
 
 ### Later, maybe

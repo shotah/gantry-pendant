@@ -3,11 +3,14 @@ import { badFrame, tooLarge, tooMany, unauthorized } from "@/lib/auth/deny";
 import { limitAuthRequest } from "@/lib/auth/limit";
 import { readSessionFromRequest } from "@/lib/auth/session";
 import { headerSaysTooLarge } from "@/lib/mailbox/caps";
-import { parseTtsBody, readTts, synthesize, TTS_JSON_MAX, voiceOffered } from "@/lib/tts/http";
+import { parseTtsBody, readTts, synthesize, TTS_JSON_MAX, voiceFor, voiceOffered } from "@/lib/tts/http";
 
 export const dynamic = "force-dynamic";
 
-/** Signed-in human posts `{ text }`, gets MP3 bytes. 404 until voice is offered and the key is set. */
+/**
+ * Signed-in human posts `{ text, lang? }`, gets MP3 bytes. 404 until voice is
+ * offered and the key is set. `lang` swaps the Chirp locale (docs/frontends.md).
+ */
 export async function POST(req: Request) {
   if (!voiceOffered(env)) {
     return new Response(null, { status: 404 });
@@ -52,5 +55,5 @@ export async function POST(req: Request) {
   if (!parsed.ok) {
     return parsed.error === "too large" ? tooLarge() : badFrame();
   }
-  return synthesize(cfg, parsed.text, fetch);
+  return synthesize(parsed.lang ? voiceFor(cfg, parsed.lang) : cfg, parsed.text, fetch);
 }

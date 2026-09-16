@@ -1,3 +1,4 @@
+import type { LangId } from "@/lib/phone/lang";
 import { clipForSpeech, speakable } from "@/lib/phone/speakable";
 import { speakFailFromStatus, type SpeakEvent } from "@/lib/phone/speaker";
 
@@ -37,6 +38,8 @@ export type SpeakDeps = {
   audio?: HTMLAudioElement;
   /** Progress for the shell to paint: fetching → playing → done, or failed with a reason. */
   onPhase?: (ev: SpeakEvent) => void;
+  /** Settings → Language. The Worker swaps Chirp's locale; unset keeps its `TTS_VOICE`. */
+  lang?: LangId;
 };
 
 /**
@@ -60,7 +63,7 @@ export async function browserSpeak(markdown: string, deps: SpeakDeps = {}): Prom
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(deps.lang ? { text, lang: deps.lang } : { text }),
     });
   } catch {
     tell({ phase: "failed", reason: "offline" });
