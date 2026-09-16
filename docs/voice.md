@@ -277,7 +277,7 @@ PWA: `window.SpeechRecognition` / `webkitSpeechRecognition`, Chrome
 Android is the walk. Hold-to-talk uses `continuous` + interim so
 release is the commit; a 2s watchdog covers `stop()` with no
 `onend`. The recognizer listens in Settings → Language
-(`pendant.lang`, `en` default; `ja` → `ja-JP`, `zh` → `zh-CN`,
+(`pendant.lang`, `en` default; `ja` → `ja-JP`, `zh` → `zh-CN`, `vi` → `vi-VN`,
 `lib/phone/lang.ts`) — without it Chrome guesses from the UI locale
 and Japanese comes back as noise. Detection runs after mount so the
 server paint and the hydrated paint agree. If the constructor is missing (Firefox, iOS
@@ -348,8 +348,8 @@ The Worker holds `GOOGLE_TTS_API_KEY` (restrict it to that API in
 the GCP console) and the voice is the `TTS_VOICE` var
 (`en-US-Chirp3-HD-Leda` by default; Crystal picked Chirp over the
 OpenAI voices). `lang` is the phone's Settings → Language (`en` |
-`ja` | `zh`): the Worker keeps the speaker and swaps the locale
-(`ja-JP-Chirp3-HD-Leda`, `cmn-CN-Chirp3-HD-Leda`); missing or junk
+`ja` | `zh` | `vi`): the Worker keeps the speaker and swaps the locale
+(`ja-JP-Chirp3-HD-Leda`, `cmn-CN-…`, `vi-VN-…`); missing or junk
 keeps `TTS_VOICE` as is
 ([frontends.md](frontends.md#language-what-every-mouth-must-do-the-same)).
 Signed-in session, same rate bucket as `/api/push`,
@@ -681,7 +681,7 @@ strips asterisks here.
       says the same, mic pulses; a silent reply names why (404 no
       key, 401, 429, 502 Google, offline, autoplay)
       (`lib/phone/speaker.ts`, `browserSpeak` `onPhase`)
-- [x] Settings → Language (`en` / `ja` / `zh`, `pendant.lang`): the
+- [x] Settings → Language (`en` / `ja` / `zh` / `vi`, `pendant.lang`): the
       recognizer hears it and `/api/tts` speaks it — additive `lang`
       on the body, Worker swaps the Chirp locale and keeps the
       speaker (`lib/phone/lang.ts`, `lib/tts/http.ts` `voiceFor`)
@@ -711,7 +711,7 @@ strips asterisks here.
 - [ ] Do not run that recognizer on the Auto template
 - [ ] Reply to your own hold via `/api/tts` with the Bearer session
       (or Android `TextToSpeech` if the robot is acceptable there)
-- [ ] Settings → Language with the same three ids (`cab` / `lang`):
+- [ ] Settings → Language with the same four ids (`cab` / `lang`):
       `EXTRA_LANGUAGE` on the recognizer, `lang` on the `/api/tts`
       body — [frontends.md](frontends.md#language-what-every-mouth-must-do-the-same)
 - [ ] Auto stays the speaker in the car

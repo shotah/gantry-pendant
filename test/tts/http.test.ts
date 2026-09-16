@@ -87,6 +87,7 @@ describe("voiceFor", () => {
   it("keeps the speaker and swaps the locale for another language", () => {
     expect(voiceFor(cfg, "ja")).toEqual({ apiKey: "k", voice: "ja-JP-Chirp3-HD-Leda", languageCode: "ja-JP" });
     expect(voiceFor(cfg, "zh")).toEqual({ apiKey: "k", voice: "cmn-CN-Chirp3-HD-Leda", languageCode: "cmn-CN" });
+    expect(voiceFor(cfg, "vi")).toEqual({ apiKey: "k", voice: "vi-VN-Chirp3-HD-Leda", languageCode: "vi-VN" });
     const puck = { apiKey: "k", voice: "en-GB-Chirp3-HD-Puck", languageCode: "en-GB" };
     expect(voiceFor(puck, "ja").voice).toBe("ja-JP-Chirp3-HD-Puck");
   });

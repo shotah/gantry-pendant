@@ -67,7 +67,7 @@ export type TtsBody = { ok: true; text: string; lang?: LangId } | { ok: false; e
 
 /**
  * `{ text, lang? }`. Blank is a bad frame, not a silent 200. `lang` is the
- * phone's Settings → Language (`en` | `ja` | `zh`); unknown or missing is
+ * phone's Settings → Language (`en` | `ja` | `zh` | `vi`); unknown or missing is
  * dropped, not refused, so an old mouth that sends `{ text }` still speaks.
  */
 export function parseTtsBody(raw: unknown): TtsBody {

@@ -688,7 +688,7 @@ describe("PhoneShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "settings" }));
     const picker = screen.getByLabelText("Language") as HTMLSelectElement;
     expect(picker.value).toBe("en");
-    expect([...picker.options].map((o) => o.textContent)).toEqual(["English", "日本語 · Japanese", "中文 · Mandarin"]);
+    expect([...picker.options].map((o) => o.textContent)).toEqual(["English", "日本語 · Japanese", "中文 · Mandarin", "Tiếng Việt · Vietnamese"]);
     fireEvent.change(picker, { target: { value: "ja" } });
     expect(picker.value).toBe("ja");
     expect(window.localStorage.getItem("pendant.lang")).toBe("ja");

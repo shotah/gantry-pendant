@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_LANG, LANGUAGES, langIdOf, parseLang, speechLang, ttsLocale } from "@/lib/phone/lang";
 
 describe("language catalog", () => {
-  it("is English, Japanese, Mandarin — English first and default", () => {
-    expect(LANGUAGES.map((l) => l.id)).toEqual(["en", "ja", "zh"]);
+  it("is English, Japanese, Mandarin, Vietnamese — English first and default", () => {
+    expect(LANGUAGES.map((l) => l.id)).toEqual(["en", "ja", "zh", "vi"]);
     expect(DEFAULT_LANG).toBe("en");
-    expect(LANGUAGES.map((l) => l.label)).toEqual(["English", "日本語 · Japanese", "中文 · Mandarin"]);
+    expect(LANGUAGES.map((l) => l.label)).toEqual(["English", "日本語 · Japanese", "中文 · Mandarin", "Tiếng Việt · Vietnamese"]);
   });
 
   it("only knows its own ids; junk is not a language", () => {
@@ -29,9 +29,11 @@ describe("language catalog", () => {
     expect(speechLang("en")).toBe("en-US");
     expect(speechLang("ja")).toBe("ja-JP");
     expect(speechLang("zh")).toBe("zh-CN");
+    expect(speechLang("vi")).toBe("vi-VN");
     expect(ttsLocale("en")).toBe("en-US");
     expect(ttsLocale("ja")).toBe("ja-JP");
     // Chirp 3 HD spells Mandarin `cmn-CN`; a recognizer wants `zh-CN`.
     expect(ttsLocale("zh")).toBe("cmn-CN");
+    expect(ttsLocale("vi")).toBe("vi-VN");
   });
 });

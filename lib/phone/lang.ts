@@ -10,6 +10,7 @@ export const LANGUAGES = [
   { id: "en", label: "English", speech: "en-US", tts: "en-US" },
   { id: "ja", label: "日本語 · Japanese", speech: "ja-JP", tts: "ja-JP" },
   { id: "zh", label: "中文 · Mandarin", speech: "zh-CN", tts: "cmn-CN" },
+  { id: "vi", label: "Tiếng Việt · Vietnamese", speech: "vi-VN", tts: "vi-VN" },
 ] as const;
 
 export type LangId = (typeof LANGUAGES)[number]["id"];
