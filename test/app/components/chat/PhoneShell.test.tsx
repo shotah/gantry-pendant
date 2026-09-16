@@ -352,7 +352,7 @@ describe("PhoneShell", () => {
     expect(screen.getByText("Kit")).toBeTruthy();
     expect(screen.queryByLabelText("Agent name")).toBeNull();
     expect(screen.queryByRole("button", { name: "color theme" })).toBeNull();
-    expect(screen.queryByRole("radiogroup", { name: "Font size" })).toBeNull();
+    expect(screen.queryByLabelText("Font size")).toBeNull();
     expect(screen.queryByRole("link", { name: "Open crane stand-in" })).toBeNull();
     expect(screen.queryByText(RELEASE)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "settings" }));
@@ -363,8 +363,7 @@ describe("PhoneShell", () => {
     expect((screen.getByLabelText("Agent name") as HTMLInputElement).value).toBe("kit");
     expect(screen.getByLabelText("Agent access secret")).toBeTruthy();
     expect(screen.getByRole("button", { name: "color theme" })).toBeTruthy();
-    expect(screen.getByRole("radiogroup", { name: "Font size" })).toBeTruthy();
-    expect(screen.getByRole("radio", { name: "Small" }).getAttribute("aria-checked")).toBe("true");
+    expect((screen.getByLabelText("Font size") as HTMLSelectElement).value).toBe("sm");
     expect(screen.getByRole("button", { name: "Enable notifications" })).toBeTruthy();
     expect(screen.getByText("Access")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Enable location" })).toBeTruthy();
@@ -388,10 +387,12 @@ describe("PhoneShell", () => {
     render(<PhoneShell />);
     expect(await screen.findByText("live")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "settings" }));
-    fireEvent.click(screen.getByRole("radio", { name: "Large" }));
+    const picker = screen.getByLabelText("Font size") as HTMLSelectElement;
+    expect([...picker.options].map((o) => o.textContent)).toEqual(["Small", "Medium", "Large", "Extra large"]);
+    fireEvent.change(picker, { target: { value: "lg" } });
     expect(document.documentElement.getAttribute("data-font")).toBe("lg");
     expect(localStorage.getItem("pendant.font")).toBe("lg");
-    expect(screen.getByRole("radio", { name: "Large" }).getAttribute("aria-checked")).toBe("true");
+    expect(picker.value).toBe("lg");
   });
 
   it("paints typing and a draft bubble for the stream sample", async () => {

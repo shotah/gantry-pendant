@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FontSelect } from "../shared/FontSelect";
+import { SettingsSelect } from "../shared/SettingsSelect";
 import { ThemeSelect } from "../shared/ThemeSelect";
 import type { SlashCommand } from "@/app/lib/slash";
 import { Compose } from "./Compose";
@@ -1273,24 +1274,18 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                 : null}
               {phone && cfg?.mode === "oidc" && cranes.length
                 ? (
-                    <label className="flex flex-col gap-1 text-xs text-muted">
-                      Agent
-                      <select
-                        className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
-                        value={slug}
-                        onChange={(e) => {
-                          setSlugTouched(true);
-                          setSlug(e.target.value);
-                        }}
-                      >
-                        {slug && !cranes.includes(slug)
-                          ? <option value={slug}>{displaySlug(slug)}</option>
-                          : null}
-                        {cranes.map((c) => (
-                          <option key={c} value={c}>{displaySlug(c)}</option>
-                        ))}
-                      </select>
-                    </label>
+                    <SettingsSelect
+                      label="Agent"
+                      value={slug}
+                      options={[
+                        ...(slug && !cranes.includes(slug) ? [{ id: slug, label: displaySlug(slug) }] : []),
+                        ...cranes.map((c) => ({ id: c, label: displaySlug(c) })),
+                      ]}
+                      onChange={(id) => {
+                        setSlugTouched(true);
+                        setSlug(id);
+                      }}
+                    />
                   )
                 : null}
               {mailboxGap || (phone && cfg?.mode === "oidc" && waitingForCrane)
@@ -1356,46 +1351,27 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                     </div>
                   )
                 : null}
-              <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted">Font size</span>
-                <FontSelect />
-              </div>
+              <FontSelect />
               {phone && cfg?.voice
                 ? (
-                    <div className="flex flex-col gap-1">
-                      <label className="flex flex-col gap-1 text-xs text-muted">
-                        Language
-                        <select
-                          className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
-                          value={lang}
-                          onChange={(e) => pickLang(e.target.value)}
-                        >
-                          {LANGUAGES.map((l) => (
-                            <option key={l.id} value={l.id}>{l.label}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <p className="text-[11px] text-dim">{`Hold to talk listens, and ${title} speaks, in this language.`}</p>
-                    </div>
+                    <SettingsSelect
+                      label="Language"
+                      value={lang}
+                      options={LANGUAGES}
+                      onChange={pickLang}
+                      hint={`Hold to talk listens, and ${title} speaks, in this language.`}
+                    />
                   )
                 : null}
               {phone
                 ? (
-                    <div className="flex flex-col gap-1">
-                      <label className="flex flex-col gap-1 text-xs text-muted">
-                        Photo size
-                        <select
-                          className="w-full rounded border border-edge bg-canvas px-1.5 py-1 text-sm text-fg"
-                          value={photoSize}
-                          onChange={(e) => pickPhotoSize(e.target.value)}
-                        >
-                          {PHOTO_SIZES.map((s) => (
-                            <option key={s.id} value={s.id}>{`${s.label} · ${s.edge} px`}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <p className="text-[11px] text-dim">Smaller sends faster and costs fewer tokens to look at.</p>
-                    </div>
+                    <SettingsSelect
+                      label="Photo size"
+                      value={photoSize}
+                      options={PHOTO_SIZES.map((s) => ({ id: s.id, label: `${s.label} · ${s.edge} px` }))}
+                      onChange={pickPhotoSize}
+                      hint="Smaller sends faster and costs fewer tokens to look at."
+                    />
                   )
                 : null}
               {phone
