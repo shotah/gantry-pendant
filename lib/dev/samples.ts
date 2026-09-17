@@ -29,6 +29,7 @@ export type SampleBubble = {
   kind?: string;
   at: number;
   photo?: string;
+  reaction?: string;
 };
 
 export type SampleScene = {
@@ -168,9 +169,9 @@ export function sampleScene(id: SampleId, role: Role): SampleScene {
     id: "thread",
     messages: [
       bubble("t1", "you", SAMPLE_LINES.threadYou, { at: 1 }),
-      bubble("t2", "kit", SAMPLE_LINES.threadKitLatch, { at: 2 }),
-      bubble("t3", "you", SAMPLE_LINES.threadYouLeave, { at: 3 }),
-      bubble("t4", "kit", SAMPLE_LINES.threadKit, { at: 4 }),
+      bubble("t2", "kit", SAMPLE_LINES.threadKitLatch, { at: 2, kind: "reply", reaction: "🙏" }),
+      bubble("t3", "you", SAMPLE_LINES.threadYouLeave, { at: 3, kind: "inbound", reaction: "👍" }),
+      bubble("t4", "kit", SAMPLE_LINES.threadKit, { at: 4, kind: "reply" }),
     ],
     status: "up",
     gpsHint: role === "phone" ? "pin ±12m this send" : undefined,

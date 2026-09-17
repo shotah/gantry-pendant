@@ -37,10 +37,10 @@ export function canReact(m: Pick<ChatBubble, "from" | "kind" | "id">): boolean {
   return m.from === "kit" && (m.kind === "reply" || m.kind === "push") && Boolean(m.id);
 }
 
-function ReactionChip({ emoji, mine, onClick }: { emoji: string; mine: boolean; onClick?: () => void }) {
-  const cls = `mt-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[0.85em] leading-none ${
-    mine ? "border-accent-line bg-you" : "border-line bg-kit"
-  }`;
+/** Rides the bubble's bottom corner, half over the edge — outer side, like every chat app. */
+function ReactionChip({ emoji, side, onClick }: { emoji: string; side: "left" | "right"; onClick?: () => void }) {
+  const cls = `absolute -bottom-2.5 ${side === "right" ? "right-2" : "left-2"} inline-flex items-center `
+    + "rounded-full border border-line bg-panel px-1.5 py-0.5 text-[0.85em] leading-none shadow-sm";
   if (!onClick) {
     return <span aria-label={`reaction ${emoji}`} className={cls}>{emoji}</span>;
   }
@@ -146,55 +146,59 @@ export function Thread({
           onReact?.(m.id, toggleReaction(m.reaction, emoji));
           setPicking(null);
         };
+        const chip = Boolean(m.reaction) && !open;
         return (
           <li key={m.live ? "kit-live" : m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
-            <div
-              className={`max-w-[85%] rounded-2xl border px-3 py-2 text-chat leading-relaxed ${
-                mine
-                  ? "border-accent-line bg-you text-fg"
-                  : "border-line bg-kit text-body shadow-sm"
-              }${reactable ? " pointer-coarse:select-none" : ""}`}
-              onPointerDown={reactable ? (e) => startHold(e, m.id) : undefined}
-              onPointerMove={reactable ? moveHold : undefined}
-              onPointerUp={reactable ? cancelHold : undefined}
-              onPointerCancel={reactable ? cancelHold : undefined}
-              onPointerLeave={reactable ? cancelHold : undefined}
-              onContextMenu={reactable
-                ? (e) => {
-                    e.preventDefault();
-                    cancelHold();
-                    setPicking(m.id);
-                  }
-                : undefined}
-            >
-              {m.kind === "push"
-                ? <p className="mb-1 text-[0.7em] uppercase tracking-wide text-dim">ping</p>
-                : null}
-              {m.photo
-                ? <img src={m.photo} alt="" className="mb-2 max-h-48 rounded-lg" />
-                : null}
-              {m.text
+            {/* The chip overlaps the bubble's bottom edge; the wrapper pads for it so the next row does not collide. */}
+            <div className={`relative max-w-[85%]${chip ? " mb-2.5" : ""}`}>
+              <div
+                className={`rounded-2xl border px-3 py-2 text-chat leading-relaxed ${
+                  mine
+                    ? "border-accent-line bg-you text-fg"
+                    : "border-line bg-kit text-body shadow-sm"
+                }${reactable ? " pointer-coarse:select-none" : ""}`}
+                onPointerDown={reactable ? (e) => startHold(e, m.id) : undefined}
+                onPointerMove={reactable ? moveHold : undefined}
+                onPointerUp={reactable ? cancelHold : undefined}
+                onPointerCancel={reactable ? cancelHold : undefined}
+                onPointerLeave={reactable ? cancelHold : undefined}
+                onContextMenu={reactable
+                  ? (e) => {
+                      e.preventDefault();
+                      cancelHold();
+                      setPicking(m.id);
+                    }
+                  : undefined}
+              >
+                {m.kind === "push"
+                  ? <p className="mb-1 text-[0.7em] uppercase tracking-wide text-dim">ping</p>
+                  : null}
+                {m.photo
+                  ? <img src={m.photo} alt="" className="mb-2 max-h-48 rounded-lg" />
+                  : null}
+                {m.text
+                  ? (
+                      <div className={m.kind === "draft" ? "italic text-dim" : undefined}>
+                        <MarkdownBody text={m.text} />
+                      </div>
+                    )
+                  : null}
+                {mine && m.failed
+                  ? <p role="alert" className="mt-1 text-[0.7em] text-danger">{m.failed}</p>
+                  : mine && m.pending
+                    ? <p className="mt-1 text-[0.7em] text-dim">sending</p>
+                    : null}
+              </div>
+              {chip && m.reaction
                 ? (
-                    <div className={m.kind === "draft" ? "italic text-dim" : undefined}>
-                      <MarkdownBody text={m.text} />
-                    </div>
+                    <ReactionChip
+                      emoji={m.reaction}
+                      side={mine ? "right" : "left"}
+                      onClick={reactable ? () => setPicking(m.id) : undefined}
+                    />
                   )
                 : null}
-              {mine && m.failed
-                ? <p role="alert" className="mt-1 text-[0.7em] text-danger">{m.failed}</p>
-                : mine && m.pending
-                  ? <p className="mt-1 text-[0.7em] text-dim">sending</p>
-                  : null}
             </div>
-            {m.reaction && !open
-              ? (
-                  <ReactionChip
-                    emoji={m.reaction}
-                    mine={!mine}
-                    onClick={reactable ? () => setPicking(m.id) : undefined}
-                  />
-                )
-              : null}
             {open ? <ReactionPicker current={m.reaction} onPick={pick} /> : null}
           </li>
         );
