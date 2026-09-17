@@ -140,6 +140,24 @@ create those. Steps: [deployment.md](deployment.md).
    Without those keys the socket + queue still work; Enable
    notifications only toasts while the page is alive.
 
+   **Prove the pipe, not the toast.** Settings → Notifications →
+   **Test** is a round trip: `POST /api/push { slug }` makes the room
+   push a real card through the push service to every subscription it
+   holds for you, and the service worker shows it even with the app in
+   front (`test: true`). The row then says one of:
+
+   | Row says | Means |
+   | --- | --- |
+   | `Lock-screen ping sent to 1 device.` | Pipe is good. If no card showed, the browser dropped it (OS notification setting, battery mode) |
+   | `No lock-screen subscription for this room — tap Enable again.` | Nothing stored for you in this room's DO |
+   | `Push service refused (VAPID keys do not match this subscription) — tap Enable again.` | 401 / 403 from FCM / Mozilla / Apple. The browser's subscription was made for older VAPID keys (`npm run vapid` re-run). Enable now unsubscribes and re-subscribes when the stored key differs from the Worker's |
+   | `That subscription had expired — tap Enable again.` | 404 / 410; the row is purged |
+   | `Local toast only — this Worker has no VAPID keys …` | `GET /api/push` is 404; only the page toast was shown |
+
+   Enable itself now says *why* when registering fails (no VAPID, not
+   signed in, Worker refused the endpoint host, browser has no Push
+   API) instead of a bare "did not register".
+
    Kit's pocket voice is the same leftover path. Enable Cloud
    Text-to-Speech in that GCP project, mint an API key restricted to
    that API, then `npx wrangler secret put GOOGLE_TTS_API_KEY`

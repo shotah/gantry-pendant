@@ -23,16 +23,14 @@ self.addEventListener("fetch", (event) => {
 });
 
 // Web Push (VAPID). Android may keep a mailbox socket OPEN while frozen, so
-// the Worker fans push even then. Skip the tray only if a window is visible.
+// the Worker fans push even then. Skip the tray only if a window is visible —
+// except a round-trip test (`test: true`), which you tapped with the app open.
 self.addEventListener("push", (event) => {
   event.waitUntil((async () => {
-    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    if (windows.some((c) => c.visibilityState === "visible")) {
-      return;
-    }
     let title = "pendant";
     let body = "New message";
     let tag = "pendant";
+    let test = false;
     try {
       const parsed = event.data ? event.data.json() : null;
       if (parsed && typeof parsed === "object") {
@@ -45,9 +43,14 @@ self.addEventListener("push", (event) => {
         if (typeof parsed.tag === "string" && parsed.tag) {
           tag = parsed.tag;
         }
+        test = parsed.test === true;
       }
     } catch {
       // unencrypted / empty payload
+    }
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    if (!test && windows.some((c) => c.visibilityState === "visible")) {
+      return;
     }
     await self.registration.showNotification(title, {
       body,

@@ -112,6 +112,19 @@ function liveSocket() {
   return ws as FakeSocket;
 }
 
+/** Frames the phone sent that are turns — not the connect ack or a `seen` ack. */
+function sentTurns(ws: FakeSocket): Record<string, unknown>[] {
+  return ws.send.mock.calls
+    .map(([data]) => JSON.parse(String(data)) as Record<string, unknown>)
+    .filter((f) => f.kind !== "ack");
+}
+
+function sentAcks(ws: FakeSocket): Record<string, unknown>[] {
+  return ws.send.mock.calls
+    .map(([data]) => JSON.parse(String(data)) as Record<string, unknown>)
+    .filter((f) => f.kind === "ack");
+}
+
 async function connectSpike(opts: { voice?: boolean } = {}) {
   stubAuth(true, opts);
   stubSocket();
@@ -444,7 +457,7 @@ describe("PhoneShell", () => {
     expect(await screen.findByText("hi")).toBeTruthy();
     expect(geo).not.toHaveBeenCalled();
     await waitFor(() => expect(ws.send).toHaveBeenCalled());
-    const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as { text?: string; context?: unknown };
+    const frame = (sentTurns(ws)[0] ?? {}) as { text?: string; context?: unknown };
     expect(frame.text).toBe("hi");
     expect(frame.context).toEqual({ surface: "browser" });
   });
@@ -462,7 +475,7 @@ describe("PhoneShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("near me")).toBeTruthy();
     await waitFor(() => expect(ws.send).toHaveBeenCalled());
-    const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as {
+    const frame = (sentTurns(ws)[0] ?? {}) as {
       text?: string;
       kind?: string;
       context?: { geo?: { lat: number; lon: number; accuracy_m?: number }; at?: string; tz?: string; surface?: string; battery?: unknown; net?: string };
@@ -490,7 +503,7 @@ describe("PhoneShell", () => {
     expect(await screen.findByText("tacos")).toBeTruthy();
     expect(screen.queryByText(/NOW: fake/)).toBeNull();
     await waitFor(() => expect(ws.send).toHaveBeenCalled());
-    const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as {
+    const frame = (sentTurns(ws)[0] ?? {}) as {
       text?: string;
       context?: { geo?: { lat: number } };
     };
@@ -508,7 +521,7 @@ describe("PhoneShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "drop pin" }));
     expect(await screen.findByText("pin ±5m this send")).toBeTruthy();
     expect(ws.send).toHaveBeenCalled();
-    const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as {
+    const frame = (sentTurns(ws)[0] ?? {}) as {
       kind?: string;
       text?: string;
       context?: { geo?: { lat: number; lon: number } };
@@ -759,7 +772,7 @@ describe("PhoneShell", () => {
     holdAndSay("what's the weather tonight");
     expect(await screen.findByText("what's the weather tonight")).toBeTruthy();
     await waitFor(() => expect(ws.send).toHaveBeenCalled());
-    const frame = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as {
+    const frame = (sentTurns(ws)[0] ?? {}) as {
       kind?: string;
       text?: string;
       context?: { input?: string; geo?: unknown };
@@ -807,7 +820,7 @@ describe("PhoneShell", () => {
 
     arm();
     holdAndSay("hello");
-    await waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(sentTurns(ws)).toHaveLength(1));
     act(() => {
       ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "hi there", seq: 1, at: 10 }));
     });
@@ -825,7 +838,7 @@ describe("PhoneShell", () => {
 
     arm();
     holdAndSay("again");
-    await waitFor(() => expect(ws.send).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(sentTurns(ws)).toHaveLength(2));
     act(() => {
       ws.deliver(JSON.stringify({ id: "r2", kind: "reply", text: "still here", seq: 2, at: 20 }));
     });
@@ -849,18 +862,18 @@ describe("PhoneShell", () => {
     });
     fireEvent.change(screen.getByPlaceholderText(/Message Kit/), { target: { value: "typed" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(sentTurns(ws)).toHaveLength(1));
     act(() => {
       ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "read this", seq: 1, at: 10 }));
     });
     expect(browserSpeak).not.toHaveBeenCalled();
-    const typed = JSON.parse(String(ws.send.mock.calls[0]?.[0])) as { context?: unknown };
+    const typed = (sentTurns(ws)[0] ?? {}) as { context?: unknown };
     expect(typed.context).toEqual({ surface: "browser" });
 
     voiceOn();
     holdAndSay("spoken");
-    await waitFor(() => expect(ws.send).toHaveBeenCalledTimes(2));
-    const spokenId = (JSON.parse(String(ws.send.mock.calls[1]?.[0])) as { id: string }).id;
+    await waitFor(() => expect(sentTurns(ws)).toHaveLength(2));
+    const spokenId = ((sentTurns(ws)[1] ?? {}) as { id: string }).id;
     act(() => {
       ws.deliver(JSON.stringify({ kind: "error", id: spokenId, text: "rate" }));
       ws.deliver(JSON.stringify({ id: "r2", kind: "reply", text: "later", seq: 2, at: 20 }));
@@ -931,7 +944,7 @@ describe("PhoneShell", () => {
     act(() => {
       next.open();
     });
-    expect(next.send).toHaveBeenCalledWith(JSON.stringify({ kind: "ack", since: "2" }));
+    expect(next.send).toHaveBeenCalledWith(JSON.stringify({ kind: "ack", since: "2", seen: true }));
   });
 
   it("does not yank the thread to the bottom after you scroll up", async () => {
@@ -1191,9 +1204,9 @@ describe("PhoneShell", () => {
     fireEvent.change(screen.getByPlaceholderText(/Message Kit/), { target: { value: "this hatch?" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => {
-      expect(ws.send).toHaveBeenCalledTimes(1);
+      expect(sentTurns(ws)).toHaveLength(1);
     });
-    const frame = JSON.parse(ws.send.mock.calls[0]?.[0] ?? "{}") as { kind?: string; text?: string; images?: { url: string }[] };
+    const frame = (sentTurns(ws)[0] ?? {}) as { kind?: string; text?: string; images?: { url: string }[] };
     expect(frame.kind).toBe("inbound");
     expect(frame.text).toBe("this hatch?");
     expect(frame.images).toHaveLength(1);
@@ -1572,6 +1585,58 @@ describe("PhoneShell", () => {
     });
     expect(screen.queryByText("Looks like rain")).toBeNull();
     expect(screen.getByText(/Nothing yet/)).toBeTruthy();
+  });
+
+  it("marks the connect ack seen, bare when there is no cursor yet", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    expect(sentAcks(ws)).toEqual([{ kind: "ack", seen: true }]);
+  });
+
+  it("acks a live reply or push as seen while the tab is visible, never a replay", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "Rain.", seq: 1 }));
+      ws.deliver(JSON.stringify({ id: "h0", kind: "reply", text: "Earlier.", seq: 0, replay: true }));
+      ws.deliver(JSON.stringify({ id: "p1", kind: "push", text: "Ping.", seq: 2 }));
+      ws.deliver(JSON.stringify({ kind: "typing", user_id: "1182" }));
+    });
+    expect(sentAcks(ws).slice(1)).toEqual([
+      { kind: "ack", id: "r1", seen: true },
+      { kind: "ack", id: "p1", seen: true },
+    ]);
+  });
+
+  it("closes its own tray cards on connect and when another mouth says seen", async () => {
+    const cards = [{ close: vi.fn() }, { close: vi.fn() }];
+    const getNotifications = vi.fn(async () => cards);
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: { getRegistration: vi.fn(async () => ({ getNotifications })) },
+    });
+    try {
+      const ws = await connectSpike();
+      act(() => {
+        ws.open();
+      });
+      await waitFor(() => expect(getNotifications).toHaveBeenCalledTimes(1));
+      expect(cards.every((c) => c.close.mock.calls.length === 1)).toBe(true);
+      act(() => {
+        ws.deliver(JSON.stringify({ kind: "ack", seen: true, user_id: "1182", since: "4" }));
+      });
+      await waitFor(() => expect(getNotifications).toHaveBeenCalledTimes(2));
+      act(() => {
+        ws.deliver(JSON.stringify({ kind: "ack", id: "m1" })); // plain delivery ack: not seen
+      });
+      expect(getNotifications).toHaveBeenCalledTimes(2);
+    } finally {
+      Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: undefined });
+    }
   });
 
   it("forgets the draft text on reply so the same words paint again next turn", async () => {

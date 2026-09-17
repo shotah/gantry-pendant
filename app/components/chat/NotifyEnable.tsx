@@ -11,11 +11,23 @@ import {
   notifyNeedHomeScreen,
   type NotifyPermission,
 } from "@/lib/phone/notify";
+import {
+  PushRegister,
+  pushRegisterHint,
+  PushTestFail,
+  pushTestHint,
+  type PushRegisterResult,
+  type PushTestResult,
+} from "@/lib/phone/pushState";
 
 export function NotifyEnable({
   onGranted,
+  onTest,
 }: {
-  onGranted?: () => void | boolean | Promise<void | boolean>;
+  /** Register this browser for lock-screen push once the OS says yes. */
+  onGranted?: () => PushRegisterResult | Promise<PushRegisterResult>;
+  /** Ask the Worker for a real push. Without it, Test is a local toast only. */
+  onTest?: () => PushTestResult | Promise<PushTestResult>;
 }) {
   const [permission, setPermission] = useState<NotifyPermission>("default");
   const [asked, setAsked] = useState(false);
@@ -66,17 +78,27 @@ export function NotifyEnable({
     if (next !== "granted") {
       return;
     }
-    const subscribed = onGranted ? (await onGranted()) !== false : true;
+    const registered: PushRegisterResult = onGranted ? await onGranted() : PushRegister.Ok;
     const ok = await browserShowNotify(NOTIFY_TEST);
-    if (!subscribed) {
-      setStatus("Granted, but lock-screen push did not register.");
+    if (registered !== PushRegister.Ok) {
+      setStatus(`Granted, but lock-screen push did not register. ${pushRegisterHint(registered)}`.trim());
       return;
     }
     setStatus(ok ? "Sent a test ping." : "Granted, but the toast did not appear.");
   }
 
   async function test() {
+    // The real thing when the Worker can: a card through the push service, shown even with the app open.
+    const pushed: PushTestResult | undefined = onTest ? await onTest() : undefined;
+    if (pushed && pushed !== PushTestFail.NoVapid) {
+      setStatus(pushTestHint(pushed));
+      return;
+    }
     const ok = await browserShowNotify(NOTIFY_TEST);
+    if (pushed === PushTestFail.NoVapid) {
+      setStatus(pushTestHint(pushed));
+      return;
+    }
     setStatus(ok ? "Sent a test ping." : "The toast did not appear.");
   }
 

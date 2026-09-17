@@ -7,6 +7,7 @@ import {
   parsePushDelete,
   parsePushPut,
   parsePushSub,
+  parsePushTest,
   prunePushForRoom,
   PUSH_PER_USER,
   pushStoreKey,
@@ -53,6 +54,10 @@ describe("push subscription", () => {
       endpoint: sub.endpoint,
     });
     expect(parsePushDelete({ slug: "kit" })).toBeNull();
+    expect(parsePushTest({ slug: "Kit" })).toEqual({ slug: "kit" });
+    expect(parsePushTest({ slug: "nope!" })).toBeNull();
+    expect(parsePushTest({})).toBeNull();
+    expect(parsePushTest(null)).toBeNull();
   });
 
   it("caps devices per human and drops a yanked room member", () => {

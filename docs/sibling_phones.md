@@ -173,6 +173,77 @@ the same `sub`.
 2. [ ] Walk Cab + PWA on the deployed Worker (same Google account).
 3. Leave Cab `MailboxClient.sweep` in place.
 
+---
+
+## Cross-mouth notification dismissal (sized 2026-09-17; pendant side shipped same day)
+
+Ask: reading or replying on the PWA should clear Cab's HUN. Read
+against `gantry-cab` `drive/CabNotifier.kt`, `drive/MailboxService.kt`,
+`Mouth.kt`, `mailbox/Wire.kt` (read only; the Cab checkout owns the
+change).
+
+What Cab has (verified):
+
+- **One card.** `CabNotifier.kitMessage` posts a single
+  `MessagingStyle` notification (`MESSAGE_ID`) with an in-memory
+  `history` of Kit turns; `dismissKit()` clears both. Already called
+  from `MainActivity.onResume`, the car thread screen, swipe, and
+  "Mark as read". So "dismiss" is cancel-all — no per-`seq` mapping.
+- **Posting** is in `MailboxService.onFrame`: `fresh && frame.spoken()`
+  (live `reply` / `push`, not `replay`) then `shouldPost(...)`. A
+  sibling `inbound` already comes through the same `onFrame` with
+  `fresh == true` and `spoken() == false`.
+- **Incoming `ack`** in `Mouth.ingest` is `frame.id?.let { ack(it) }` —
+  clears a *pending own* line by id, otherwise a no-op. Safe to fan an
+  ack at an old Cab.
+- **`WireFrame`** is a fixed data class (`text kind id since images
+  context commands seq at replay rev theme`); unknown JSON keys are
+  dropped. An additive `seen` is invisible to an old build.
+- No Cab FCM. Everything is what the socket hears.
+
+What the wire carries today: the sibling `inbound` (shipped above);
+and one phone `ack since:<seq>` on connect (PWA and Cab both), which
+the Worker forwards to the **crane only**. `ack` means *delivered* —
+Cab and (later) Helm ack from a background service and on every 2 min
+sweep. The PWA drops its socket on tab hide and redials on visible,
+so a PWA socket being up *is* "the human is looking".
+
+| Tier | What | Where | Size | Worth it |
+| --- | --- | --- | --- | --- |
+| 1 — replied elsewhere | In `MailboxService.onFrame`: `fresh && frame.kind == "inbound" && !frame.replay` → `CabNotifier.dismissKit(this)`. The human just typed on another mouth | **Cab only.** ~3 lines + a `MailboxService` / `Mouth` test. No pendant change, no wire change, no lockstep | Small | Yes. Covers "reading and replying on PWA". Ship it regardless of the rest |
+| 2 — read, no reply | Additive `seen: true` on phone `ack`. Worker fans a `seen` ack to `sub:<userId>` sockets except the sender — never a plain ack (background delivery acks must not dismiss each other). PWA sets `seen` on its connect `ack since` (visible by construction) and sends `ack id seen` on each live `reply` / `push` while visible. Cab: `WireFrame.seen`, and in `onFrame` `kind == "ack" && seen` → `dismissKit` | Pendant: `frame.ts` whitelist + `ClientFrame`, `mailbox.ts` fan (`siblingPhoneTag` shape), `PhoneShell` two send points, `test/worker` + `PhoneShell` tests, `frontends.md`. Cab: one field, one `if`, one test. Helm later, same two lines | Small-medium; two repos, additive, old Cab unaffected | Only if "opened the PWA, read, did not reply" is common. Not a mess — same shape as sibling fan — but it is a wire change for one case |
+| 3 — the other way | Cab reads → PWA Web Push cards close | PWA service worker `getNotifications()` + close on visible / on a `seen` ack | Medium | Shipped the cheap half: PWA closes its own tray on connect and on a `seen` ack. A closed PWA tab has no socket — see the limit in [frontends.md → Seen](frontends.md#seen-what-every-mouth-must-do-the-same) |
+
+Traps, as handled: a bare `seen` ack (no `since`, no `id`) is copied
+to siblings and **not** forwarded to the crane (`bareAck` in
+`lib/mailbox/seen.ts`), so the PWA may send one on a fresh device;
+phone acks spend the phone's 30/min bucket, one per live reply is
+fine; an `ack id` from the PWA deletes that reply's queued row for the
+`sub`, which `ack since` already does today — Cab catches up from the
+transcript, not the queue.
+
+- [x] **Decide:** Tier 1 + 2. Pendant side shipped 2026-09-17:
+      `frame.ts` `seen`, `lib/mailbox/seen.ts`, Worker fan in the
+      phone-ack branch, PWA connect / per-reply `seen` sends and
+      `browserCloseShownNotify`. Contract:
+      [frontends.md → Seen](frontends.md#seen-what-every-mouth-must-do-the-same).
+
+Cab (that checkout owns these; the pendant Worker already speaks it):
+
+- [ ] **Tier 1 — sibling inbound dismisses.** `MailboxService.onFrame`:
+      `fresh && frame.kind == "inbound" && !frame.replay` →
+      `CabNotifier.dismissKit(this)`. Test in `MailboxService` /
+      `Mouth`.
+- [ ] **Tier 2 receive.** `WireFrame.seen: Boolean?` (parse `true`
+      only). `onFrame`: `frame.kind == "ack" && frame.seen == true` →
+      `dismissKit`. `Mouth.ingest`'s by-id ack stays (no-op).
+- [ ] **Tier 2 send (reverse, to the PWA / Helm).** `seen: true` on
+      the connect `ack since` only when the phone or car thread is on
+      screen (`onResume`, `carThreadVisible`) — not from the service
+      redial or the sweep; `ack id seen` per live `reply` / `push`
+      painted on screen; bare `{ kind: "ack", seen: true }` from
+      "Mark as read" / swipe when the socket is up.
+
 Cab does not need a lockstep APK for (1). Walk it anyway —
 [frontends.md](frontends.md) says a PWA-only paint is not enough when
 the queue or thread order is in play.

@@ -56,6 +56,7 @@ import {
 import { parseEmailVerified, parseExpMs, socketMessageAllowed } from "../lib/mailbox/socketAuth";
 import { pruneDualLimits, takeFrame, type DualLimit } from "../lib/mailbox/rate";
 import { HeldDrafts, blankDraft, clearsDraft, cranePublishedDraft, phoneMustNotPublishDraft } from "../lib/mailbox/draft";
+import { bareAck, seenAckFor } from "../lib/mailbox/seen";
 import { cranePublishedTyping, phoneMustNotPublishTyping } from "../lib/mailbox/typing";
 import {
   collectTagged,
@@ -65,14 +66,16 @@ import {
   queueForCrane,
   roleTag,
   socketTags,
+  subTag,
   type SocketMeta,
 } from "../lib/mailbox/tags";
-import { fanWebPush } from "../lib/push/fan";
-import { sendWebPush } from "../lib/push/send";
+import { fanWebPush, testWebPush } from "../lib/push/fan";
+import { sendWebPush, sendWebPushDetailed } from "../lib/push/send";
 import {
   dropPush,
   parsePushDelete,
   parsePushPut,
+  parsePushTest,
   prunePushForRoom,
   PUSH_STORE_PREFIX,
   pushStoreKey,
@@ -272,16 +275,16 @@ export class Mailbox extends DurableObject<Env> {
       fanOut(this.peers(tag), encodeFrame({ kind: "draft", user_id: out.user_id, text }));
       return;
     }
-    if (!out.id) {
-      out.id = newQueueId();
-    }
-    if (meta.role === "crane" && out.kind === "ack") {
-      if (out.id) {
-        await this.deleteQueued({ id: out.id, to: "crane" });
-      }
-      return;
-    }
     if (meta.role === "phone" && out.kind === "ack") {
+      // "Seen" rides on the phone's own ack; copy it to the human's other
+      // mouths so they drop their cards (docs/frontends.md → Seen).
+      const seen = seenAckFor(meta.role, out, meta.userId);
+      if (seen && meta.userId) {
+        fanOut(exceptSender(this.peers(subTag(meta.userId)), ws), encodeFrame(seen));
+      }
+      if (bareAck(out)) {
+        return;
+      }
       if (out.since) {
         await this.dropAckedThrough(out.since, meta.userId);
       }
@@ -289,6 +292,15 @@ export class Mailbox extends DurableObject<Env> {
         await this.ackPhoneId(out.id, meta.userId);
       }
       fanOut(this.peers(roleTag("crane")), encodeFrame(out));
+      return;
+    }
+    if (!out.id) {
+      out.id = newQueueId();
+    }
+    if (meta.role === "crane" && out.kind === "ack") {
+      if (out.id) {
+        await this.deleteQueued({ id: out.id, to: "crane" });
+      }
       return;
     }
     if (shouldQueue(out.kind)) {
@@ -700,6 +712,31 @@ export class Mailbox extends DurableObject<Env> {
       const next = dropPush(mine, userId, parsed.endpoint);
       await this.writePush(userId, mine, next);
       return Response.json({ ok: true });
+    }
+    if (request.method === "POST") {
+      // Round-trip test: a real card through the push service to this human's rows.
+      if (!parsePushTest(raw)) {
+        return Response.json({ error: "bad frame" }, { status: 400 });
+      }
+      const vapid = readVapid(this.env);
+      if (!vapid) {
+        return new Response(null, { status: 404 });
+      }
+      const slug = parseStoredSlug(await this.ctx.storage.get<string>(SLUG_STORE_KEY)) ?? "";
+      const { counts, gone } = await testWebPush({
+        title: slug,
+        stored: await this.loadPushFor(userId),
+        send: (subscription, payload) => sendWebPushDetailed({
+          vapid,
+          subscription,
+          payload,
+          fetch: globalThis.fetch,
+        }),
+      });
+      for (const row of gone) {
+        await this.ctx.storage.delete(pushStoreKey(row.userId, row.subscription.endpoint));
+      }
+      return Response.json(counts);
     }
     return new Response("method", { status: 405 });
   }

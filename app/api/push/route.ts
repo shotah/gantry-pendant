@@ -7,7 +7,7 @@ import { fetchRoomUsers } from "@/lib/mailbox/allow";
 import { headerSaysTooLarge } from "@/lib/mailbox/caps";
 import { mailboxStub } from "@/lib/mailbox/location";
 import { parseSlug } from "@/lib/mailbox/slug";
-import { parsePushDelete, parsePushPut } from "@/lib/push/subscription";
+import { parsePushDelete, parsePushPut, parsePushTest } from "@/lib/push/subscription";
 import { readVapid } from "@/lib/push/vapid";
 import { hostFromRequest } from "@/lib/dev/mode";
 
@@ -60,7 +60,22 @@ export async function DELETE(req: Request) {
   return mutate(req, "DELETE");
 }
 
-async function mutate(req: Request, method: "PUT" | "DELETE"): Promise<Response> {
+/** Round-trip test: the room pushes a real card to every subscription it holds for you. */
+export async function POST(req: Request) {
+  return mutate(req, "POST");
+}
+
+function parsePushBody(method: "PUT" | "DELETE" | "POST", raw: unknown): { slug: string } | null {
+  if (method === "PUT") {
+    return parsePushPut(raw);
+  }
+  if (method === "DELETE") {
+    return parsePushDelete(raw);
+  }
+  return parsePushTest(raw);
+}
+
+async function mutate(req: Request, method: "PUT" | "DELETE" | "POST"): Promise<Response> {
   const vapid = readVapid(env);
   if (!vapid) {
     return new Response(null, { status: 404 });
@@ -83,7 +98,7 @@ async function mutate(req: Request, method: "PUT" | "DELETE"): Promise<Response>
   } catch {
     return badFrame();
   }
-  const parsed = method === "PUT" ? parsePushPut(raw) : parsePushDelete(raw);
+  const parsed = parsePushBody(method, raw);
   if (!parsed) {
     return badFrame();
   }

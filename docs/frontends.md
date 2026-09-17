@@ -45,6 +45,7 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Helm pins the last bubble. Do not assume either needs the PWA CSS |
 | Draft→reply remount | PWA `live` React key, Cab / Helm `composeKey` (`kit-live`) so Markdown does not remount when `__draft__` becomes `r1`. Not on the wire. |
 | `draft` / `typing` (answer in progress) | Cumulative full text, one bubble per `sub`, ended by `reply` / `error` or a blank `draft` (the clear). The Worker forwards a blank only while a draft is held, refuses an empty `reply` (`error bad frame` to the crane), and re-sends the latest `draft` on a phone connect flush (forgotten when the crane goes or after 60 s quiet). Additive — every mouth already paints `draft` at any time — [Draft](#draft-what-every-mouth-must-do-the-same) |
+| `seen` on a phone `ack` (read on another mouth) | Additive `seen: true` on the phone's own `ack`. The Worker copies it to that human's **other** `sub:<userId>` sockets as `{ kind: "ack", seen: true, user_id, since?, id? }` — never a plain ack, which is delivery. A mouth that hears one drops its notification cards. A bare `{ kind: "ack", seen: true }` (no cursor yet) goes to siblings only, not the crane. Old Cab drops the key (`Mouth.ingest` acks by id → no-op) — [Seen](#seen-what-every-mouth-must-do-the-same) |
 | Photo caps, encode ladder, `error` tokens | Every mouth encodes to the same budget and paints refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
 | Face / backdrop blobs and their notices | Cab and Helm refetch `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
 | Header face (size, hang, stroke) | Cab TopAppBar and Helm header overlay, not PWA-only — [Header face](#header-face) |
@@ -171,6 +172,80 @@ flush `draft` or the `reply` is what changes it) and **expires after
 `HELD_DRAFT_TTL_MS` is the same number). An identical re-sent draft is
 not life on either. Helm: same two rules when it grows drafts. Walk:
 [draft_stream_handoff.md](draft_stream_handoff.md).
+
+---
+
+## Seen (what every mouth must do the same)
+
+Reading or answering on one mouth clears the other mouths' cards.
+Two signals carry it; both are already on the wire, one is new.
+
+**The signals.**
+
+1. **A sibling `inbound`** (shipped — [sibling_phones.md](sibling_phones.md)).
+   The human typed on another mouth. Live (`replay` absent), same
+   `sub`, an `id` you did not send. That *is* "read and replied".
+2. **A `seen` ack** (new, additive). A phone puts `seen: true` on its
+   own `ack` when the thread is on screen there. The Worker copies it
+   to the same human's other `sub:<userId>` sockets, never back to
+   the sender, never to another human, and forwards the original to
+   the crane as before:
+
+   ```json
+   { "kind": "ack", "seen": true, "user_id": "1182", "since": "42" }
+   { "kind": "ack", "seen": true, "user_id": "1182", "id": "r7" }
+   { "kind": "ack", "seen": true, "user_id": "1182" }
+   ```
+
+   A plain `ack` (no `seen`) is **delivery**, not reading — Cab acks
+   from a background service and on every 2 min sweep — and is never
+   copied. A bare `seen` ack (no `since`, no `id`) is copied to
+   siblings and **not** forwarded to the crane: nothing to acknowledge.
+
+**What a mouth sends** (the PWA does this; Cab and Helm do the same):
+
+- On connect with the thread on screen: `ack since:<seq> seen:true`
+  (the cursor ack it already sends, plus the key). No cursor yet
+  (fresh device, empty cache): bare `{ kind: "ack", seen: true }`.
+  A PWA socket is only up while the tab is visible, so its connect
+  ack is always seen. Cab: only when the phone thread or the car
+  thread is on screen (`onResume`, `carThreadVisible`) — **not** from
+  the foreground service's redial or the sweep.
+- Per live `reply` / `push` painted while the thread is on screen:
+  `{ kind: "ack", id, seen: true }`. Not on `replay`; not for a turn
+  with no `id`. One ack per live reply is inside the phone's rate
+  bucket. That `ack id` also drops the reply's queued row for the
+  `sub`, which `ack since` does today — siblings hydrate from the
+  transcript, not the queue.
+- Cab "Mark as read" / swipe: `{ kind: "ack", seen: true }` (bare)
+  when the socket is up, so the PWA (if open) and Helm hear it.
+
+**What a mouth does on hearing one.**
+
+| Signal | Cab (`MailboxService.onFrame`) | PWA | Helm |
+| --- | --- | --- | --- |
+| `fresh && kind == "inbound" && !replay` | `CabNotifier.dismissKit(this)` | closes its tray via `browserCloseShownNotify` on connect — a live sibling inbound needs the tab visible, which already closed them | same as Cab when it has a card |
+| `kind == "ack" && seen` | `CabNotifier.dismissKit(this)`; `Mouth.ingest` may still run its by-id ack (no-op) | `browserCloseShownNotify()` — closes every card the service worker holds (Web Push and local toasts share it) | same |
+| plain `ack` | nothing new | nothing new | nothing new |
+
+Cab needs `WireFrame.seen: Boolean?` (parse `true` only), the two
+`if`s above, and the two send points. An old APK drops the key and
+keeps its card — no lockstep, no crash. Helm: identical shape.
+
+**The honest limit, the other way.** A hidden or closed PWA tab has
+**no socket**. Nothing on the mailbox wire reaches it; only Web Push
+does. The PWA closes its own cards the moment it is visible (connect →
+`browserCloseShownNotify`), so "open the PWA" clears the PWA tray, and
+a `seen` from Cab clears it only while the tab is up. Clearing a
+closed PWA's tray from Cab would need a **silent Web Push** to the
+service worker; Chrome and Firefox charge silent pushes against a
+budget and Chrome paints "This site has been updated in the
+background" when it runs out. Not doing that. If it ever matters, box
+it here first.
+
+Cover: `test/mailbox/seen.test.ts`, `test/worker/mailbox.test.ts`
+(seen acks), `test/app/components/chat/PhoneShell.test.tsx` (seen /
+tray cases).
 
 ---
 

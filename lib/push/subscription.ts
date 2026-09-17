@@ -127,6 +127,16 @@ export function parsePushDelete(raw: unknown): { slug: string; endpoint: string 
   return { slug, endpoint };
 }
 
+/** `POST /api/push` — send a real test card to everything stored for this human in the room. */
+export function parsePushTest(raw: unknown): { slug: string } | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const o = raw as Record<string, unknown>;
+  const slug = typeof o.slug === "string" ? parseSlug(o.slug) : null;
+  return slug ? { slug } : null;
+}
+
 export function endpointHash(endpoint: string): string {
   let h = 0x811c9dc5;
   for (let i = 0; i < endpoint.length; i++) {

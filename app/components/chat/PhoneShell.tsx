@@ -31,8 +31,8 @@ import { loadThread, saveThread, threadCacheKey } from "@/app/lib/threadStore";
 import { browserBumpBadge, browserClearBadge } from "@/app/lib/badge";
 import { browserGeo } from "@/app/lib/geo";
 import { browserBuzzPush } from "@/app/lib/haptic";
-import { browserNotifyIncoming } from "@/app/lib/notify";
-import { browserSubscribePush } from "@/app/lib/push";
+import { browserCloseShownNotify, browserNotifyIncoming } from "@/app/lib/notify";
+import { browserRegisterPush, browserTestPush } from "@/app/lib/push";
 import { browserSpeak } from "@/app/lib/tts";
 import { isIos, isStandalone, signInHint } from "@/app/lib/install";
 import { fileToPhoto } from "@/app/lib/photo";
@@ -81,6 +81,7 @@ import { isPinnedToBottom, pinToBottom } from "@/lib/phone/threadScroll";
 import { recoverViewport, viewportShellHeight } from "@/lib/phone/viewport";
 import { encodeFrame, orderAt, orderSeq, type Role, type WireFrame } from "@/lib/mailbox/frame";
 import { DRAFT_TTL_MS } from "@/lib/mailbox/draft";
+import { connectSeenAck, seenAckForTurn } from "@/lib/mailbox/seen";
 import { clearsTyping, TYPING_TTL_MS } from "@/lib/mailbox/typing";
 import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
 
@@ -107,6 +108,8 @@ type ClientFrame = {
   text?: string;
   images?: { url: string }[];
   context?: unknown;
+  /** Phone `ack` only: the thread is on screen here (docs/frontends.md → Seen). */
+  seen?: true;
 };
 
 function clientFrameId(frame: object): string | undefined {
@@ -507,7 +510,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     if (!phone || cfg?.mode !== "oidc" || !me || !listed || !roomSlug || needGoogle || mailboxGap || waitingForCrane) {
       return;
     }
-    void browserSubscribePush(roomSlug);
+    void browserRegisterPush(roomSlug);
   }, [phone, cfg?.mode, me, listed, roomSlug, needGoogle, mailboxGap, waitingForCrane]);
 
   useEffect(() => {
@@ -611,7 +614,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       backoffRef.current = BACKOFF_MS;
       setStatus("up");
       const since = ackSince({ id: lastSeenId.current, seq: lastSeenSeq.current });
-      if (since) {
+      if (phone) {
+        // A phone socket is only up while the tab is visible: the cursor is seen, and our own tray is stale.
+        sendClientFrame(ws, connectSeenAck(since));
+        void browserCloseShownNotify();
+      } else if (since) {
         sendClientFrame(ws, { kind: "ack", since });
       }
     };
@@ -736,6 +743,10 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       const seq = orderSeq(frame.seq);
       const at = orderAt(frame.at);
       if (frame.kind === "ack") {
+        if (phone && frame.seen) {
+          // Another of this human's mouths has the thread on screen: our tray card is read.
+          void browserCloseShownNotify();
+        }
         if (id) {
           setMessages((prev) => prev.map((m) => (
             m.id === id ? { ...m, pending: false } : m
@@ -797,6 +808,10 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             text: frame.text,
             photo: Boolean(frame.images?.[0]?.url),
           });
+          const seen = seenAckForTurn({ kind: frame.kind, id, replay: frame.replay }, document.visibilityState === "visible");
+          if (seen) {
+            sendClientFrame(ws, seen);
+          }
           // Finished turns only: not draft / typing, not hydrate, not a cron push, not a sibling's inbound.
           if (frame.kind === "reply" && awaitingVoice.current) {
             awaitingVoice.current = false;
@@ -1302,7 +1317,10 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                       <span className="text-xs text-muted">Access</span>
                       {cfg?.voice ? <MicEnable /> : null}
                       <GeoEnable sending={gpsOn} onToggle={toggleGps} />
-                      <NotifyEnable onGranted={() => browserSubscribePush(roomSlug)} />
+                      <NotifyEnable
+                        onGranted={() => browserRegisterPush(roomSlug)}
+                        onTest={cfg?.mode === "oidc" ? () => browserTestPush(roomSlug) : undefined}
+                      />
                     </div>
                   )
                 : null}

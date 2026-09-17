@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { HELD_DRAFT_TTL_MS } from "@/lib/mailbox/draft";
 import type { WireFrame } from "@/lib/mailbox/frame";
 import { QUEUE_STORE_PREFIX, type Queued } from "@/lib/mailbox/queue";
 import { socketTags } from "@/lib/mailbox/tags";
+import { PUSH_STORE_PREFIX } from "@/lib/push/subscription";
+import { encodeBase64Url, generateVapidKeys } from "@/lib/push/vapid";
 
 vi.mock("cloudflare:workers", () => ({
   DurableObject: class {
@@ -110,9 +112,9 @@ type Ctx = ConstructorParameters<typeof Mailbox>[0];
 type Env = ConstructorParameters<typeof Mailbox>[1];
 type Flushable = { flush(ws: FakeSocket, role: "phone" | "crane", userId?: string): Promise<void> };
 
-function room() {
+function room(env: Record<string, string> = {}) {
   const state = new FakeState();
-  const box = new Mailbox(state as unknown as Ctx, {} as Env);
+  const box = new Mailbox(state as unknown as Ctx, env as unknown as Env);
   const crane = new FakeSocket();
   state.acceptWebSocket(crane, socketTags({ role: "crane", rateId: "bearer:kit" }));
   const phone = (sub: string): FakeSocket => {
@@ -269,6 +271,56 @@ describe("Mailbox crane rate", () => {
   });
 });
 
+describe("Mailbox seen acks", () => {
+  it("copies a phone's seen ack to that human's other mouths, not the sender, not another human", async () => {
+    const { crane, phone, say } = room();
+    const pwa = phone("1182");
+    const cab = phone("1182");
+    const bob = phone("7");
+
+    await say(pwa, { kind: "ack", since: "4", seen: true });
+
+    expect(cab.frames()).toEqual([{ kind: "ack", seen: true, user_id: "1182", since: "4" }]);
+    expect(pwa.sent).toEqual([]);
+    expect(bob.sent).toEqual([]);
+    expect(crane.frames()).toEqual([{ kind: "ack", since: "4", seen: true, user_id: "1182" }]);
+  });
+
+  it("keeps a bare seen ack away from the crane", async () => {
+    const { crane, phone, say } = room();
+    const pwa = phone("1182");
+    const cab = phone("1182");
+
+    await say(pwa, { kind: "ack", seen: true });
+
+    expect(cab.frames()).toEqual([{ kind: "ack", seen: true, user_id: "1182" }]);
+    expect(crane.sent).toEqual([]);
+  });
+
+  it("never copies a plain delivery ack", async () => {
+    const { crane, phone, say } = room();
+    const pwa = phone("1182");
+    const cab = phone("1182");
+
+    await say(pwa, { kind: "ack", since: "4" });
+    await say(pwa, { kind: "ack", id: "m1" });
+
+    expect(cab.sent).toEqual([]);
+    expect(crane.kinds()).toEqual(["ack", "ack"]);
+  });
+
+  it("acks a seen reply id for the phone like any ack", async () => {
+    const { state, crane, phone, say } = room();
+    const pwa = phone("1182");
+    await say(crane, { kind: "reply", id: "r1", user_id: "1182", text: "Rain." });
+    expect(state.storage.queued().some((q) => q.id === "r1" && q.to === "phone")).toBe(true);
+
+    await say(pwa, { kind: "ack", id: "r1", seen: true });
+
+    expect(state.storage.queued().some((q) => q.id === "r1")).toBe(false);
+  });
+});
+
 describe("Mailbox held draft", () => {
   it("hands the latest draft back to a phone that connects mid-answer", async () => {
     const { crane, phone, say, connect } = room();
@@ -387,5 +439,78 @@ describe("Mailbox held draft", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("Mailbox round-trip push test", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** The push service's answer. A spy, not a stub — the file-level socket stub must survive. */
+  function pushServiceSays(status: number, onUrl?: (url: string) => void) {
+    return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      onUrl?.(String(input));
+      return new Response(null, { status });
+    });
+  }
+
+  async function vapidEnv(): Promise<Record<string, string>> {
+    const keys = await generateVapidKeys();
+    return {
+      VAPID_PUBLIC_KEY: keys.publicKey,
+      VAPID_PRIVATE_KEY: JSON.stringify(keys.privateJwk),
+      VAPID_SUBJECT: "mailto:ada@example.com",
+    };
+  }
+
+  async function clientSub(endpoint: string) {
+    const pair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+    const raw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
+    const auth = crypto.getRandomValues(new Uint8Array(16));
+    return { endpoint, keys: { p256dh: encodeBase64Url(raw), auth: encodeBase64Url(auth) } };
+  }
+
+  function pushOp(method: string, sub: string, body: object): Request {
+    return new Request("https://mailbox/push", {
+      method,
+      headers: { "X-Pendant-Op": "push", "X-Pendant-Sub": sub, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("pushes a real test card to this human's rows and reports the push service's answer", async () => {
+    const { state, box } = room(await vapidEnv());
+    const subscription = await clientSub("https://fcm.googleapis.com/fcm/send/ada-phone");
+    expect((await box.fetch(pushOp("PUT", "1182", { slug: "kit", subscription }))).ok).toBe(true);
+    const bob = await clientSub("https://fcm.googleapis.com/fcm/send/bob-phone");
+    expect((await box.fetch(pushOp("PUT", "7", { slug: "kit", subscription: bob }))).ok).toBe(true);
+
+    const pushService = pushServiceSays(201, (url) => expect(url).toBe(subscription.endpoint));
+    const ok = await box.fetch(pushOp("POST", "1182", { slug: "kit" }));
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ rows: 1, ok: 1, gone: 0, fail: 0, statuses: [] });
+    expect(pushService).toHaveBeenCalledOnce();
+
+    pushServiceSays(403);
+    const refused = await box.fetch(pushOp("POST", "1182", { slug: "kit" }));
+    expect(await refused.json()).toEqual({ rows: 1, ok: 0, gone: 0, fail: 1, statuses: [403] });
+
+    pushServiceSays(410);
+    const gone = await box.fetch(pushOp("POST", "1182", { slug: "kit" }));
+    expect(await gone.json()).toEqual({ rows: 1, ok: 0, gone: 1, fail: 0, statuses: [] });
+    const left = [...state.storage.rows.keys()].filter((k) => k.startsWith(PUSH_STORE_PREFIX));
+    expect(left).toHaveLength(1);
+    expect(left[0]).toContain(":7:");
+
+    const empty = await box.fetch(pushOp("POST", "1182", { slug: "kit" }));
+    expect(await empty.json()).toEqual({ rows: 0, ok: 0, gone: 0, fail: 0, statuses: [] });
+  });
+
+  it("is 404 without VAPID keys and 400 on a junk body", async () => {
+    const bare = room();
+    expect((await bare.box.fetch(pushOp("POST", "1182", { slug: "kit" }))).status).toBe(404);
+    const keyed = room(await vapidEnv());
+    expect((await keyed.box.fetch(pushOp("POST", "1182", { slug: "nope!" }))).status).toBe(400);
   });
 });

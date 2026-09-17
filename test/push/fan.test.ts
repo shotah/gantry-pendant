@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { fanWebPush, pushPayload } from "@/lib/push/fan";
+import { fanWebPush, pushPayload, testWebPush } from "@/lib/push/fan";
+import { PushSend } from "@/lib/push/send";
 import type { StoredPush } from "@/lib/push/subscription";
 import { encodeBase64Url } from "@/lib/push/vapid";
 
@@ -71,5 +72,39 @@ describe("fan web push", () => {
       send,
     });
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("round-trip test push", () => {
+  it("pushes a test card to every row and counts what the push service said", async () => {
+    const ada1 = row("ada", 1);
+    const ada2 = row("ada", 2);
+    const ada3 = row("ada", 3);
+    const send = vi.fn(async (sub: { endpoint: string }) => {
+      if (sub.endpoint.endsWith("-2")) {
+        return { result: PushSend.Gone, status: 410 };
+      }
+      if (sub.endpoint.endsWith("-3")) {
+        return { result: PushSend.Fail, status: 403 };
+      }
+      return { result: PushSend.Ok, status: 201 };
+    });
+    const { counts, gone } = await testWebPush({ title: "kit", stored: [ada1, ada2, ada3], send });
+    expect(send).toHaveBeenCalledTimes(3);
+    expect(send).toHaveBeenCalledWith(ada1.subscription, {
+      title: "Kit",
+      body: "Lock-screen push is on.",
+      test: true,
+    });
+    expect(counts).toEqual({ rows: 3, ok: 1, gone: 1, fail: 1, statuses: [403] });
+    expect(gone).toEqual([ada2]);
+  });
+
+  it("reports an empty room honestly", async () => {
+    const send = vi.fn(async () => ({ result: PushSend.Ok }));
+    const { counts, gone } = await testWebPush({ title: "kit", stored: [], send });
+    expect(send).not.toHaveBeenCalled();
+    expect(counts).toEqual({ rows: 0, ok: 0, gone: 0, fail: 0, statuses: [] });
+    expect(gone).toEqual([]);
   });
 });

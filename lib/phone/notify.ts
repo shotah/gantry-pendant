@@ -7,6 +7,8 @@ export type NotifyPayload = {
   body: string;
   tag?: string;
   icon?: string;
+  /** A round-trip test: the service worker shows it even with a window in front. */
+  test?: true;
 };
 
 export type NotifyApi = {
@@ -25,6 +27,13 @@ export const NOTIFY_TAG = "pendant";
 export const NOTIFY_TEST: NotifyPayload = {
   title: "pendant",
   body: "Notifications are on.",
+};
+
+/** What the Worker pushes for `POST /api/push` — proves the whole pipe, not just the toast. */
+export const NOTIFY_PUSH_TEST: NotifyPayload = {
+  title: "pendant",
+  body: "Lock-screen push is on.",
+  test: true,
 };
 
 const BODY_MAX = 140;

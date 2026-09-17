@@ -114,7 +114,7 @@ describe("PhoneShell thread on the device", () => {
     act(() => {
       ws.open();
     });
-    expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ kind: "ack", since: "2" }));
+    expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ kind: "ack", since: "2", seen: true }));
   });
 
   it("folds replay under the cached bubbles and saves new turns", async () => {

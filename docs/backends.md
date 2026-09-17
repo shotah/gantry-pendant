@@ -85,7 +85,7 @@ crane.
 | --- | --- | --- |
 | `inbound` | `text`, `images[]`, `context`, `user_id`, `email` (**only when verified**), `id`, `seq`, `at` | Allowlist on `sub` / email, learn the sub for `push`, `here` from `context.geo`, then `Handler` |
 | `pin` | `context.geo`, no text / photo | `here` only. Silent |
-| `ack` | `id` / `since` from a phone | Forwarded; the crane ignores it |
+| `ack` | `id` / `since` from a phone; additive `seen: true` when that mouth has the thread on screen | Forwarded; the crane ignores it. A bare `seen` ack (no `id`, no `since`) is copied to the human's other phone sockets only and never reaches the crane — [frontends.md → Seen](frontends.md#seen-what-every-mouth-must-do-the-same) |
 | `face` / `backdrop` / `theme` | notice | Ignored (`ignoredKind`) |
 | `error` | `text` token, `id` | Logged (`pendant mailbox error`). Does not start a turn. A refused `reply` is still lost — no retry |
 

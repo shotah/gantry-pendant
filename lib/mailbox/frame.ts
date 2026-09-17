@@ -47,6 +47,12 @@ export type WireFrame = {
   users?: RoomUser[];
   /** Hydrate-only. Unread queue flush must not set this. Clients must not send it. */
   replay?: boolean;
+  /**
+   * Phone `ack` only: the human is looking at the thread on that mouth. The
+   * mailbox copies a `seen` ack to their other mouths so those drop their
+   * cards. A plain ack is delivery, not reading — never treat it as seen.
+   */
+  seen?: true;
 };
 
 export type ParseOpts = { role?: Role };
@@ -324,6 +330,9 @@ export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseO
   }
   if (o.replay === true) {
     frame.replay = true;
+  }
+  if (o.seen === true) {
+    frame.seen = true;
   }
   if (o.context != null) {
     const blob = JSON.stringify(o.context);

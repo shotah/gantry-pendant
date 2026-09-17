@@ -42,6 +42,30 @@ export async function browserShowNotify(payload: NotifyPayload): Promise<boolean
   });
 }
 
+/**
+ * Close every card this app has in the tray — the thread is on screen here,
+ * or another mouth said `seen`. Returns how many went. Tray cards are the
+ * service worker's (Web Push and local toasts both go through it).
+ */
+export async function browserCloseShownNotify(): Promise<number> {
+  if (typeof navigator === "undefined" || !navigator.serviceWorker) {
+    return 0;
+  }
+  try {
+    const reg = await navigator.serviceWorker.getRegistration("/");
+    if (!reg || typeof reg.getNotifications !== "function") {
+      return 0;
+    }
+    const shown = await reg.getNotifications();
+    for (const n of shown) {
+      n.close();
+    }
+    return shown.length;
+  } catch {
+    return 0;
+  }
+}
+
 export function browserNotifyIncoming(opts: {
   kind?: string;
   title: string;
