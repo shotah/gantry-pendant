@@ -54,12 +54,22 @@ describe("queue", () => {
     expect(newQueueId(1, () => 0.5)).toMatch(/^1-/);
   });
 
-  it("does not queue pin, ack, cmds, typing, or draft", () => {
+  it("replaces a row put again under the same (id, to) — latest body, one row", () => {
+    const first = msg({ id: "r1", to: "crane", body: '{"text":"👍"}', at: 10 });
+    const again = msg({ id: "r1", to: "crane", body: '{"text":"❤️"}', at: 20 });
+    const other = msg({ id: "r1", to: "phone", body: '{"text":"reply"}', at: 5 });
+    const next = enqueue([other, first], again, { now: 20 });
+    expect(next.filter((m) => queueIdentity(m) === "crane:r1")).toEqual([again]);
+    expect(next.filter((m) => queueIdentity(m) === "phone:r1")).toEqual([other]);
+  });
+
+  it("does not queue pin, ack, cmds, typing, draft, or react on its own", () => {
     expect(shouldQueue("pin")).toBe(false);
     expect(shouldQueue("ack")).toBe(false);
     expect(shouldQueue("cmds")).toBe(false);
     expect(shouldQueue("typing")).toBe(false);
     expect(shouldQueue("draft")).toBe(false);
+    expect(shouldQueue("react")).toBe(false); // the Worker queues a phone react for a down crane itself
     expect(shouldQueue("inbound")).toBe(true);
     expect(shouldQueue("reply")).toBe(true);
     expect(shouldQueue("push")).toBe(true);

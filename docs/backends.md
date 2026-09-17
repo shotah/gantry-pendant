@@ -87,7 +87,7 @@ crane.
 | `pin` | `context.geo`, no text / photo | `here` only. Silent |
 | `ack` | `id` / `since` from a phone; additive `seen: true` when that mouth has the thread on screen | Forwarded; the crane ignores it. A bare `seen` ack (no `id`, no `since`) is copied to the human's other phone sockets only and never reaches the crane — [frontends.md → Seen](frontends.md#seen-what-every-mouth-must-do-the-same) |
 | `face` / `backdrop` / `theme` | notice | Ignored (`ignoredKind`) |
-| `react` | `user_id`, `id` (one of the crane's `reply` / `push` ids), `text` emoji set; empty = cleared | `scheduleReaction`: 3 s settle per `(sub, id)`, then a reaction turn naming the target from `Recent`. Fan only — no crane socket, no delivery — [frontends.md → Reactions](frontends.md#reactions-what-every-mouth-must-do-the-same) |
+| `react` | `user_id`, `id` (one of the crane's `reply` / `push` ids), `text` emoji set; empty = cleared | `scheduleReaction`: 3 s settle per `(sub, id)`, then a reaction turn naming the target from `Recent`. No crane socket → queued `q:crane:<id>` (latest per bubble wins) and drained on connect, `seq` / `at` stamped like any crane-bound row — [frontends.md → Reactions](frontends.md#reactions-what-every-mouth-must-do-the-same) |
 | `error` | `text` token, `id` | Logged (`pendant mailbox error`). Does not start a turn. A refused `reply` is still lost — no retry |
 
 **Frames the crane sends.**

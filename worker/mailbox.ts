@@ -320,7 +320,20 @@ export class Mailbox extends DurableObject<Env> {
         fanOut(exceptSender(this.peers(subTag(reaction.userId)), ws), body);
       }
       if (meta.role === "phone") {
-        fanOut(this.peers(roleTag("crane")), body);
+        // Crane down: keep it like an inbound. Keyed by the bubble, so a
+        // second reaction on the same bubble replaces the first — latest wins.
+        const sent = fanOut(this.peers(roleTag("crane")), body);
+        if (queueForCrane(sent.length)) {
+          await this.putQueued({
+            id: reaction.id,
+            to: "crane",
+            body,
+            at: now,
+            userId: reaction.userId || undefined,
+            kind: "react",
+            bytes: utf8Bytes(body),
+          });
+        }
       }
       return;
     }

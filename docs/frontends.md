@@ -46,7 +46,7 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | Draft→reply remount | PWA `live` React key, Cab / Helm `composeKey` (`kit-live`) so Markdown does not remount when `__draft__` becomes `r1`. Not on the wire. |
 | `draft` / `typing` (answer in progress) | Cumulative full text, one bubble per `sub`, ended by `reply` / `error` or a blank `draft` (the clear). The Worker forwards a blank only while a draft is held, refuses an empty `reply` (`error bad frame` to the crane), and re-sends the latest `draft` on a phone connect flush (forgotten when the crane goes or after 60 s quiet). Additive — every mouth already paints `draft` at any time — [Draft](#draft-what-every-mouth-must-do-the-same) |
 | `seen` on a phone `ack` (read on another mouth) | Additive `seen: true` on the phone's own `ack`. The Worker copies it to that human's **other** `sub:<userId>` sockets as `{ kind: "ack", seen: true, user_id, since?, id? }` — never a plain ack, which is delivery. A mouth that hears one drops its notification cards. A bare `{ kind: "ack", seen: true }` (no cursor yet) goes to siblings only, not the crane. Old Cab drops the key (`Mouth.ingest` acks by id → no-op) — [Seen](#seen-what-every-mouth-must-do-the-same) |
-| `react` (emoji on a bubble, both ways) | New `kind`, existing fields: `{ kind: "react", user_id, id: <bubble id>, text: "👍" }`; empty `text` clears. Worker stores it per human (`r:<sub>`), fans it to the human's `sub:` sockets (and to the crane when a phone sent it), replays it after the transcript on connect. Not a turn: no `seq`, queue, push, or cursor move. **Old Cab paints a stray bubble** — it needs `ignoredKind` for `react` before the crane starts reacting — [Reactions](#reactions-what-every-mouth-must-do-the-same) |
+| `react` (emoji on a bubble, both ways) | New `kind`, existing fields: `{ kind: "react", user_id, id: <bubble id>, text: "👍" }`; empty `text` clears. Worker stores it per human (`r:<sub>`), fans it to the human's `sub:` sockets (and to the crane when a phone sent it — queued for a down crane), replays it after the transcript on connect. Not a turn: no `seq`, phone queue, push, or cursor move. **Old Cab paints a stray bubble** — it needs `ignoredKind` for `react` before the crane starts reacting — [Reactions](#reactions-what-every-mouth-must-do-the-same) |
 | Photo caps, encode ladder, `error` tokens | Every mouth encodes to the same budget and paints refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
 | Face / backdrop blobs and their notices | Cab and Helm refetch `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
 | Header face (size, hang, stroke) | Cab TopAppBar and Helm header overlay, not PWA-only — [Header face](#header-face) |
@@ -275,9 +275,12 @@ This is the wire and the paint.
   normalizes whitespace, refuses control characters, caps it at
   `REACTION_TEXT_MAX` (64 bytes), and refuses a `react` with no `id`
   (`error bad frame`).
-- **Not a turn.** No `seq`, no `at`, no queue row, no Web Push, no
-  cursor move, no toast, no haptic. It does not clear `typing` or a
-  `draft` — Kit sends its `react` *before* the reply, mid-typing.
+- **Not a turn.** No `seq`, no `at`, no phone queue row, no Web Push,
+  no cursor move, no toast, no haptic. It does not clear `typing` or a
+  `draft` — Kit sends its `react` *before* the reply, mid-typing. The
+  one queue it touches is crane-bound: a phone's `react` waits for a
+  down crane the way an `inbound` does (a drained row carries the
+  queue's `seq` / `at`; the crane ignores them).
 - Picker and model share one list, `REACTION_PALETTE` in
   `lib/mailbox/react.ts` (= crane `channel.Palette`):
   `👍 👎 ❤️ 🔥 🤣 😢 🤔 🙏 👀 🎉 💯 👏`. The Worker accepts anything
@@ -288,7 +291,7 @@ This is the wire and the paint.
 | From | Worker | Rate |
 | --- | --- | --- |
 | crane `react` (`user_id` required) | Validate; store `r:<sub>` → `{ id: emoji }`; fan to every `sub:<user_id>` socket | off the bucket, like `typing` |
-| phone `react` | Stamp `user_id`; validate; store `r:<sub>`; fan to the human's **other** `sub:` sockets (not the sender); fan to the crane. No crane socket up → the crane never hears it (no queue; the chip still paints and hydrates) | in the phone's bucket |
+| phone `react` | Stamp `user_id`; validate; store `r:<sub>`; fan to the human's **other** `sub:` sockets (not the sender); fan to the crane. No crane socket up → queued for the crane like an `inbound` (`q:crane:<bubble id>`, so a second reaction on the same bubble replaces the first — latest wins; drained on the crane's next connect; queue TTL applies). The crane then runs its reaction turn late — accepted | in the phone's bucket |
 | phone connect flush | After the transcript replay, one `react` per stored reaction whose bubble was just replayed, with `replay: true`, in thread order | — |
 
 `r:<sub>` keeps only ids the transcript still has (pruned on every

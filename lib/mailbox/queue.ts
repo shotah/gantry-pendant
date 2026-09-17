@@ -162,7 +162,9 @@ export function enqueue(
   const max = opts.max ?? QUEUE_MAX;
   const ttl = opts.ttlMs ?? QUEUE_TTL_MS;
   const cap = opts.bytesMax ?? QUEUE_BYTES_MAX;
-  const live = pruneQueue([...items, msg], opts.now, ttl);
+  // Same (id, to) again is a replacement — one storage key, latest body.
+  const same = queueIdentity(msg);
+  const live = pruneQueue([...items.filter((m) => queueIdentity(m) !== same), msg], opts.now, ttl);
   const key = destOf(msg);
   const mine = live.filter((m) => destOf(m) === key);
   const keptMine = [...mine];

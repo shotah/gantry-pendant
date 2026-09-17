@@ -566,6 +566,31 @@ describe("Mailbox reactions", () => {
     expect(state.storage.rows.has("r:1182")).toBe(false);
   });
 
+  it("queues the human's reaction when no crane socket is up; latest on a bubble wins; the crane drains it on connect", async () => {
+    const { state, box, crane, phone, say } = room();
+    const pwa = phone("1182");
+    await say(crane, { kind: "reply", id: "r1", user_id: "1182", text: "Rain at 6." });
+    await say(crane, { kind: "reply", id: "r2", user_id: "1182", text: "Bring a coat." });
+    crane.close();
+    pwa.sent.length = 0;
+
+    await say(pwa, { kind: "react", id: "r1", text: "👍" });
+    await say(pwa, { kind: "react", id: "r1", text: "❤️" });
+    await say(pwa, { kind: "react", id: "r2", text: "🔥" });
+
+    const forCrane = state.storage.queued().filter((q) => q.to === "crane");
+    expect(forCrane.map((q) => [q.id, q.kind])).toEqual([["r1", "react"], ["r2", "react"]]);
+    expect(pwa.sent).toEqual([]); // no ack for a react, no error either
+    expect(state.storage.rows.get("r:1182")).toEqual({ r1: "❤️", r2: "🔥" });
+
+    const back = new FakeSocket();
+    state.acceptWebSocket(back, socketTags({ role: "crane", rateId: "bearer:kit" }));
+    await (box as unknown as Flushable).flush(back, "crane");
+    const reacts = back.frames().filter((f) => f.kind === "react");
+    expect(reacts.map((f) => [f.id, f.text, f.user_id])).toEqual([["r1", "❤️", "1182"], ["r2", "🔥", "1182"]]);
+    expect(state.storage.queued().filter((q) => q.to === "crane")).toEqual([]);
+  });
+
   it("refuses a react without an id or with junk text, and a crane react without a human", async () => {
     const { crane, phone, say } = room();
     const pwa = phone("1182");
