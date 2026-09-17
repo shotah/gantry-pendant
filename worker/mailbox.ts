@@ -44,14 +44,22 @@ import {
   shouldTranscript,
   transcriptStoreKey,
 } from "../lib/mailbox/transcript";
-import { exceptSender, persistInboundForPhone, persistRole, resolvePhoneKind, routeTag, siblingPhoneTag } from "../lib/mailbox/route";
+import {
+  emptyReply,
+  exceptSender,
+  persistInboundForPhone,
+  persistRole,
+  resolvePhoneKind,
+  routeTag,
+  siblingPhoneTag,
+} from "../lib/mailbox/route";
 import { parseEmailVerified, parseExpMs, socketMessageAllowed } from "../lib/mailbox/socketAuth";
 import { pruneDualLimits, takeFrame, type DualLimit } from "../lib/mailbox/rate";
-import { cranePublishedDraft, phoneMustNotPublishDraft } from "../lib/mailbox/draft";
+import { blankDraft, clearsDraft, cranePublishedDraft, phoneMustNotPublishDraft } from "../lib/mailbox/draft";
 import { cranePublishedTyping, phoneMustNotPublishTyping } from "../lib/mailbox/typing";
 import {
   collectTagged,
-  openSockets,
+  fanOut,
   parseSocketTags,
   queueForCrane,
   roleTag,
@@ -101,6 +109,14 @@ const BACKDROP_BLOB: BlobSpec = {
 };
 
 export class Mailbox extends DurableObject<Env> {
+  /**
+   * Latest `draft` text per `sub` while Kit is mid-answer, so a phone that
+   * redials (Cab sweep, PWA tab hide) gets the bubble back on connect. Memory
+   * only: a room mid-stream does not hibernate, and if it ever does the
+   * phone just waits for `reply` as before. Dropped on `reply` / `error`.
+   */
+  private readonly drafts = new Map<string, string>();
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
@@ -196,7 +212,12 @@ export class Mailbox extends DurableObject<Env> {
     } else if (!out.kind) {
       out.kind = "reply";
     }
-    const skipRate = cranePublishedDraft(meta.role, out.kind);
+    if (meta.role === "crane" && emptyReply(out)) {
+      ws.send(encodeError("bad frame", out.id));
+      return;
+    }
+    // Ephemeral, unstored, a few dozen bytes; the crane's 30/min bucket is for turns.
+    const skipRate = cranePublishedDraft(meta.role, out.kind) || cranePublishedTyping(meta.role, out.kind);
     if (!skipRate) {
       const limits = await this.take(meta.rateId, parsed.bytes);
       if (!limits) {
@@ -220,32 +241,22 @@ export class Mailbox extends DurableObject<Env> {
     if (cranePublishedCmds(meta.role, out.kind)) {
       const body = encodeFrame({ kind: "cmds", commands: parseCommands(out.commands) });
       await this.ctx.storage.put(CMDS_STORE_KEY, body);
-      for (const p of this.peers(roleTag("phone"))) {
-        p.send(body);
-      }
+      fanOut(this.peers(roleTag("phone")), body);
       return;
     }
     if (cranePublishedTyping(meta.role, out.kind)) {
       const tag = routeTag(meta.role, out);
       if (tag && out.user_id) {
-        const body = encodeFrame({ kind: "typing", user_id: out.user_id });
-        for (const p of this.peers(tag)) {
-          p.send(body);
-        }
+        fanOut(this.peers(tag), encodeFrame({ kind: "typing", user_id: out.user_id }));
       }
       return;
     }
     if (cranePublishedDraft(meta.role, out.kind)) {
       const tag = routeTag(meta.role, out);
-      if (tag && out.user_id) {
-        const body = encodeFrame({
-          kind: "draft",
-          user_id: out.user_id,
-          text: out.text ?? "",
-        });
-        for (const p of this.peers(tag)) {
-          p.send(body);
-        }
+      if (tag && out.user_id && !blankDraft(out)) {
+        const text = out.text ?? "";
+        this.drafts.set(out.user_id, text);
+        fanOut(this.peers(tag), encodeFrame({ kind: "draft", user_id: out.user_id, text }));
       }
       return;
     }
@@ -265,9 +276,7 @@ export class Mailbox extends DurableObject<Env> {
       if (out.id) {
         await this.ackPhoneId(out.id, meta.userId);
       }
-      for (const c of this.peers(roleTag("crane"))) {
-        c.send(encodeFrame(out));
-      }
+      fanOut(this.peers(roleTag("crane")), encodeFrame(out));
       return;
     }
     if (shouldQueue(out.kind)) {
@@ -276,7 +285,7 @@ export class Mailbox extends DurableObject<Env> {
     }
     const body = encodeFrame(out);
     const tag = routeTag(meta.role, out);
-    const peers = tag ? openSockets(this.peers(tag)) : [];
+    const peers = tag ? this.peers(tag) : [];
     const dest = persistRole(meta.role, out.kind, out.user_id);
     const phoneRow = (): Queued => ({
       id: out.id || newQueueId(),
@@ -289,22 +298,19 @@ export class Mailbox extends DurableObject<Env> {
       bytes: utf8Bytes(body),
     });
     if (dest === "phone") {
+      if (out.user_id && clearsDraft(out.kind)) {
+        this.drafts.delete(out.user_id);
+      }
       // Fan live sockets before durable persist. Drafts already skip
       // storage; waiting on queue+transcript here is the draft→reply hitch.
-      for (const p of peers) {
-        p.send(body);
-      }
+      fanOut(peers, body);
       await this.rememberPhone(phoneRow());
       await this.notifyOffline(out);
       return;
     }
     if (dest === "crane") {
-      if (peers.length) {
-        for (const p of peers) {
-          p.send(body);
-        }
-      }
-      if (queueForCrane(peers.length)) {
+      const sent = fanOut(peers, body);
+      if (queueForCrane(sent.length)) {
         await this.putQueued({
           id: out.id,
           to: "crane",
@@ -321,18 +327,14 @@ export class Mailbox extends DurableObject<Env> {
       }
       const sibling = siblingPhoneTag(meta.role, out.kind, meta.userId);
       if (sibling) {
-        for (const p of exceptSender(openSockets(this.peers(sibling)), ws)) {
-          p.send(body);
-        }
+        fanOut(exceptSender(this.peers(sibling), ws), body);
       }
       if (meta.role === "phone" && out.kind === "inbound") {
         ws.send(encodeFrame({ kind: "ack", id: out.id }));
       }
       return;
     }
-    for (const p of peers) {
-      p.send(body);
-    }
+    fanOut(peers, body);
   }
 
   async webSocketClose() {
@@ -375,9 +377,7 @@ export class Mailbox extends DurableObject<Env> {
 
   /** Every socket in the room, crane included — it ignores frames with no `user_id`. */
   private announce(body: string): void {
-    for (const sock of this.ctx.getWebSockets()) {
-      sock.send(body);
-    }
+    fanOut(this.ctx.getWebSockets(), body);
   }
 
   private async themeHttp(request: Request): Promise<Response> {
@@ -495,6 +495,14 @@ export class Mailbox extends DurableObject<Env> {
       });
       for (const m of take) {
         ws.send(stampOrderOnBody(m.body, { seq: m.seq, at: m.at }));
+      }
+      // Kit mid-answer for this human: put the bubble back. Not replay, not
+      // stored; the same `draft` every mouth already paints (docs/frontends.md).
+      if (userId) {
+        const held = this.drafts.get(userId);
+        if (held) {
+          ws.send(encodeFrame({ kind: "draft", user_id: userId, text: held }));
+        }
       }
       return;
     }

@@ -44,6 +44,7 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | Queue / `ack` / `since` / `seq` | Cab and Helm parse `seq` / `at`, insert like `placeInThread`, ack the highest seq. Transcript hydrate is the same frames plus `replay` — see below |
 | Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Helm pins the last bubble. Do not assume either needs the PWA CSS |
 | Draft→reply remount | PWA `live` React key, Cab / Helm `composeKey` (`kit-live`) so Markdown does not remount when `__draft__` becomes `r1`. Not on the wire. |
+| `draft` / `typing` (answer in progress) | Cumulative full text, one bubble per `sub`, ended by `reply` / `error`. The Worker drops a blank `draft`, refuses an empty `reply` (`error bad frame` to the crane), and re-sends the latest `draft` on a phone connect flush. Additive — every mouth already paints `draft` at any time — [Draft](#draft-what-every-mouth-must-do-the-same) |
 | Photo caps, encode ladder, `error` tokens | Every mouth encodes to the same budget and paints refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
 | Face / backdrop blobs and their notices | Cab and Helm refetch `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
 | Header face (size, hang, stroke) | Cab TopAppBar and Helm header overlay, not PWA-only — [Header face](#header-face) |
@@ -110,6 +111,48 @@ Cab (`mailbox/Thread.kt`, `Mouth.ingest`, `MailboxClient`) and Helm
   does this with `ThreadCache` (JSON on disk, not Room); Helm does
   the same in `Sources/Mailbox/ThreadCache.swift`. First `ack`
   `since` is the highest cached seq.
+
+---
+
+## Draft (what every mouth must do the same)
+
+While Kit is mid-answer the crane sends `typing` (chip) and `draft`
+(bubble) to `sub:<userId>`. Neither is stored, stamped, queued, or
+replayed. The mailbox rules, so no mouth has to guess:
+
+- **`draft.text` is the whole answer so far**, not a delta. A mouth
+  replaces its bubble with the new text. Later `draft`s only grow it.
+- **Blank never reaches a phone.** The Worker drops a `draft` with
+  missing or whitespace `text` before fan-out (`blankDraft`). A crane
+  resetting its buffer at a tool call cannot blank the bubble. Ending
+  a turn is `reply` or `error`, never an empty draft. Mouths that read
+  blank as "clear" (Cab, PWA) can keep that code; it no longer fires.
+- **A `reply` with no text and no photo is refused.** The crane gets
+  `{ kind: "error", text: "bad frame", id }` and nothing is fanned,
+  stored, or pushed. A photo-only `reply` still passes. So `reply`
+  always replaces the draft with something to paint.
+- **Connect flush may end with one `draft`.** After the transcript
+  replay and the unread queue for that `sub`, if Kit is mid-answer
+  for that human the Worker sends the latest draft text as a plain
+  `draft` (no `replay`, no `seq`). Cab `Mouth.ingest` and Helm take a
+  `draft` at any time, so a sweep, a tab hide, or a 3 s airplane
+  blip mid-answer gets the bubble back. Held in Durable Object memory
+  per `sub`; dropped on that human's `reply` or `error`. If the room
+  ever hibernates mid-stream the phone simply waits for `reply`, as
+  before. Do not cache a `draft` in the device thread store.
+- **Fan-out never stops at a stale socket.** `getWebSockets` still
+  lists a socket Cab `cancel()`ed after a sweep or a hidden PWA tab
+  until the peer answers the close; `send()` on it throws. Every
+  Worker fan (`fanOut`) skips non-OPEN sockets and swallows a throw so
+  the live sibling still gets the frame. Nothing for a mouth to do.
+- **`typing` and `draft` do not spend the crane's rate bucket**
+  (`RATE_FRAMES_PER_MIN` is for turns). The crane may refresh
+  `typing` every ≤ 4 s through a tool call without bouncing its next
+  `reply`.
+
+Cover: `test/worker/mailbox.test.ts`. Cab / Helm paint is unchanged;
+if either adds a draft TTL (dead crane, ghost bubble) that is mouth-
+local and stays out of this doc.
 
 ---
 

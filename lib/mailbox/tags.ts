@@ -58,6 +58,27 @@ export function openSockets<T extends { readyState: number }>(sockets: readonly 
   return sockets.filter(isSocketOpen);
 }
 
+export type Sendable = { readyState: number; send(body: string): void };
+
+/**
+ * Fan one body to every open socket. `getWebSockets` can still list a socket
+ * that is CLOSING (Cab's `cancel()`ed sweep socket, a hidden PWA tab, a 4401),
+ * and `send()` on one throws — an unguarded loop would starve every peer after
+ * it and drop the crane's frame. Returns the sockets that took the body.
+ */
+export function fanOut<T extends Sendable>(sockets: readonly T[], body: string): T[] {
+  const sent: T[] = [];
+  for (const ws of openSockets(sockets)) {
+    try {
+      ws.send(body);
+      sent.push(ws);
+    } catch {
+      // stale: closed under us between the readyState check and the write
+    }
+  }
+  return sent;
+}
+
 /** Queue inbound for the crane only when no live crane socket is open. */
 export function queueForCrane(openPeerCount: number): boolean {
   return openPeerCount < 1;

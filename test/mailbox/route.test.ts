@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { exceptSender, persistInboundForPhone, persistRole, phoneKindAllowed, resolvePhoneKind, routeTag, siblingPhoneTag } from "@/lib/mailbox/route";
+import {
+  emptyReply,
+  exceptSender,
+  persistInboundForPhone,
+  persistRole,
+  phoneKindAllowed,
+  resolvePhoneKind,
+  routeTag,
+  siblingPhoneTag,
+} from "@/lib/mailbox/route";
 import { shouldTranscript } from "@/lib/mailbox/transcript";
 import type { WireFrame } from "@/lib/mailbox/frame";
 
@@ -87,5 +96,14 @@ describe("route", () => {
     const bob = { id: "bob" };
     expect(exceptSender([ada, cab, bob], ada)).toEqual([cab, bob]);
     expect(exceptSender([ada], ada)).toEqual([]);
+  });
+
+  it("calls a reply empty only when it has neither words nor a photo", () => {
+    expect(emptyReply({ kind: "reply" })).toBe(true);
+    expect(emptyReply({ kind: "reply", text: "  " })).toBe(true);
+    expect(emptyReply({ kind: "reply", text: "rain" })).toBe(false);
+    expect(emptyReply({ kind: "reply", images: [{ url: "https://cdn.example/a.jpg" }] })).toBe(false);
+    expect(emptyReply({ kind: "push" })).toBe(false);
+    expect(emptyReply({ kind: "error" })).toBe(false);
   });
 });

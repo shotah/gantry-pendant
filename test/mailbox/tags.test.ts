@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   collectTagged,
+  fanOut,
   isSocketOpen,
   parseSocketTags,
   queueForCrane,
@@ -9,6 +10,20 @@ import {
   subTag,
   tagAliases,
 } from "@/lib/mailbox/tags";
+
+function socket(readyState: number, fail = false) {
+  const sent: string[] = [];
+  return {
+    readyState,
+    sent,
+    send(body: string) {
+      if (fail) {
+        throw new TypeError("Can't call WebSocket send() after close().");
+      }
+      sent.push(body);
+    },
+  };
+}
 
 describe("socket tags", () => {
   it("prefixes every slot so user_id cannot match role or verified", () => {
@@ -65,5 +80,16 @@ describe("socket tags", () => {
     expect(isSocketOpen({ readyState: 0 })).toBe(false);
     expect(queueForCrane(0)).toBe(true);
     expect(queueForCrane(1)).toBe(false);
+  });
+
+  it("fans past closing and throwing sockets and reports who took it", () => {
+    const closing = socket(2);
+    const throwing = socket(1, true);
+    const live = socket(1);
+    const took = fanOut([closing, throwing, live], "{}");
+    expect(took).toEqual([live]);
+    expect(live.sent).toEqual(["{}"]);
+    expect(closing.sent).toEqual([]);
+    expect(fanOut([], "{}")).toEqual([]);
   });
 });

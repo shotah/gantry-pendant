@@ -23,6 +23,14 @@ export function phoneKindAllowed(frame: WireFrame): boolean {
 }
 
 /**
+ * A `reply` with no words and no photo is not a turn. Refuse it so no mouth
+ * paints an empty bubble, drops its draft, or replays a blank on hydrate.
+ */
+export function emptyReply(frame: WireFrame): boolean {
+  return frame.kind === "reply" && !hasText(frame) && !hasImages(frame);
+}
+
+/**
  * Tag for `getWebSockets`. Prefixed so `user_id` cannot collide with role /
  * verified / email slots. Phone-originated frames go to the crane.
  * Crane `reply` requires `user_id`. Crane `push` with no `user_id` is all phones.
