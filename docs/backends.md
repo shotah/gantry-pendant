@@ -87,6 +87,7 @@ crane.
 | `pin` | `context.geo`, no text / photo | `here` only. Silent |
 | `ack` | `id` / `since` from a phone; additive `seen: true` when that mouth has the thread on screen | Forwarded; the crane ignores it. A bare `seen` ack (no `id`, no `since`) is copied to the human's other phone sockets only and never reaches the crane — [frontends.md → Seen](frontends.md#seen-what-every-mouth-must-do-the-same) |
 | `face` / `backdrop` / `theme` | notice | Ignored (`ignoredKind`) |
+| `react` | `user_id`, `id` (one of the crane's `reply` / `push` ids), `text` emoji set; empty = cleared | `scheduleReaction`: 3 s settle per `(sub, id)`, then a reaction turn naming the target from `Recent`. Fan only — no crane socket, no delivery — [frontends.md → Reactions](frontends.md#reactions-what-every-mouth-must-do-the-same) |
 | `error` | `text` token, `id` | Logged (`pendant mailbox error`). Does not start a turn. A refused `reply` is still lost — no retry |
 
 **Frames the crane sends.**
@@ -97,6 +98,7 @@ crane.
 | `push` | `text` and / or photo; `user_id` optional | Same. No `user_id` = every phone socket + broadcast transcript `t:_` + Web Push to every stored subscription | yes |
 | `typing` | `user_id` | Fan only. Not queued. Phones show it for 6 s (`TYPING_TTL_MS`) | yes |
 | `draft` | `user_id`, `text` | Fan only. Not queued, not in the transcript, no `seq` | **no** |
+| `react` | `user_id`, `id` (the human's `inbound` id), `text` emoji; empty clears | Stored `r:<sub>` by bubble id (pruned to the transcript), fan to every `sub:<user_id>` socket, replayed after the transcript on phone connect. No queue, no `seq`, no Web Push. Missing `id` / `user_id` or junk text → `error bad frame` | **no** |
 | `cmds` | `commands[]` | Stored; fan to phones; replayed on phone connect | yes |
 | `allow` | `users[]` (`sub` and / or `email`) | Stored room list; KV directory; phones no longer listed get `4401` | yes |
 | `ack` | `id` | Deletes that crane-bound queue row. Unused by Go today | yes |

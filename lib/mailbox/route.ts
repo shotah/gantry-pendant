@@ -2,9 +2,9 @@ import { hasGeo, hasImages, hasText, type FrameKind, type Role, type WireFrame }
 import { shouldQueue } from "./queue";
 import { roleTag, subTag } from "./tags";
 
-const PHONE_KINDS = new Set<FrameKind>(["inbound", "pin", "ack"]);
+const PHONE_KINDS = new Set<FrameKind>(["inbound", "pin", "ack", "react"]);
 
-/** Phone may send inbound | pin | ack. Default inbound (text/images) or pin (geo-only). */
+/** Phone may send inbound | pin | ack | react. Default inbound (text/images) or pin (geo-only). */
 export function resolvePhoneKind(frame: WireFrame): FrameKind | undefined {
   if (frame.kind) {
     return PHONE_KINDS.has(frame.kind) ? frame.kind : undefined;

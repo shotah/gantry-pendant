@@ -46,6 +46,7 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | Draft→reply remount | PWA `live` React key, Cab / Helm `composeKey` (`kit-live`) so Markdown does not remount when `__draft__` becomes `r1`. Not on the wire. |
 | `draft` / `typing` (answer in progress) | Cumulative full text, one bubble per `sub`, ended by `reply` / `error` or a blank `draft` (the clear). The Worker forwards a blank only while a draft is held, refuses an empty `reply` (`error bad frame` to the crane), and re-sends the latest `draft` on a phone connect flush (forgotten when the crane goes or after 60 s quiet). Additive — every mouth already paints `draft` at any time — [Draft](#draft-what-every-mouth-must-do-the-same) |
 | `seen` on a phone `ack` (read on another mouth) | Additive `seen: true` on the phone's own `ack`. The Worker copies it to that human's **other** `sub:<userId>` sockets as `{ kind: "ack", seen: true, user_id, since?, id? }` — never a plain ack, which is delivery. A mouth that hears one drops its notification cards. A bare `{ kind: "ack", seen: true }` (no cursor yet) goes to siblings only, not the crane. Old Cab drops the key (`Mouth.ingest` acks by id → no-op) — [Seen](#seen-what-every-mouth-must-do-the-same) |
+| `react` (emoji on a bubble, both ways) | New `kind`, existing fields: `{ kind: "react", user_id, id: <bubble id>, text: "👍" }`; empty `text` clears. Worker stores it per human (`r:<sub>`), fans it to the human's `sub:` sockets (and to the crane when a phone sent it), replays it after the transcript on connect. Not a turn: no `seq`, queue, push, or cursor move. **Old Cab paints a stray bubble** — it needs `ignoredKind` for `react` before the crane starts reacting — [Reactions](#reactions-what-every-mouth-must-do-the-same) |
 | Photo caps, encode ladder, `error` tokens | Every mouth encodes to the same budget and paints refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
 | Face / backdrop blobs and their notices | Cab and Helm refetch `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
 | Header face (size, hang, stroke) | Cab TopAppBar and Helm header overlay, not PWA-only — [Header face](#header-face) |
@@ -246,6 +247,93 @@ it here first.
 Cover: `test/mailbox/seen.test.ts`, `test/worker/mailbox.test.ts`
 (seen acks), `test/app/components/chat/PhoneShell.test.tsx` (seen /
 tray cases).
+
+---
+
+## Reactions (what every mouth must do the same)
+
+An emoji on a bubble, both ways. Kit reacts to what the human said;
+the human reacts to what Kit said. The crane side (kernel `[react 👍]`
+token, `ReactionSink`, settle, triage) is
+[ai-gantry `docs/reactions.md`](https://github.com/shotah/ai-gantry/blob/main/docs/reactions.md).
+This is the wire and the paint.
+
+**One frame, one new `kind`.** Existing fields only.
+
+```json
+{ "kind": "react", "user_id": "1182", "id": "m-9f2c", "text": "👍" }
+{ "kind": "react", "user_id": "1182", "id": "r1758140000123", "text": "❤️" }
+{ "kind": "react", "user_id": "1182", "id": "r1758140000123", "text": "" }
+```
+
+- `id` is the bubble reacted to: the human's `inbound` id when Kit
+  reacts, Kit's `reply` / `push` id when the human does. Every
+  `reply` now carries a crane-stamped id (`r<unix-nanos>`; the Worker
+  keeps a supplied id), so there is always something to land on.
+- `text` is the emoji set — one, or several space-separated (the
+  crane reads `strings.Fields`). **Empty `text` clears.** The Worker
+  normalizes whitespace, refuses control characters, caps it at
+  `REACTION_TEXT_MAX` (64 bytes), and refuses a `react` with no `id`
+  (`error bad frame`).
+- **Not a turn.** No `seq`, no `at`, no queue row, no Web Push, no
+  cursor move, no toast, no haptic. It does not clear `typing` or a
+  `draft` — Kit sends its `react` *before* the reply, mid-typing.
+- Picker and model share one list, `REACTION_PALETTE` in
+  `lib/mailbox/react.ts` (= crane `channel.Palette`):
+  `👍 👎 ❤️ 🔥 🤣 😢 🤔 🙏 👀 🎉 💯 👏`. The Worker accepts anything
+  short and printable so the list can grow without lockstep.
+
+**What the Worker does.**
+
+| From | Worker | Rate |
+| --- | --- | --- |
+| crane `react` (`user_id` required) | Validate; store `r:<sub>` → `{ id: emoji }`; fan to every `sub:<user_id>` socket | off the bucket, like `typing` |
+| phone `react` | Stamp `user_id`; validate; store `r:<sub>`; fan to the human's **other** `sub:` sockets (not the sender); fan to the crane. No crane socket up → the crane never hears it (no queue; the chip still paints and hydrates) | in the phone's bucket |
+| phone connect flush | After the transcript replay, one `react` per stored reaction whose bubble was just replayed, with `replay: true`, in thread order | — |
+
+`r:<sub>` keeps only ids the transcript still has (pruned on every
+write; `REACTIONS_MAX` 200 hard cap; a clear deletes). A reaction on a
+broadcast `push` sits in the reacting human's `r:<sub>`, never in a
+shared row, so Ada's 👍 is not Bob's.
+
+**What a mouth does on hearing one** (live or `replay`): find the
+bubble by `id`; set its chip to `text`; empty → remove the chip. No
+bubble with that id → drop it. Never paint a `react` as a bubble.
+
+**What a mouth sends.** Long-press (450 ms hold, cancelled by a
+10 px drag) or right-click on one of Kit's `reply` / `push` bubbles
+→ palette → `{ kind: "react", id, text: emoji }`. Paint the chip at
+once. Tap the chip to reopen; picking the emoji already set sends
+`text: ""` (clear). No picker on your own bubbles, a `draft`, or a
+bubble with no `id`. Socket down → do nothing (no optimistic paint
+that hydrate would contradict).
+
+Where each mouth stands:
+
+- PWA — shipped. `Thread.tsx` (chip, hold / context-menu picker,
+  `canReact`), `PhoneShell` (`react` in → `reaction` on the bubble;
+  `onReact` out). The device thread cache keeps `reaction` with the
+  bubble.
+- Cab:
+  - [ ] **`ignoredKind` first.** `Mouth.ingest` paints any frame with
+        `text` as a Kit bubble; an old APK shows a stray `👍` bubble
+        for every crane `react` until this ships. One line in the
+        `kind` switch; release before anything below.
+  - [ ] **Paint.** `reaction` on the room row; `react` in →
+        set / clear by id (live and `replay`); chip on the bubble.
+  - [ ] **Send.** Long-press a Kit bubble → the same palette →
+        `react` out with the bubble id; empty clears. Phone thread
+        only — Auto has no long-press affordance; leave it read-only.
+  - [ ] **Do not** notify, buzz, or move the `since` cursor on a
+        `react`; do not let it clear the draft bubble.
+- Helm:
+  - [ ] Same four items. Context menu on the bubble is the iOS shape;
+        CarPlay read-only.
+
+Cover: `test/mailbox/react.test.ts`, `test/worker/mailbox.test.ts`
+(Mailbox reactions), `test/app/components/chat/Thread.test.tsx`
+(Thread reactions), `test/app/components/chat/PhoneShell.test.tsx`
+(react in / out).
 
 ---
 

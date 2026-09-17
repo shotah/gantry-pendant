@@ -30,7 +30,7 @@ export type PhoneContext = {
 
 export type FrameImage = { url: string };
 
-export type FrameKind = "inbound" | "reply" | "push" | "ack" | "error" | "pin" | "cmds" | "allow" | "typing" | "draft";
+export type FrameKind = "inbound" | "reply" | "push" | "ack" | "error" | "pin" | "cmds" | "allow" | "typing" | "draft" | "react";
 
 export type WireFrame = {
   text?: string;
@@ -243,7 +243,7 @@ export function stampReplayOnBody(body: string): string {
   return encodeFrame({ ...parsed.frame, replay: true });
 }
 
-const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds", "allow", "typing", "draft"]);
+const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds", "allow", "typing", "draft", "react"]);
 
 /** Parse a mailbox frame. Never logs the body. */
 export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseOpts): ParseResult {

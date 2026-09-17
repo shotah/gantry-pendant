@@ -81,6 +81,7 @@ import { isPinnedToBottom, pinToBottom } from "@/lib/phone/threadScroll";
 import { recoverViewport, viewportShellHeight } from "@/lib/phone/viewport";
 import { encodeFrame, orderAt, orderSeq, type Role, type WireFrame } from "@/lib/mailbox/frame";
 import { DRAFT_TTL_MS } from "@/lib/mailbox/draft";
+import { parseReactionText } from "@/lib/mailbox/react";
 import { connectSeenAck, seenAckForTurn } from "@/lib/mailbox/seen";
 import { clearsTyping, TYPING_TTL_MS } from "@/lib/mailbox/typing";
 import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
@@ -217,6 +218,18 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     }
     pinToBottom(node);
   }, []);
+
+  /** Your emoji on one of Kit's bubbles; empty clears. Paints at once, then tells the room. */
+  function onReact(id: string, emoji: string) {
+    const sock = wsRef.current;
+    if (!sock || sock.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    setMessages((prev) => prev.map((m) => (
+      m.id === id ? { ...m, reaction: emoji || undefined } : m
+    )));
+    sendClientFrame(sock, { kind: "react", id, text: emoji });
+  }
 
   function onThreadScroll() {
     const node = scroller.current;
@@ -760,6 +773,16 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         setMessages((prev) => failInThread(prev, id, describeSendError(frame.text)));
         return;
       }
+      if (frame.kind === "react") {
+        // An emoji on a bubble we already have; `id` names it. Not a turn: no cursor, no toast.
+        if (id) {
+          const reaction = parseReactionText(frame.text) ?? "";
+          setMessages((prev) => prev.map((m) => (
+            m.id === id ? { ...m, reaction: reaction || undefined } : m
+          )));
+        }
+        return;
+      }
       if (id) {
         rememberCursor(id, seq);
         if (seenIds.current.has(id)) {
@@ -1235,6 +1258,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           >
             <Thread
               messages={messages}
+              onReact={phone ? onReact : undefined}
               empty={(
                 <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
                   <KitAvatar {...faceProps} size="lg" editable={false} />

@@ -1639,6 +1639,64 @@ describe("PhoneShell", () => {
     }
   });
 
+  it("paints Kit's reaction on your bubble, clears it on an empty one, and never moves the cursor", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "m1", kind: "inbound", text: "thanks!", seq: 1, at: 10 }));
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "Rain at 6.", seq: 2, at: 20 }));
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "react", user_id: "1182", id: "m1", text: "👍" }));
+    });
+    expect(screen.getByLabelText("reaction 👍")).toBeTruthy();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2); // not a bubble
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "react", user_id: "1182", id: "m1", text: "" }));
+    });
+    expect(screen.queryByLabelText("reaction 👍")).toBeNull();
+
+    // A reaction on a bubble we do not have is nothing; a replayed one paints like a live one.
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "react", user_id: "1182", id: "nope", text: "🔥" }));
+      ws.deliver(JSON.stringify({ kind: "react", user_id: "1182", id: "r1", text: "❤️", replay: true }));
+    });
+    expect(screen.queryByLabelText("reaction 🔥")).toBeNull();
+    expect(screen.getByLabelText("reaction ❤️")).toBeTruthy();
+
+    // The cursor is the highest turn seq, untouched by react ids.
+    act(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    const next = liveSocket();
+    act(() => {
+      next.open();
+    });
+    expect(sentAcks(next)[0]).toEqual({ kind: "ack", since: "2", seen: true });
+  });
+
+  it("long-press on Kit's bubble sends your reaction and paints it; picking it again clears", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "Rain at 6.", seq: 1, at: 10 }));
+    });
+    fireEvent.contextMenu(screen.getByText("Rain at 6."));
+    fireEvent.click(screen.getByRole("button", { name: "React 👍" }));
+    expect(sentTurns(ws).filter((f) => f.kind === "react")).toEqual([{ kind: "react", id: "r1", text: "👍" }]);
+    expect(screen.getByRole("button", { name: "reaction 👍" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "reaction 👍" }));
+    fireEvent.click(screen.getByRole("button", { name: "React 👍" }));
+    expect(sentTurns(ws).filter((f) => f.kind === "react").at(-1)).toEqual({ kind: "react", id: "r1", text: "" });
+    expect(screen.queryByLabelText("reaction 👍")).toBeNull();
+  });
+
   it("forgets the draft text on reply so the same words paint again next turn", async () => {
     const ws = await connectSpike();
     act(() => {

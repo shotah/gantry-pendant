@@ -514,3 +514,82 @@ describe("Mailbox round-trip push test", () => {
     expect((await keyed.box.fetch(pushOp("POST", "1182", { slug: "nope!" }))).status).toBe(400);
   });
 });
+
+describe("Mailbox reactions", () => {
+  it("fans Kit's reaction to the human's mouths, stores it, and hydrates it after the bubble", async () => {
+    const { state, crane, phone, say, connect } = room();
+    const pwa = phone("1182");
+    const cab = phone("1182");
+    const bob = phone("7");
+    await say(pwa, { id: "m1", text: "thanks!" });
+
+    await say(crane, { kind: "react", user_id: "1182", id: "m1", text: "👍" });
+
+    expect(cab.frames().filter((f) => f.kind === "react")).toEqual([
+      { kind: "react", id: "m1", text: "👍", user_id: "1182" },
+    ]);
+    expect(pwa.frames().filter((f) => f.kind === "react")).toEqual([
+      { kind: "react", id: "m1", text: "👍", user_id: "1182" },
+    ]);
+    expect(bob.sent).toEqual([]);
+    expect(state.storage.queued().some((q) => q.kind === "react")).toBe(false);
+    expect(state.storage.rows.get("r:1182")).toEqual({ m1: "👍" });
+
+    const fresh = phone("1182");
+    await connect(fresh, "1182");
+    const kinds = fresh.kinds();
+    expect(kinds.indexOf("react")).toBeGreaterThan(kinds.indexOf("inbound"));
+    expect(fresh.frames().find((f) => f.kind === "react")).toEqual({
+      kind: "react", id: "m1", text: "👍", user_id: "1182", replay: true,
+    });
+  });
+
+  it("hands the human's reaction to the crane and their other mouths, not back to the sender", async () => {
+    const { state, crane, phone, say } = room();
+    const pwa = phone("1182");
+    const cab = phone("1182");
+    await say(crane, { kind: "reply", id: "r1", user_id: "1182", text: "Rain at 6." });
+    crane.sent.length = 0;
+    pwa.sent.length = 0;
+    cab.sent.length = 0;
+
+    await say(pwa, { kind: "react", id: "r1", text: "❤️" });
+
+    expect(crane.frames()).toEqual([{ kind: "react", id: "r1", text: "❤️", user_id: "1182" }]);
+    expect(cab.frames()).toEqual([{ kind: "react", id: "r1", text: "❤️", user_id: "1182" }]);
+    expect(pwa.sent).toEqual([]);
+    expect(state.storage.rows.get("r:1182")).toEqual({ r1: "❤️" });
+
+    await say(pwa, { kind: "react", id: "r1", text: "" });
+    expect(crane.frames().at(-1)).toEqual({ kind: "react", id: "r1", text: "", user_id: "1182" });
+    expect(cab.frames().at(-1)).toEqual({ kind: "react", id: "r1", text: "", user_id: "1182" });
+    expect(state.storage.rows.has("r:1182")).toBe(false);
+  });
+
+  it("refuses a react without an id or with junk text, and a crane react without a human", async () => {
+    const { crane, phone, say } = room();
+    const pwa = phone("1182");
+
+    await say(pwa, { kind: "react", text: "👍" });
+    await say(pwa, { kind: "react", id: "r1", text: "x\u0000" });
+    await say(crane, { kind: "react", id: "m1", text: "👍" });
+
+    expect(pwa.frames()).toEqual([
+      { kind: "error", text: "bad frame" },
+      { kind: "error", text: "bad frame", id: "r1" },
+    ]);
+    expect(crane.frames()).toEqual([{ kind: "error", text: "bad frame", id: "m1" }]);
+  });
+
+  it("does not spend the crane's turn bucket on a react", async () => {
+    const { crane, phone, say } = room();
+    const pwa = phone("1182");
+    await say(pwa, { id: "m1", text: "hi" });
+    pwa.sent.length = 0;
+    for (let i = 0; i < 40; i += 1) {
+      await say(crane, { kind: "react", user_id: "1182", id: "m1", text: i % 2 ? "👍" : "❤️" });
+    }
+    expect(pwa.frames().every((f) => f.kind === "react")).toBe(true);
+    expect(pwa.frames()).toHaveLength(40);
+  });
+});

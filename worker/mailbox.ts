@@ -56,6 +56,16 @@ import {
 import { parseEmailVerified, parseExpMs, socketMessageAllowed } from "../lib/mailbox/socketAuth";
 import { pruneDualLimits, takeFrame, type DualLimit } from "../lib/mailbox/rate";
 import { HeldDrafts, blankDraft, clearsDraft, cranePublishedDraft, phoneMustNotPublishDraft } from "../lib/mailbox/draft";
+import {
+  applyReaction,
+  asReactions,
+  cranePublishedReact,
+  encodeReaction,
+  reactionFor,
+  reactionFramesFor,
+  reactionsStoreKey,
+  type Reaction,
+} from "../lib/mailbox/react";
 import { bareAck, seenAckFor } from "../lib/mailbox/seen";
 import { cranePublishedTyping, phoneMustNotPublishTyping } from "../lib/mailbox/typing";
 import {
@@ -223,7 +233,9 @@ export class Mailbox extends DurableObject<Env> {
       return;
     }
     // Ephemeral, unstored, a few dozen bytes; the crane's 30/min bucket is for turns.
-    const skipRate = cranePublishedDraft(meta.role, out.kind) || cranePublishedTyping(meta.role, out.kind);
+    const skipRate = cranePublishedDraft(meta.role, out.kind)
+      || cranePublishedTyping(meta.role, out.kind)
+      || cranePublishedReact(meta.role, out.kind);
     if (!skipRate) {
       const limits = await this.take(meta.rateId, parsed.bytes);
       if (!limits) {
@@ -292,6 +304,24 @@ export class Mailbox extends DurableObject<Env> {
         await this.ackPhoneId(out.id, meta.userId);
       }
       fanOut(this.peers(roleTag("crane")), encodeFrame(out));
+      return;
+    }
+    if (out.kind === "react") {
+      // Both ways (docs/frontends.md → Reactions). Not a turn: no seq, no
+      // queue, no Web Push. Stored per human by message id so hydrate paints it.
+      const reaction = reactionFor(meta.role, out);
+      if (!reaction) {
+        ws.send(encodeError("bad frame", out.id));
+        return;
+      }
+      const body = encodeFrame(encodeReaction(reaction));
+      if (reaction.userId) {
+        await this.storeReaction(reaction);
+        fanOut(exceptSender(this.peers(subTag(reaction.userId)), ws), body);
+      }
+      if (meta.role === "phone") {
+        fanOut(this.peers(roleTag("crane")), body);
+      }
       return;
     }
     if (!out.id) {
@@ -528,7 +558,14 @@ export class Mailbox extends DurableObject<Env> {
       if (storedTheme) {
         ws.send(encodeThemeNotice(storedTheme));
       }
-      await this.sendTranscript(ws, userId);
+      const replayed = await this.sendTranscript(ws, userId);
+      if (userId) {
+        // Reactions ride after the bubbles they sit on; hydrate-tagged like them.
+        const reactions = asReactions(await this.ctx.storage.get(reactionsStoreKey(userId)));
+        for (const frame of reactionFramesFor(userId, reactions, replayed)) {
+          ws.send(encodeFrame(frame));
+        }
+      }
       const items = await this.loadQueue();
       const cursor = userId ? await this.phoneCursor(userId) : 0;
       const take = peekFor(items, "phone", Date.now(), {
@@ -571,14 +608,35 @@ export class Mailbox extends DurableObject<Env> {
     await this.ctx.storage.put(key, next);
   }
 
-  private async sendTranscript(ws: WebSocket, userId?: string): Promise<void> {
+  /** This human's reload thread: personal rows over broadcasts, oldest first. */
+  private async transcriptFor(userId?: string): Promise<Queued[]> {
     const personal = userId
       ? asTranscript(await this.ctx.storage.get(transcriptStoreKey(userId)))
       : [];
     const broadcasts = asTranscript(await this.ctx.storage.get(transcriptStoreKey("")));
-    for (const m of hydrateTranscript(personal, broadcasts)) {
+    return hydrateTranscript(personal, broadcasts);
+  }
+
+  /** Replays the thread; returns the ids sent so reactions can follow. */
+  private async sendTranscript(ws: WebSocket, userId?: string): Promise<string[]> {
+    const rows = await this.transcriptFor(userId);
+    for (const m of rows) {
       const ordered = stampOrderOnBody(m.body, { seq: m.seq, at: m.at });
       ws.send(stampReplayOnBody(ordered));
+    }
+    return rows.map((m) => m.id);
+  }
+
+  /** Keep a reaction only for a bubble hydrate will paint; clears delete. */
+  private async storeReaction(r: Reaction): Promise<void> {
+    const key = reactionsStoreKey(r.userId);
+    const cur = asReactions(await this.ctx.storage.get(key));
+    const keep = new Set((await this.transcriptFor(r.userId)).map((m) => m.id));
+    const next = applyReaction(cur, r, keep);
+    if (Object.keys(next).length) {
+      await this.ctx.storage.put(key, next);
+    } else {
+      await this.ctx.storage.delete(key);
     }
   }
 
