@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PhoneShell } from "@/app/components/chat/PhoneShell";
 import { RELEASE } from "@/app/lib/release";
 import { DEV_USER, MOCK_REPLIES, SAMPLE_LINES } from "@/lib/dev/samples";
+import { DRAFT_TTL_MS } from "@/lib/mailbox/draft";
 import { TYPING_TTL_MS } from "@/lib/mailbox/typing";
 import { clearGeoCache } from "@/lib/phone/geo";
 import type { SpeakEvent } from "@/lib/phone/speaker";
@@ -1504,6 +1505,92 @@ describe("PhoneShell", () => {
     });
     expect(screen.queryByText("⏳ spinning up")).toBeNull();
     expect(screen.getByText(/Nothing yet/)).toBeTruthy();
+  });
+
+  it("keeps the draft through a socket gap; the connect flush repaints the same bubble", async () => {
+    const first = await connectSpike();
+    act(() => {
+      first.open();
+    });
+    act(() => {
+      first.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "Looks like" }));
+    });
+    const node = (await screen.findByText("Looks like")).closest("li");
+    vi.useFakeTimers();
+    act(() => {
+      first.close();
+    });
+    expect(screen.getByText("down")).toBeTruthy();
+    expect(screen.getByText("Looks like").closest("li")).toBe(node);
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    const second = liveSocket();
+    expect(second).not.toBe(first);
+    act(() => {
+      second.open();
+    });
+    act(() => {
+      second.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "Looks like" }));
+    });
+    expect(screen.getAllByText("Looks like")).toHaveLength(1);
+    expect(screen.getByText("Looks like").closest("li")).toBe(node);
+  });
+
+  it("drops a draft after DRAFT_TTL_MS quiet; typing and new words are life, a re-sent copy is not", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    vi.useFakeTimers();
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "Looks like" }));
+    });
+    expect(screen.getByText("Looks like")).toBeTruthy();
+    act(() => {
+      vi.advanceTimersByTime(50_000);
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "typing", user_id: "1182" }));
+    });
+    act(() => {
+      vi.advanceTimersByTime(50_000);
+    });
+    expect(screen.getByText("Looks like")).toBeTruthy(); // 100 s after the words, 50 s after the chip
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "Looks like rain" }));
+    });
+    act(() => {
+      vi.advanceTimersByTime(DRAFT_TTL_MS - 1);
+    });
+    expect(screen.getByText("Looks like rain")).toBeTruthy();
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "Looks like rain" })); // flush re-send: not life
+    });
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.queryByText("Looks like rain")).toBeNull();
+    expect(screen.getByText(/Nothing yet/)).toBeTruthy();
+  });
+
+  it("forgets the draft text on reply so the same words paint again next turn", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "Sure." }));
+    });
+    act(() => {
+      ws.deliver(JSON.stringify({ id: "r1", kind: "reply", text: "Sure." }));
+    });
+    expect(screen.getAllByText("Sure.")).toHaveLength(1);
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "draft", user_id: "1182", text: "Sure." }));
+    });
+    expect(screen.getAllByText("Sure.")).toHaveLength(2);
+    expect(screen.getAllByText("Sure.").some((n) => n.closest(".italic"))).toBe(true);
   });
 
   it("picks from /me cranes and still lets you type another slug", async () => {

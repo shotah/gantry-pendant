@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { HELD_DRAFT_TTL_MS } from "@/lib/mailbox/draft";
 import type { WireFrame } from "@/lib/mailbox/frame";
 import { QUEUE_STORE_PREFIX, type Queued } from "@/lib/mailbox/queue";
 import { socketTags } from "@/lib/mailbox/tags";
@@ -189,7 +190,7 @@ describe("Mailbox fan-out", () => {
 });
 
 describe("Mailbox junk frames", () => {
-  it("drops a blank draft instead of blanking every phone", async () => {
+  it("drops a blank draft when no draft is held", async () => {
     const { crane, phone, say } = room();
     const ada = phone("1182");
 
@@ -197,6 +198,24 @@ describe("Mailbox junk frames", () => {
     await say(crane, { kind: "draft", user_id: "1182", text: "   " });
 
     expect(ada.sent).toEqual([]);
+  });
+
+  it("forwards a blank draft as the clear while a draft is held, then forgets it", async () => {
+    const { crane, phone, say, connect } = room();
+    const ada = phone("1182");
+
+    await say(crane, { kind: "draft", user_id: "1182", text: "Looks like" });
+    await say(crane, { kind: "draft", user_id: "1182" }); // crane Discard: cancel / empty turn
+    await say(crane, { kind: "draft", user_id: "1182", text: " " }); // second blank: nothing held, noise
+
+    expect(ada.frames()).toEqual([
+      { kind: "draft", user_id: "1182", text: "Looks like" },
+      { kind: "draft", user_id: "1182", text: "" },
+    ]);
+
+    const back = phone("1182");
+    await connect(back, "1182");
+    expect(back.sent).toEqual([]);
   });
 
   it("refuses an empty reply as a bad frame and stores nothing", async () => {
@@ -255,7 +274,6 @@ describe("Mailbox held draft", () => {
     const { crane, phone, say, connect } = room();
     await say(crane, { kind: "draft", user_id: "1182", text: "Looks" });
     await say(crane, { kind: "draft", user_id: "1182", text: "Looks like rain" });
-    await say(crane, { kind: "draft", user_id: "1182", text: "" }); // blank: dropped, does not clear
 
     const back = phone("1182");
     await connect(back, "1182");
@@ -291,5 +309,83 @@ describe("Mailbox held draft", () => {
     await connect(back, "1182");
 
     expect(back.kinds()).not.toContain("draft");
+  });
+
+  it("forgets every held draft when the last crane socket goes", async () => {
+    const { box, crane, phone, say, connect } = room();
+    await say(crane, { kind: "draft", user_id: "1182", text: "Looks like" });
+    await say(crane, { kind: "draft", user_id: "7", text: "Two days" });
+
+    crane.close();
+    await box.webSocketClose(crane as unknown as WebSocket);
+
+    const ada = phone("1182");
+    await connect(ada, "1182");
+    const bob = phone("7");
+    await connect(bob, "7");
+    expect(ada.sent).toEqual([]);
+    expect(bob.sent).toEqual([]);
+  });
+
+  it("forgets on a crane socket error too", async () => {
+    const { box, crane, phone, say, connect } = room();
+    await say(crane, { kind: "draft", user_id: "1182", text: "Looks like" });
+
+    await box.webSocketError(crane as unknown as WebSocket);
+
+    const ada = phone("1182");
+    await connect(ada, "1182");
+    expect(ada.sent).toEqual([]);
+  });
+
+  it("keeps the draft when a fresh-dial crane socket closes while the main one is up", async () => {
+    const { state, box, crane, phone, say, connect } = room();
+    await say(crane, { kind: "draft", user_id: "1182", text: "Looks like" });
+
+    const dial = new FakeSocket();
+    state.acceptWebSocket(dial, socketTags({ role: "crane", rateId: "bearer:kit" }));
+    dial.close();
+    await box.webSocketClose(dial as unknown as WebSocket);
+
+    const ada = phone("1182");
+    await connect(ada, "1182");
+    expect(ada.frames()).toEqual([{ kind: "draft", user_id: "1182", text: "Looks like" }]);
+  });
+
+  it("does not forget when a phone socket goes", async () => {
+    const { box, crane, phone, say, connect } = room();
+    const first = phone("1182");
+    await say(crane, { kind: "draft", user_id: "1182", text: "Looks like" });
+
+    first.close();
+    await box.webSocketClose(first as unknown as WebSocket);
+
+    const back = phone("1182");
+    await connect(back, "1182");
+    expect(back.frames()).toEqual([{ kind: "draft", user_id: "1182", text: "Looks like" }]);
+  });
+
+  it("expires a held draft after 60 s with no words and no typing; typing is life", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(1_000_000);
+      const { crane, phone, say, connect } = room();
+      await say(crane, { kind: "draft", user_id: "1182", text: "Looks like" });
+
+      vi.setSystemTime(1_000_000 + 50_000);
+      await say(crane, { kind: "typing", user_id: "1182" });
+
+      vi.setSystemTime(1_000_000 + 100_000); // 100 s after the words, 50 s after the chip
+      const alive = phone("1182");
+      await connect(alive, "1182");
+      expect(alive.frames()).toEqual([{ kind: "draft", user_id: "1182", text: "Looks like" }]);
+
+      vi.setSystemTime(1_000_000 + 50_000 + HELD_DRAFT_TTL_MS + 1);
+      const ghost = phone("1182");
+      await connect(ghost, "1182");
+      expect(ghost.sent).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

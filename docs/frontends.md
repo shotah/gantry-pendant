@@ -44,7 +44,7 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | Queue / `ack` / `since` / `seq` | Cab and Helm parse `seq` / `at`, insert like `placeInThread`, ack the highest seq. Transcript hydrate is the same frames plus `replay` — see below |
 | Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Helm pins the last bubble. Do not assume either needs the PWA CSS |
 | Draft→reply remount | PWA `live` React key, Cab / Helm `composeKey` (`kit-live`) so Markdown does not remount when `__draft__` becomes `r1`. Not on the wire. |
-| `draft` / `typing` (answer in progress) | Cumulative full text, one bubble per `sub`, ended by `reply` / `error`. The Worker drops a blank `draft`, refuses an empty `reply` (`error bad frame` to the crane), and re-sends the latest `draft` on a phone connect flush. Additive — every mouth already paints `draft` at any time — [Draft](#draft-what-every-mouth-must-do-the-same) |
+| `draft` / `typing` (answer in progress) | Cumulative full text, one bubble per `sub`, ended by `reply` / `error` or a blank `draft` (the clear). The Worker forwards a blank only while a draft is held, refuses an empty `reply` (`error bad frame` to the crane), and re-sends the latest `draft` on a phone connect flush (forgotten when the crane goes or after 60 s quiet). Additive — every mouth already paints `draft` at any time — [Draft](#draft-what-every-mouth-must-do-the-same) |
 | Photo caps, encode ladder, `error` tokens | Every mouth encodes to the same budget and paints refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
 | Face / backdrop blobs and their notices | Cab and Helm refetch `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
 | Header face (size, hang, stroke) | Cab TopAppBar and Helm header overlay, not PWA-only — [Header face](#header-face) |
@@ -122,11 +122,14 @@ replayed. The mailbox rules, so no mouth has to guess:
 
 - **`draft.text` is the whole answer so far**, not a delta. A mouth
   replaces its bubble with the new text. Later `draft`s only grow it.
-- **Blank never reaches a phone.** The Worker drops a `draft` with
-  missing or whitespace `text` before fan-out (`blankDraft`). A crane
-  resetting its buffer at a tool call cannot blank the bubble. Ending
-  a turn is `reply` or `error`, never an empty draft. Mouths that read
-  blank as "clear" (Cab, PWA) can keep that code; it no longer fires.
+- **A blank `draft` is the clear, and only while a bubble is up.**
+  The crane's one blank is `Discard` (cancel, empty turn, error), so
+  when the Worker holds a draft for that `sub` a `draft` with missing
+  or whitespace `text` is fanned as `text: ""` and the held text is
+  forgotten. Mouths remove the bubble on it (Cab `applyDraft`, PWA
+  `PhoneShell` `draft` branch) — keep that code. With nothing held a
+  blank is noise and is dropped before fan-out, so a stray empty
+  flush cannot blank a phone that has no bubble.
 - **A `reply` with no text and no photo is refused.** The crane gets
   `{ kind: "error", text: "bad frame", id }` and nothing is fanned,
   stored, or pushed. A photo-only `reply` still passes. So `reply`
@@ -137,9 +140,16 @@ replayed. The mailbox rules, so no mouth has to guess:
   `draft` (no `replay`, no `seq`). Cab `Mouth.ingest` and Helm take a
   `draft` at any time, so a sweep, a tab hide, or a 3 s airplane
   blip mid-answer gets the bubble back. Held in Durable Object memory
-  per `sub`; dropped on that human's `reply` or `error`. If the room
-  ever hibernates mid-stream the phone simply waits for `reply`, as
-  before. Do not cache a `draft` in the device thread store.
+  per `sub` (`HeldDrafts`), forgotten on that human's `reply`,
+  `error`, or blank `draft`; when the **last crane socket** closes or
+  errors (drafts stop, `reply` dials fresh — a fresh-dial socket
+  closing while the main one is up does not count); and after
+  `HELD_DRAFT_TTL_MS` 60 s with no new words and no `typing` for that
+  `sub` — the same life rule as Cab's `DRAFT_TTL_MS`, so a re-sent
+  identical draft is never a ghost that outlives the phone's own
+  expiry. If the room ever hibernates mid-stream the phone simply
+  waits for `reply`, as before. Do not cache a `draft` in the device
+  thread store.
 - **Fan-out never stops at a stale socket.** `getWebSockets` still
   lists a socket Cab `cancel()`ed after a sweep or a hidden PWA tab
   until the peer answers the close; `send()` on it throws. Every
@@ -150,9 +160,17 @@ replayed. The mailbox rules, so no mouth has to guess:
   `typing` every ≤ 4 s through a tool call without bouncing its next
   `reply`.
 
-Cover: `test/worker/mailbox.test.ts`. Cab / Helm paint is unchanged;
-if either adds a draft TTL (dead crane, ghost bubble) that is mouth-
-local and stays out of this doc.
+Cover: `test/worker/mailbox.test.ts`, `test/mailbox/draft.test.ts`,
+`test/app/components/chat/PhoneShell.test.tsx` (draft cases).
+
+**Mouth-local, every mouth the same:** the draft **survives a socket
+gap** (Cab `setUp(false)`, PWA `onclose` — neither clears it; the
+flush `draft` or the `reply` is what changes it) and **expires after
+60 s** with no new words and no `typing` (Cab `DRAFT_TTL_MS`, PWA
+`DRAFT_TTL_MS` in `lib/mailbox/draft.ts`; the Worker's
+`HELD_DRAFT_TTL_MS` is the same number). An identical re-sent draft is
+not life on either. Helm: same two rules when it grows drafts. Walk:
+[draft_stream_handoff.md](draft_stream_handoff.md).
 
 ---
 

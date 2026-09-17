@@ -80,6 +80,7 @@ import {
 import { isPinnedToBottom, pinToBottom } from "@/lib/phone/threadScroll";
 import { recoverViewport, viewportShellHeight } from "@/lib/phone/viewport";
 import { encodeFrame, orderAt, orderSeq, type Role, type WireFrame } from "@/lib/mailbox/frame";
+import { DRAFT_TTL_MS } from "@/lib/mailbox/draft";
 import { clearsTyping, TYPING_TTL_MS } from "@/lib/mailbox/typing";
 import { nextMockReply, parseSample, sampleScene, type SampleId } from "@/lib/dev/samples";
 
@@ -178,6 +179,13 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const pinned = useRef(true);
   const [typing, setTyping] = useState(false);
   const typingTimer = useRef(0);
+  /**
+   * Mouth-local draft expiry (docs/frontends.md → Draft). New words and
+   * `typing` re-arm it; an identical re-sent draft does not. Runs through a
+   * socket gap on purpose: the bubble stays, and a dead crane still clears.
+   */
+  const draftTimer = useRef(0);
+  const draftText = useRef("");
   /** Armed by a hold-to-talk send; the next live `reply` is read aloud, then it disarms (docs/voice.md). */
   const awaitingVoice = useRef(false);
   /** Header mic. Off = typing (default). Detected after mount so SSR and hydration agree. */
@@ -360,6 +368,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     return () => {
       window.clearTimeout(echoTimer.current);
       window.clearTimeout(typingTimer.current);
+      window.clearTimeout(draftTimer.current);
       void releaseScreenWake(wakeRef.current);
     };
   }, []);
@@ -583,6 +592,18 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     });
     const ws = new WebSocket(url);
     wsRef.current = ws;
+    const disarmDraft = () => {
+      window.clearTimeout(draftTimer.current);
+      draftTimer.current = 0;
+      draftText.current = "";
+    };
+    const armDraft = () => {
+      window.clearTimeout(draftTimer.current);
+      draftTimer.current = window.setTimeout(() => {
+        disarmDraft();
+        setMessages((prev) => prev.filter((m) => m.id !== DRAFT_BUBBLE_ID));
+      }, DRAFT_TTL_MS);
+    };
     ws.onopen = () => {
       if (gen !== connectGen.current || stoppedRef.current) {
         return;
@@ -600,7 +621,8 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       }
       setStatus("down");
       setTyping(false);
-      setMessages((prev) => prev.filter((m) => m.id !== DRAFT_BUBBLE_ID));
+      // The draft stays: `reply` replaces it, the connect flush refreshes it,
+      // a blank clears it, `draftTimer` expires it. Same as Cab `setUp(false)`.
       window.clearTimeout(typingTimer.current);
       typingTimer.current = 0;
       void releaseScreenWake(wakeRef.current);
@@ -668,6 +690,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             setTyping(false);
             typingTimer.current = 0;
           }, TYPING_TTL_MS);
+          if (draftText.current) {
+            armDraft();
+          }
         }
         return;
       }
@@ -676,6 +701,12 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           return;
         }
         const text = frame.text ?? "";
+        if (!text.trim()) {
+          disarmDraft();
+        } else if (text !== draftText.current) {
+          draftText.current = text;
+          armDraft();
+        }
         setMessages((prev) => {
           const rest = prev.filter((m) => m.id !== DRAFT_BUBBLE_ID);
           if (!text.trim()) {
@@ -697,6 +728,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         setTyping(false);
         window.clearTimeout(typingTimer.current);
         typingTimer.current = 0;
+      }
+      if (phone && frame.kind === "reply") {
+        disarmDraft();
       }
       const id = clientFrameId(frame);
       const seq = orderSeq(frame.seq);

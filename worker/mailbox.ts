@@ -55,11 +55,12 @@ import {
 } from "../lib/mailbox/route";
 import { parseEmailVerified, parseExpMs, socketMessageAllowed } from "../lib/mailbox/socketAuth";
 import { pruneDualLimits, takeFrame, type DualLimit } from "../lib/mailbox/rate";
-import { blankDraft, clearsDraft, cranePublishedDraft, phoneMustNotPublishDraft } from "../lib/mailbox/draft";
+import { HeldDrafts, blankDraft, clearsDraft, cranePublishedDraft, phoneMustNotPublishDraft } from "../lib/mailbox/draft";
 import { cranePublishedTyping, phoneMustNotPublishTyping } from "../lib/mailbox/typing";
 import {
   collectTagged,
   fanOut,
+  isSocketOpen,
   parseSocketTags,
   queueForCrane,
   roleTag,
@@ -113,9 +114,11 @@ export class Mailbox extends DurableObject<Env> {
    * Latest `draft` text per `sub` while Kit is mid-answer, so a phone that
    * redials (Cab sweep, PWA tab hide) gets the bubble back on connect. Memory
    * only: a room mid-stream does not hibernate, and if it ever does the
-   * phone just waits for `reply` as before. Dropped on `reply` / `error`.
+   * phone just waits for `reply` as before. Dropped on `reply` / `error` /
+   * blank `draft`, when the last crane socket goes, or after
+   * `HELD_DRAFT_TTL_MS` with no words and no `typing`.
    */
-  private readonly drafts = new Map<string, string>();
+  private readonly drafts = new HeldDrafts();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -247,17 +250,26 @@ export class Mailbox extends DurableObject<Env> {
     if (cranePublishedTyping(meta.role, out.kind)) {
       const tag = routeTag(meta.role, out);
       if (tag && out.user_id) {
+        this.drafts.touch(out.user_id, Date.now());
         fanOut(this.peers(tag), encodeFrame({ kind: "typing", user_id: out.user_id }));
       }
       return;
     }
     if (cranePublishedDraft(meta.role, out.kind)) {
       const tag = routeTag(meta.role, out);
-      if (tag && out.user_id && !blankDraft(out)) {
-        const text = out.text ?? "";
-        this.drafts.set(out.user_id, text);
-        fanOut(this.peers(tag), encodeFrame({ kind: "draft", user_id: out.user_id, text }));
+      if (!tag || !out.user_id) {
+        return;
       }
+      const text = out.text ?? "";
+      if (blankDraft(out)) {
+        // Only a clear if there is a bubble to clear; otherwise noise.
+        if (!this.drafts.drop(out.user_id)) {
+          return;
+        }
+      } else {
+        this.drafts.hold(out.user_id, text, Date.now());
+      }
+      fanOut(this.peers(tag), encodeFrame({ kind: "draft", user_id: out.user_id, text }));
       return;
     }
     if (!out.id) {
@@ -299,7 +311,7 @@ export class Mailbox extends DurableObject<Env> {
     });
     if (dest === "phone") {
       if (out.user_id && clearsDraft(out.kind)) {
-        this.drafts.delete(out.user_id);
+        this.drafts.drop(out.user_id);
       }
       // Fan live sockets before durable persist. Drafts already skip
       // storage; waiting on queue+transcript here is the draft→reply hitch.
@@ -337,8 +349,9 @@ export class Mailbox extends DurableObject<Env> {
     fanOut(peers, body);
   }
 
-  async webSocketClose() {
+  async webSocketClose(ws: WebSocket) {
     // Hibernation keeps tags; nothing to log (bodies stay off the wire logs).
+    this.forgetDraftsIfCraneGone(ws);
   }
 
   async webSocketError(ws: WebSocket) {
@@ -346,6 +359,23 @@ export class Mailbox extends DurableObject<Env> {
       ws.close(1011, "error");
     } catch {
       // already closing
+    }
+    this.forgetDraftsIfCraneGone(ws);
+  }
+
+  /**
+   * The crane's socket dropped mid-answer: drafts and `typing` stop (the
+   * crane does not redial for those; `reply` dials fresh). Without this the
+   * held text is a ghost every connect flush hands back. A fresh-dial socket
+   * closing while the main one is up is not "gone".
+   */
+  private forgetDraftsIfCraneGone(ws: WebSocket): void {
+    if (parseSocketTags(this.ctx.getTags(ws)).role !== "crane") {
+      return;
+    }
+    const others = exceptSender(this.peers(roleTag("crane")), ws).filter(isSocketOpen);
+    if (!others.length) {
+      this.drafts.clear();
     }
   }
 
@@ -499,7 +529,7 @@ export class Mailbox extends DurableObject<Env> {
       // Kit mid-answer for this human: put the bubble back. Not replay, not
       // stored; the same `draft` every mouth already paints (docs/frontends.md).
       if (userId) {
-        const held = this.drafts.get(userId);
+        const held = this.drafts.current(userId, Date.now());
         if (held) {
           ws.send(encodeFrame({ kind: "draft", user_id: userId, text: held }));
         }

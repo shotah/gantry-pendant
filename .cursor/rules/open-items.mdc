@@ -1,0 +1,42 @@
+---
+description: Open items, follow-ups, and behaviour changes are recorded in docs/ or the todo list in the same turn, never only in chat.
+alwaysApply: true
+---
+
+# Open items live in the repo
+
+Chat is fleeting. Anything the user would need after this session goes
+in one of three places, in the same turn you notice it:
+
+- **Code** — small and in scope: do it.
+- **The doc being tracked** — a handoff or design doc in `docs/` for
+  this work: add a `- [ ]` box under the owning section (Worker / PWA /
+  Cab / Helm / crane) saying what, why, and where the fix goes. Refresh
+  the doc's "Open" summary line if it has one. Tick `[x]` with a short
+  note when done.
+- **The todo list** — this-session work: add a todo.
+
+This covers a gap you noticed on a sibling surface (PWA vs Cab vs Helm),
+something you chose not to do, a limitation of the approach you took, a
+test you did not write, a doc that now describes the wrong behaviour.
+
+Do not end a turn with "one note…", "not done here…", or "say the word
+if you want it" as the only record. If it is worth a sentence in chat,
+it is worth a box in the doc.
+
+When a change alters behaviour a doc describes (`docs/frontends.md`,
+`docs/voice.md`, a handoff doc), update that doc in the same change.
+
+Before the final summary, reread it: every follow-up named there is
+already in a doc or the todo list, and the summary says where.
+
+```text
+❌ BAD — chat only
+  One note for the PWA, not done here: it has no draft TTL. Say the word.
+
+✅ GOOD — docs/draft_stream_handoff.md, PWA section, same turn
+  - [ ] **Draft TTL.** No mouth-local expiry; a crane that hangs without
+        closing leaves the bubble until the next `reply`. Cab has 60 s.
+        Mirror it in `PhoneShell`; test with fake timers.
+  (summary: "PWA draft TTL is open — boxed in draft_stream_handoff.md")
+```
