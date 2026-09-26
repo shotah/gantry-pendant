@@ -82,7 +82,7 @@ the Durable Object.
 | `thread-paper` | `/?sample=thread&theme=paper` | Paper (light). Boom / Inlay / Lamp stay shared with gantree. |
 | `thread-xl` | `/?sample=thread&font=xl` | Extra-large chat type. Small is the default. |
 | `settings` | `/?sample=empty` | Cog → right-hand drawer, scrolls on its own — Access (mic when voice is on, location, notifications), theme, follow Kit’s mood, font, photo size, backdrop, Install. Scrim, ×, Escape close it. |
-| `goals` | `/?sample=thread` then target | Goals drawer from the crane's `aims` frame — per aim: sentence, 30-day rating, five-day grid, stamp line, week strip, slope / block / effect; cross-aim next-day line under the cards. Every button is a `/aims …` turn. Hidden when the board is empty. |
+| `goals` | `/?sample=thread` then target | Goals drawer from the crane's `aims` frame — per aim: sentence, 30-day rating, five-day grid, stamp line, week strip, slope / block / effect; cross-aim next-day line under the cards. Every button is a `/aims …` turn. Hidden when the board is empty; the header badge counts only aims changed since the drawer was last opened. |
 | `crane` | `/crane?sample=crane` | Loopback stand-in for the harness (`PENDANT_DEV`). |
 
 ---

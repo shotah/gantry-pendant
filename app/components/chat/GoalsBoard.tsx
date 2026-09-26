@@ -20,15 +20,24 @@ function TargetIcon() {
   );
 }
 
-/** Header button. Nothing when the board is empty — the screen is optional. */
-export function GoalsButton({ count, open, onToggle }: { count: number; open: boolean; onToggle: () => void }) {
+/**
+ * Header button. Nothing when the board is empty — the screen is optional.
+ * The badge is a call to action: how many aims changed since the human
+ * last opened the drawer (`lib/phone/aimsSeen.ts`), never the board size.
+ */
+export function GoalsButton({ count, changes, open, onToggle }: {
+  count: number;
+  changes: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
   if (!count) {
     return null;
   }
   return (
     <button
       type="button"
-      aria-label={`goals (${count})`}
+      aria-label={changes ? `goals (${changes} changed)` : "goals"}
       title="Goals"
       aria-haspopup="dialog"
       aria-expanded={open}
@@ -38,9 +47,13 @@ export function GoalsButton({ count, open, onToggle }: { count: number; open: bo
       onClick={onToggle}
     >
       <TargetIcon />
-      <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-ok px-1 text-center text-[10px] font-medium leading-4 text-canvas">
-        {count}
-      </span>
+      {changes > 0
+        ? (
+            <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-ok px-1 text-center text-[10px] font-medium leading-4 text-canvas">
+              {changes}
+            </span>
+          )
+        : null}
     </button>
   );
 }

@@ -10,13 +10,17 @@ afterEach(() => {
 });
 
 describe("GoalsButton", () => {
-  it("is nothing on an empty board and a counted button otherwise", () => {
-    const { container, rerender } = render(<GoalsButton count={0} open={false} onToggle={() => {}} />);
+  it("is nothing on an empty board; the badge is unseen changes, not the board size", () => {
+    const { container, rerender } = render(<GoalsButton count={0} changes={0} open={false} onToggle={() => {}} />);
     expect(container.innerHTML).toBe("");
     const onToggle = vi.fn();
-    rerender(<GoalsButton count={2} open={false} onToggle={onToggle} />);
-    fireEvent.click(screen.getByRole("button", { name: "goals (2)" }));
+    rerender(<GoalsButton count={2} changes={0} open={false} onToggle={onToggle} />);
+    const quiet = screen.getByRole("button", { name: "goals" });
+    expect(quiet.textContent).toBe("");
+    fireEvent.click(quiet);
     expect(onToggle).toHaveBeenCalledTimes(1);
+    rerender(<GoalsButton count={2} changes={1} open={false} onToggle={onToggle} />);
+    expect(screen.getByRole("button", { name: "goals (1 changed)" }).textContent).toBe("1");
   });
 });
 

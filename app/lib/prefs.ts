@@ -1,3 +1,5 @@
+import type { AimRow } from "@/lib/mailbox/aims";
+import { aimsFingerprint, aimsSeenPref, type AimsSeen, writeAimsSeenPref } from "@/lib/phone/aimsSeen";
 import type { LangId } from "@/lib/phone/lang";
 import type { PhotoSizeId } from "@/lib/phone/photo";
 import {
@@ -97,4 +99,19 @@ export function saveLangPref(id: LangId): void {
     return;
   }
   writeLangPref(window.localStorage, id);
+}
+
+export function browserAimsSeen(): AimsSeen {
+  if (typeof window === "undefined") {
+    return {};
+  }
+  return aimsSeenPref(window.localStorage);
+}
+
+/** Mark the board looked at. Returns the fingerprint either way so state can follow. */
+export function saveAimsSeen(aims: AimRow[]): AimsSeen {
+  if (typeof window === "undefined") {
+    return aimsFingerprint(aims);
+  }
+  return writeAimsSeenPref(window.localStorage, aims);
 }

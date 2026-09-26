@@ -48,6 +48,7 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | `seen` on a phone `ack` (read on another mouth) | Additive `seen: true` on the phone's own `ack`. The Worker copies it to that human's **other** `sub:<userId>` sockets as `{ kind: "ack", seen: true, user_id, since?, id? }` — never a plain ack, which is delivery. A mouth that hears one drops its notification cards. A bare `{ kind: "ack", seen: true }` (no cursor yet) goes to siblings only, not the crane. Old Cab drops the key (`Mouth.ingest` acks by id → no-op) — [Seen](#seen-what-every-mouth-must-do-the-same) |
 | `react` (emoji on a bubble, both ways) | New `kind`, existing fields: `{ kind: "react", user_id, id: <bubble id>, text: "👍" }`; empty `text` clears. Worker stores it per human (`r:<sub>`), fans it to the human's `sub:` sockets (and to the crane when a phone sent it — queued for a down crane), replays it after the transcript on connect. Not a turn: no `seq`, phone queue, push, or cursor move. **Old Cab paints a stray bubble** — it needs `ignoredKind` for `react` before the crane starts reacting — [Reactions](#reactions-what-every-mouth-must-do-the-same) |
 | `aims` (goals board) | New `kind`, crane only: `{ kind: "aims", aims: [{ area, sentence, rating30, sum7, streak, note, days[], weeks?, slope?, block?, effect? }], links? }`. Pushed on dial after `cmds` and when the board changes; the Worker stores the latest (`aims`, or `aims:<sub>` with a `user_id`) and replays it on connect. Empty `aims` clears. Not a turn. Old Cab: no `text`, so no stray bubble — [Aims board](#aims-board-what-every-mouth-must-do-the-same) |
+| `act` (device actions: alarms, timers, DO schedules) — **planned, not on the wire yet** | New `kind`, request/response, not a turn. Crane → phone `{ kind: "act", id, name, turn, device?, input }`, phone → crane the same `id` with `ok` / `output` / `error`. Worker routes by `device`, then the `turn` socket, then any socket on the `sub` with the cap; answers `offline` / `no_device` / `ambiguous` / `timeout` itself; `schedule.*` and `device.list` are Worker-answered. Phones announce `device` / `kind` / `caps` / `label` on the upgrade. Old Cab drops it (no `text`). Contract and checklists for all three repos: Cab [`docs/device_actions.md`](https://github.com/shotah/gantry-cab/blob/main/docs/device_actions.md) |
 | Photo caps, encode ladder, `error` tokens | Every mouth encodes to the same budget and paints refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
 | Face / backdrop blobs and their notices | Cab and Helm refetch `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
 | Header face (size, hang, stroke) | Cab TopAppBar and Helm header overlay, not PWA-only — [Header face](#header-face) |
@@ -318,18 +319,17 @@ Where each mouth stands:
   `canReact`), `PhoneShell` (`react` in → `reaction` on the bubble;
   `onReact` out). The device thread cache keeps `reaction` with the
   bubble.
-- Cab:
-  - [ ] **`ignoredKind` first.** `Mouth.ingest` paints any frame with
-        `text` as a Kit bubble; an old APK shows a stray `👍` bubble
-        for every crane `react` until this ships. One line in the
-        `kind` switch; release before anything below.
-  - [ ] **Paint.** `reaction` on the room row; `react` in →
-        set / clear by id (live and `replay`); chip on the bubble.
-  - [ ] **Send.** Long-press a Kit bubble → the same palette →
-        `react` out with the bubble id; empty clears. Phone thread
-        only — Auto has no long-press affordance; leave it read-only.
-  - [ ] **Do not** notify, buzz, or move the `since` cursor on a
-        `react`; do not let it clear the draft bubble.
+- Cab — shipped in tree (`mailbox/React.kt`, `Mouth.applyReaction`,
+  `ui/ChatTurn.kt`; `ReactTest` / `MouthTest` / `ChatTurnTest`).
+  - [x] **`ignoredKind` first.** `Mouth.ingest` lands a `react` on
+        the named bubble and never paints a stray bubble.
+  - [x] **Paint.** `ChatLine.reaction`; `react` in → set / clear by
+        id (live and `replay`); chip on the bubble.
+  - [x] **Send.** 450 ms hold (10 px cancel) on a Kit bubble → the
+        same palette → `react` out; tap the chip to reopen; picking
+        the set emoji clears. Auto read-only.
+  - [x] **Do not** notify, buzz, or move the `since` cursor on a
+        `react` (`movesCursor`); it does not clear the draft.
 - Helm:
   - [ ] Same four items. Context menu on the bubble is the iOS shape;
         CarPlay read-only.
@@ -434,8 +434,8 @@ cascade, `/aims block`). Not on an ordinary chat turn.
 
 - On `aims`: replace its board with `aims`; empty → hide the screen.
 - The screen is optional and **hidden when the board is empty**. PWA:
-  a target button in the header with the aim count (`goals (2)`) → a
-  drawer, one card per aim: `area` and `rating30` signed, the
+  a target button in the header → a drawer, one card per aim: `area`
+  and `rating30` signed, the
   sentence, the day grid (sign is the hue, magnitude the weight, an
   eventless day an outline, the score under each cell), the stamp line
   exactly as `[aims]` carries it (`30d +1.4 · 7d +6 · streak 2 ·
@@ -449,30 +449,51 @@ cascade, `/aims block`). Not on an ordinary chat turn.
   closes so the answer is in view. Nothing is asked silently — the
   human sees what they asked.
 - Never paint an `aims` frame as a bubble. Never notify or buzz on it.
+- **The badge is a call to action, not the board size.** The header
+  button carries a number only for aims that differ from the board the
+  human last had the drawer open on — new, changed, or gone. Opening
+  the drawer marks the current board seen (and a board that lands
+  while it is open). The seen board persists on the device
+  (`pendant.aimsSeen`, area → row JSON), so the mailbox replaying the
+  same board on reconnect shows nothing. A never-seen board counts
+  whole.
 
 Where each mouth stands:
 
 - PWA — shipped. `lib/mailbox/aims.ts` (parse, caps, `signed`,
-  `statsLine`, `linkLine`), `GoalsBoard.tsx` (`GoalsButton`,
-  `GoalsSheet`, week strip), `PhoneShell` (`aims` in → state; asks go
-  through `sendText`). Waiting on the crane to send the frame —
-  ai-gantry `docs/aims-progress.md` → Pendant frame.
-- Cab:
-  - [ ] **`ignoredKind` first.** An old APK paints any frame with
-        text as a bubble; `aims` has none, so it is a no-op there, but
-        add it to the ignore list so a future `text` field cannot
-        surprise it.
-  - [ ] **Paint.** Parse the rows above (drop unknown keys, drop a bad
-        row, cap 5); a Goals entry in the phone UI, hidden when
-        empty; same card layout. Auto: read-only list of `area` +
-        stamp line, or nothing — no grid on a car screen.
-  - [ ] **Ask.** Tap → `/aims <area>` as a normal inbound.
+  `statsLine`, `linkLine`), `lib/phone/aimsSeen.ts` (`changedAims`,
+  seen pref), `GoalsBoard.tsx` (`GoalsButton`, `GoalsSheet`, week
+  strip), `PhoneShell` (`aims` in → state; asks go through
+  `sendText`). Waiting on the crane to send the frame — ai-gantry
+  `docs/aims-progress.md` → Pendant frame.
+- Cab — shipped in tree (2026-09-26), waiting on the crane frame.
+  - [x] **`ignoredKind` first.** `Mouth.ingest` handles `aims` before
+        the bubble path and returns `false`; `movesCursor` excludes
+        it. A `text` key on the frame is ignored.
+  - [x] **Paint.** `mailbox/Aims.kt` parses the rows above with the
+        same caps (5 / 14 / 13 / 3), drops a bad row not the board,
+        drops a half-formed `block` / `effect` / week whole; `[]` is a
+        clear, a missing array keeps the last board. `ui/GoalsBoard.kt`:
+        header target `goals (n)` only when the board has rows; sheet
+        with one card per aim (signed `rating30`, sentence, day grid,
+        stamp line, week strip, trend line), then the `links` lines —
+        same words as `/aims`. **Auto: nothing.**
+  - [x] **Ask.** `/aims <area>` / `/aims` / `/aims rubric` through the
+        normal send; the sheet closes. `AimsTest` / `MouthTest` /
+        `GoalsBoardTest`.
+  - [ ] **Badge = changes, not count.** `goals (n)` with the board size
+        reads as n notifications. Mirror the PWA: keep area → row of
+        the board last opened (DataStore / prefs), badge the count of
+        aims that differ, mark seen on open and while open. Same rule
+        as the section above.
 - Helm:
-  - [ ] Same three items. CarPlay: nothing.
+  - [ ] Same four items. CarPlay: nothing. Tracked with the rest of
+        the iPhone backlog in Cab `docs/helm_parity.md`.
 
-Cover: `test/mailbox/aims.test.ts`, `test/worker/mailbox.test.ts`
-(Mailbox aims board), `test/app/components/chat/GoalsBoard.test.tsx`,
-`test/app/components/chat/PhoneShell.test.tsx` (goals board).
+Cover: `test/mailbox/aims.test.ts`, `test/phone/aimsSeen.test.ts`,
+`test/worker/mailbox.test.ts` (Mailbox aims board),
+`test/app/components/chat/GoalsBoard.test.tsx`,
+`test/app/components/chat/PhoneShell.test.tsx` (goals board, badge).
 
 ---
 

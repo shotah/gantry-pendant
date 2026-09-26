@@ -106,7 +106,7 @@ const SHOTS = {
     sel: "[role=dialog][aria-label=Goals]",
     text: "next-day weight",
     phone: true,
-    click: "[aria-label^='goals (']",
+    click: "[aria-label^=goals]",
     ready: "[data-shot=phone]",
     readyText: "Leave-by 20:50",
   },

@@ -6,6 +6,7 @@ import { SettingsSelect } from "../shared/SettingsSelect";
 import { ThemeSelect } from "../shared/ThemeSelect";
 import type { SlashCommand } from "@/app/lib/slash";
 import type { AimLink, AimRow } from "@/lib/mailbox/aims";
+import { type AimsSeen, changedAims } from "@/lib/phone/aimsSeen";
 import { Compose } from "./Compose";
 import { ConfigGapNote } from "./ConfigGapNote";
 import { GeoEnable } from "./GeoEnable";
@@ -39,12 +40,14 @@ import { browserSpeak } from "@/app/lib/tts";
 import { isIos, isStandalone, signInHint } from "@/app/lib/install";
 import { fileToPhoto } from "@/app/lib/photo";
 import {
+  browserAimsSeen,
   browserBackdropPref,
   browserFollowThemePref,
   browserGeoPref,
   browserLangPref,
   browserPhotoSizePref,
   browserVoicePref,
+  saveAimsSeen,
   saveBackdropPref,
   saveFollowThemePref,
   saveGeoPref,
@@ -154,6 +157,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [catalog, setCatalog] = useState<SlashCommand[]>([]);
   const [aims, setAims] = useState<AimRow[]>([]);
   const [aimLinks, setAimLinks] = useState<AimLink[]>([]);
+  const [aimsSeen, setAimsSeen] = useState<AimsSeen>({});
   const [goalsOpen, setGoalsOpen] = useState(false);
   const [avatarRev, setAvatarRev] = useState(0);
   const [backdropRev, setBackdropRev] = useState(0);
@@ -367,11 +371,20 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     // Updater form: a constructor is a function, and setState would call it.
     setRecognizer(() => browserRecognizer());
     setVoiceOn(browserVoicePref());
+    setAimsSeen(browserAimsSeen());
     const tongue = browserLangPref();
     langRef.current = tongue;
     setLang(tongue);
     setPrefsReady(true);
   }, [phone]);
+
+  // Looking at the drawer marks the board seen — on open, and when a new
+  // board lands while it is open. The badge counts what differs from this.
+  useEffect(() => {
+    if (goalsOpen) {
+      setAimsSeen(saveAimsSeen(aims));
+    }
+  }, [goalsOpen, aims]);
 
   function pickLang(raw: string) {
     const next = parseLang(raw);
@@ -1342,7 +1355,16 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <InstallApp placement="header" />
-          {phone ? <GoalsButton count={aims.length} open={goalsOpen} onToggle={() => setGoalsOpen((v) => !v)} /> : null}
+          {phone
+            ? (
+                <GoalsButton
+                  count={aims.length}
+                  changes={changedAims(aims, aimsSeen)}
+                  open={goalsOpen}
+                  onToggle={() => setGoalsOpen((v) => !v)}
+                />
+              )
+            : null}
           {phone && cfg?.voice && recognizer
             ? <VoiceToggle on={voiceOn} speaking={speakPhase === "playing"} onToggle={toggleVoice} />
             : null}

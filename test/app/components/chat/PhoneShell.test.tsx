@@ -175,6 +175,7 @@ beforeEach(() => {
   window.localStorage.removeItem("pendant.backdrop");
   window.localStorage.removeItem("pendant.followTheme");
   window.localStorage.removeItem("pendant.roomTheme");
+  window.localStorage.removeItem("pendant.aimsSeen");
   window.localStorage.removeItem("pendant.theme");
   document.documentElement.removeAttribute("data-font");
   document.documentElement.removeAttribute("data-theme");
@@ -194,6 +195,7 @@ afterEach(() => {
   window.localStorage.removeItem("pendant.backdrop");
   window.localStorage.removeItem("pendant.followTheme");
   window.localStorage.removeItem("pendant.roomTheme");
+  window.localStorage.removeItem("pendant.aimsSeen");
   window.localStorage.removeItem("pendant.theme");
   document.documentElement.removeAttribute("data-font");
   document.documentElement.removeAttribute("data-theme");
@@ -1651,7 +1653,7 @@ describe("PhoneShell", () => {
         aims: [{ area: "training", sentence: "gym 3 mornings/wk", rating30: 1.4, sum7: 6, streak: 2, note: "asked", days: [] }],
       }));
     });
-    fireEvent.click(screen.getByRole("button", { name: "goals (1)" }));
+    fireEvent.click(screen.getByRole("button", { name: "goals (1 changed)" }));
     expect(screen.getByRole("dialog", { name: "Goals" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Ask Kit about training" }));
     expect(screen.queryByRole("dialog", { name: "Goals" })).toBeNull();
@@ -1661,6 +1663,38 @@ describe("PhoneShell", () => {
       ws.deliver(JSON.stringify({ kind: "aims", aims: [] }));
     });
     expect(screen.queryByRole("button", { name: /^goals/ })).toBeNull();
+  });
+
+  it("badges the goals button only for aims that changed since the drawer was last opened", async () => {
+    const training = { area: "training", sentence: "gym 3 mornings/wk", rating30: 1.4, sum7: 6, streak: 2, note: "asked", days: [] };
+    const weight = { area: "weight", sentence: "under 190", rating30: 0.6, sum7: 1, streak: 0, note: "", days: [] };
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+      ws.deliver(JSON.stringify({ kind: "aims", aims: [training, weight] }));
+    });
+    // Never looked: the whole board is news.
+    fireEvent.click(screen.getByRole("button", { name: "goals (2 changed)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close goals" }));
+    // Looked: quiet button, and the seen board survives a reload.
+    expect(screen.getByRole("button", { name: "goals" }).textContent).toBe("");
+    expect(JSON.parse(window.localStorage.getItem("pendant.aimsSeen") ?? "{}")).toHaveProperty("training");
+    // The mailbox replays the same board on reconnect: still quiet.
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "aims", aims: [training, weight] }));
+    });
+    expect(screen.getByRole("button", { name: "goals" })).toBeTruthy();
+    // One row moved: one to look at.
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "aims", aims: [{ ...training, sum7: 7 }, weight] }));
+    });
+    expect(screen.getByRole("button", { name: "goals (1 changed)" }).textContent).toBe("1");
+    // A board that lands while the drawer is open is seen as it arrives.
+    fireEvent.click(screen.getByRole("button", { name: "goals (1 changed)" }));
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "aims", aims: [{ ...training, sum7: 8 }, weight] }));
+    });
+    expect(screen.getByRole("button", { name: "goals" })).toBeTruthy();
   });
 
   it("paints Kit's reaction on your bubble, clears it on an empty one, and never moves the cursor", async () => {
