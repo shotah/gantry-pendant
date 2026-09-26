@@ -101,6 +101,15 @@ const SHOTS = {
     ready: "[data-shot=phone]",
     readyText: "Nothing yet",
   },
+  goals: {
+    path: "/?sample=thread",
+    sel: "[role=dialog][aria-label=Goals]",
+    text: "next-day weight",
+    phone: true,
+    click: "[aria-label^='goals (']",
+    ready: "[data-shot=phone]",
+    readyText: "Leave-by 20:50",
+  },
   crane: {
     path: "/crane?sample=crane",
     sel: "[data-shot=crane]",
