@@ -47,6 +47,7 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | `draft` / `typing` (answer in progress) | Cumulative full text, one bubble per `sub`, ended by `reply` / `error` or a blank `draft` (the clear). The Worker forwards a blank only while a draft is held, refuses an empty `reply` (`error bad frame` to the crane), and re-sends the latest `draft` on a phone connect flush (forgotten when the crane goes or after 60 s quiet). Additive — every mouth already paints `draft` at any time — [Draft](#draft-what-every-mouth-must-do-the-same) |
 | `seen` on a phone `ack` (read on another mouth) | Additive `seen: true` on the phone's own `ack`. The Worker copies it to that human's **other** `sub:<userId>` sockets as `{ kind: "ack", seen: true, user_id, since?, id? }` — never a plain ack, which is delivery. A mouth that hears one drops its notification cards. A bare `{ kind: "ack", seen: true }` (no cursor yet) goes to siblings only, not the crane. Old Cab drops the key (`Mouth.ingest` acks by id → no-op) — [Seen](#seen-what-every-mouth-must-do-the-same) |
 | `react` (emoji on a bubble, both ways) | New `kind`, existing fields: `{ kind: "react", user_id, id: <bubble id>, text: "👍" }`; empty `text` clears. Worker stores it per human (`r:<sub>`), fans it to the human's `sub:` sockets (and to the crane when a phone sent it — queued for a down crane), replays it after the transcript on connect. Not a turn: no `seq`, phone queue, push, or cursor move. **Old Cab paints a stray bubble** — it needs `ignoredKind` for `react` before the crane starts reacting — [Reactions](#reactions-what-every-mouth-must-do-the-same) |
+| `aims` (goals board) | New `kind`, crane only: `{ kind: "aims", aims: [{ area, sentence, rating30, sum7, streak, note, days[], weeks?, slope?, block?, effect? }], links? }`. Pushed on dial after `cmds` and when the board changes; the Worker stores the latest (`aims`, or `aims:<sub>` with a `user_id`) and replays it on connect. Empty `aims` clears. Not a turn. Old Cab: no `text`, so no stray bubble — [Aims board](#aims-board-what-every-mouth-must-do-the-same) |
 | Photo caps, encode ladder, `error` tokens | Every mouth encodes to the same budget and paints refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
 | Face / backdrop blobs and their notices | Cab and Helm refetch `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
 | Header face (size, hang, stroke) | Cab TopAppBar and Helm header overlay, not PWA-only — [Header face](#header-face) |
@@ -337,6 +338,141 @@ Cover: `test/mailbox/react.test.ts`, `test/worker/mailbox.test.ts`
 (Mailbox reactions), `test/app/components/chat/Thread.test.tsx`
 (Thread reactions), `test/app/components/chat/PhoneShell.test.tsx`
 (react in / out).
+
+---
+
+## Aims board (what every mouth must do the same)
+
+The crane keeps a goals ledger — aims, day scores, streaks, ratings
+([ai-gantry `docs/aims-progress.md`](https://github.com/shotah/ai-gantry/blob/main/docs/aims-progress.md)).
+The phone does not open `gantry.db` and does not query for it. The
+crane **pushes a snapshot** the way it pushes `cmds`; the mailbox
+keeps the latest and replays it on connect; a mouth paints it. The
+only way back into the harness is the `/aims` slash command the crane
+already answers, as an ordinary visible turn.
+
+**One frame, one new `kind`.** This is the wire the crane's `board.go`
+must emit — the pendant parser (`lib/mailbox/aims.ts`) is the contract
+until the crane ships, so its json tags are these names:
+
+```json
+{
+  "kind": "aims",
+  "aims": [
+    {
+      "area": "training",
+      "sentence": "gym 3 mornings/wk",
+      "rating30": 1.4,
+      "sum7": 6,
+      "streak": 2,
+      "note": "asked",
+      "note_at": "2026-09-25",
+      "days": [
+        { "day": "2026-09-22", "score": 2, "events": [411] },
+        { "day": "2026-09-23", "score": -1, "events": [413] },
+        { "day": "2026-09-24", "score": 0, "events": [] },
+        { "day": "2026-09-25", "score": 3, "events": [415] },
+        { "day": "2026-09-26", "score": 0, "events": [416] }
+      ],
+      "weeks": [
+        { "start": "2026-09-13", "mean": 0.9, "up": 3, "against": 1, "metrics": [] },
+        { "start": "2026-09-20", "mean": 1.4, "up": 4, "against": 1,
+          "metrics": [{ "metric": "weight", "mean": 191.4, "unit": "lb", "n": 3 }] }
+      ],
+      "slope": 0.3,
+      "block": { "days": 10, "up": 4, "against": 2, "mean": 0.4, "pct": 0.4 },
+      "effect": { "a": "training", "b": "", "metric": "weight", "r": -0.42, "n": 9 }
+    }
+  ],
+  "links": [
+    { "a": "training", "b": "weight", "r": 0.38, "n": 12 }
+  ]
+}
+```
+
+- `aims` is the whole board, oldest aim first, **cap 5** (the `[aims]`
+  cap). Extra rows are dropped. `{ "kind": "aims", "aims": [] }` is a
+  real frame — the mouth clears its screen.
+- Required per row: `area` (the `aim/<area>` key, `[a-z0-9_-]`),
+  `sentence`, `rating30` (30-day mean day score, `-3.0 … +3.0`),
+  `sum7`, `streak`, `note` (`nudged | asked | offered | praised |
+  quiet | ""`), `days` (oldest first; an empty day is `score 0,
+  events []`, up to 14 cells; `events` are ledger ids the human can
+  quote in `/aims <area>`).
+- Optional per row, `omitempty`: `note_at` (local `YYYY-MM-DD`);
+  `weeks` (Sunday-start local buckets from the aim's first event,
+  oldest first, cap 13 — the crane's `Weeks`; each `{ start, mean, up,
+  against, metrics[] }`, `metrics` one entry per (metric, unit) as
+  logged: `{ metric, mean, unit, n }`); `slope` (`WeekSlope`, score
+  per week, only when it has two or more weeks); `block` (`{ days, up,
+  against, mean, pct }`, only when a block row exists); `effect`
+  (`{ a, b, metric, r, n }` — the aim's `Effect`, only when
+  `StampCorr`: `|r| ≥ 0.3`, `n ≥ 8`). **A missing line means too
+  early; the screen says nothing.** A half-formed `block` / `effect` /
+  week is dropped whole.
+- Optional on the frame, `omitempty`: `links` — the cross-aim
+  `NextDay` lines that sit under all aims in `/aims`: `{ a, b, r, n }`,
+  strongest `|r|` first, **cap 3**, only the ones that pass
+  `StampCorr`. `a`, `b` are areas on this board; `a == b` is dropped.
+- Optional `user_id`: with it the board is that human's (stored
+  `aims:<sub>`, fanned to their `sub:` sockets); without, the room's
+  (stored `aims`, fanned to every phone). On connect a mouth gets its
+  human's board if one exists, else the room's. The crane plan sends
+  it room-wide after `cmds`; the `user_id` form is there for a
+  multi-human room later.
+- Crane only. A phone `aims` is `error bad frame`. Not a turn: no
+  `seq`, no queue, no Web Push, no cursor move, no toast. Counted in
+  the crane's bucket like `cmds` (it is sent on dial and after a ledger
+  write, not per turn).
+
+**When the crane sends it.** On dial, after `cmds`. Again after any
+turn or cron push where the rendered board differs from the last one
+sent on that connection (`aim_log`, an aim `memory_store`, a forget
+cascade, `/aims block`). Not on an ordinary chat turn.
+
+**What a mouth does.**
+
+- On `aims`: replace its board with `aims`; empty → hide the screen.
+- The screen is optional and **hidden when the board is empty**. PWA:
+  a target button in the header with the aim count (`goals (2)`) → a
+  drawer, one card per aim: `area` and `rating30` signed, the
+  sentence, the day grid (sign is the hue, magnitude the weight, an
+  eventless day an outline, the score under each cell), the stamp line
+  exactly as `[aims]` carries it (`30d +1.4 · 7d +6 · streak 2 ·
+  asked`), the week strip when `weeks` is there (one bar per bucket
+  around a zero line, oldest left), then the trend line when present
+  (`slope +0.3/wk · block 4/10 (40%) · weight r -0.42 (n 9)`). Under
+  all cards, one line per `links` entry: `training → next-day weight r
+  +0.38 (n 12)` — the same words as the `/aims` footer.
+- Every button is a turn: "Ask Kit about `<area>`" sends `/aims
+  <area>`; "Full report" `/aims`; "Rubric" `/aims rubric`. The drawer
+  closes so the answer is in view. Nothing is asked silently — the
+  human sees what they asked.
+- Never paint an `aims` frame as a bubble. Never notify or buzz on it.
+
+Where each mouth stands:
+
+- PWA — shipped. `lib/mailbox/aims.ts` (parse, caps, `signed`,
+  `statsLine`, `linkLine`), `GoalsBoard.tsx` (`GoalsButton`,
+  `GoalsSheet`, week strip), `PhoneShell` (`aims` in → state; asks go
+  through `sendText`). Waiting on the crane to send the frame —
+  ai-gantry `docs/aims-progress.md` → Pendant frame.
+- Cab:
+  - [ ] **`ignoredKind` first.** An old APK paints any frame with
+        text as a bubble; `aims` has none, so it is a no-op there, but
+        add it to the ignore list so a future `text` field cannot
+        surprise it.
+  - [ ] **Paint.** Parse the rows above (drop unknown keys, drop a bad
+        row, cap 5); a Goals entry in the phone UI, hidden when
+        empty; same card layout. Auto: read-only list of `area` +
+        stamp line, or nothing — no grid on a car screen.
+  - [ ] **Ask.** Tap → `/aims <area>` as a normal inbound.
+- Helm:
+  - [ ] Same three items. CarPlay: nothing.
+
+Cover: `test/mailbox/aims.test.ts`, `test/worker/mailbox.test.ts`
+(Mailbox aims board), `test/app/components/chat/GoalsBoard.test.tsx`,
+`test/app/components/chat/PhoneShell.test.tsx` (goals board).
 
 ---
 

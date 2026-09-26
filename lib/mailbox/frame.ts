@@ -1,5 +1,6 @@
 import { CONTEXT_JSON_MAX, FRAME_BYTES_MAX, IMAGE_BYTES_MAX, IMAGE_MAX, TEXT_MAX, utf8Bytes } from "./caps";
 import { parseAllowUsers, type RoomUser } from "./allow";
+import { parseAimsFrame, type AimLink, type AimRow } from "./aims";
 import { parseCommands, type SlashCommand } from "./cmds";
 
 export type Role = "phone" | "crane";
@@ -30,7 +31,7 @@ export type PhoneContext = {
 
 export type FrameImage = { url: string };
 
-export type FrameKind = "inbound" | "reply" | "push" | "ack" | "error" | "pin" | "cmds" | "allow" | "typing" | "draft" | "react";
+export type FrameKind = "inbound" | "reply" | "push" | "ack" | "error" | "pin" | "cmds" | "allow" | "typing" | "draft" | "react" | "aims";
 
 export type WireFrame = {
   text?: string;
@@ -45,6 +46,10 @@ export type WireFrame = {
   since?: string;
   commands?: SlashCommand[];
   users?: RoomUser[];
+  /** Crane `aims` only: the goals board snapshot (docs/frontends.md → Aims board). */
+  aims?: AimRow[];
+  /** Crane `aims` only: cross-aim next-day correlations under the whole board. */
+  links?: AimLink[];
   /** Hydrate-only. Unread queue flush must not set this. Clients must not send it. */
   replay?: boolean;
   /**
@@ -243,7 +248,7 @@ export function stampReplayOnBody(body: string): string {
   return encodeFrame({ ...parsed.frame, replay: true });
 }
 
-const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds", "allow", "typing", "draft", "react"]);
+const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds", "allow", "typing", "draft", "react", "aims"]);
 
 /** Parse a mailbox frame. Never logs the body. */
 export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseOpts): ParseResult {
@@ -327,6 +332,11 @@ export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseO
   }
   if (o.kind === "allow") {
     frame.users = parseAllowUsers(o.users);
+  }
+  if (o.kind === "aims") {
+    const board = parseAimsFrame(o);
+    frame.aims = board.aims;
+    frame.links = board.links;
   }
   if (o.replay === true) {
     frame.replay = true;

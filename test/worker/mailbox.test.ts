@@ -515,6 +515,66 @@ describe("Mailbox round-trip push test", () => {
   });
 });
 
+describe("Mailbox aims board", () => {
+  const board = [{ area: "training", sentence: "gym 3 mornings/wk", rating30: 1.4, sum7: 6, streak: 2, note: "asked", days: [] }];
+
+  it("stores the crane's board, fans it to phones, and replays it on connect after cmds", async () => {
+    const { state, crane, phone, say, connect } = room();
+    const ada = phone("1182");
+    await say(crane, { kind: "cmds", commands: [{ name: "aims", hint: "goals and progress", args: true }] });
+    const links = [{ a: "training", b: "weight", r: 0.38, n: 12 }];
+    await say(crane, { kind: "aims", aims: [...board, { area: "junk" }], links: [...links, { a: "x" }] });
+
+    expect(ada.frames().at(-1)).toEqual({ kind: "aims", aims: board, links });
+    expect(state.storage.rows.get("aims")).toBe(JSON.stringify({ kind: "aims", aims: board, links }));
+
+    const fresh = phone("1182");
+    await connect(fresh, "1182");
+    expect(fresh.kinds().slice(0, 2)).toEqual(["cmds", "aims"]);
+  });
+
+  it("an empty board is a real frame — stored and sent so a screen clears", async () => {
+    const { state, crane, phone, say, connect } = room();
+    const ada = phone("1182");
+    await say(crane, { kind: "aims", aims: board });
+    await say(crane, { kind: "aims", aims: [] });
+
+    expect(ada.frames().at(-1)).toEqual({ kind: "aims", aims: [] });
+    expect(state.storage.rows.get("aims")).toBe(JSON.stringify({ kind: "aims", aims: [] }));
+    const fresh = phone("1182");
+    await connect(fresh, "1182");
+    expect(fresh.frames().find((f) => f.kind === "aims")).toEqual({ kind: "aims", aims: [] });
+  });
+
+  it("a board naming a human goes only to that human and wins over the room board on connect", async () => {
+    const { crane, phone, say, connect } = room();
+    const ada = phone("1182");
+    const bob = phone("7");
+    await say(crane, { kind: "aims", aims: [] });
+    ada.sent.length = 0;
+    bob.sent.length = 0;
+    await say(crane, { kind: "aims", user_id: "1182", aims: board });
+
+    expect(ada.frames()).toEqual([{ kind: "aims", aims: board, user_id: "1182" }]);
+    expect(bob.sent).toEqual([]);
+
+    const adaAgain = phone("1182");
+    await connect(adaAgain, "1182");
+    expect(adaAgain.frames().filter((f) => f.kind === "aims")).toEqual([{ kind: "aims", aims: board, user_id: "1182" }]);
+    const bobAgain = phone("7");
+    await connect(bobAgain, "7");
+    expect(bobAgain.frames().filter((f) => f.kind === "aims")).toEqual([{ kind: "aims", aims: [] }]);
+  });
+
+  it("refuses a board from a phone", async () => {
+    const { crane, phone, say } = room();
+    const ada = phone("1182");
+    await say(ada, { kind: "aims", aims: board });
+    expect(ada.frames()).toEqual([{ kind: "error", text: "bad frame" }]);
+    expect(crane.sent).toEqual([]);
+  });
+});
+
 describe("Mailbox reactions", () => {
   it("fans Kit's reaction to the human's mouths, stores it, and hydrates it after the bubble", async () => {
     const { state, crane, phone, say, connect } = room();

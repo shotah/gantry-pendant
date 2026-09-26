@@ -17,6 +17,7 @@ import {
   type RoomUser,
 } from "../lib/mailbox/allow";
 import { utf8Bytes } from "../lib/mailbox/caps";
+import { AIMS_STORE_KEY, aimsStoreKey, cranePublishedAims, parseAimsBoard, parseLinks, phoneMustNotPublishAims } from "../lib/mailbox/aims";
 import { cranePublishedCmds, CMDS_STORE_KEY, parseCommands, phoneMustNotPublishCmds } from "../lib/mailbox/cmds";
 import { encodeError, encodeFrame, parseFrame, stampOrderOnBody, stampReplayOnBody, stripClientOrder, type Role, type WireFrame } from "../lib/mailbox/frame";
 import {
@@ -245,6 +246,7 @@ export class Mailbox extends DurableObject<Env> {
     }
     if (
       phoneMustNotPublishCmds(meta.role, out.kind)
+      || phoneMustNotPublishAims(meta.role, out.kind)
       || phoneMustNotPublishAllow(meta.role, out.kind)
       || phoneMustNotPublishTyping(meta.role, out.kind)
       || phoneMustNotPublishDraft(meta.role, out.kind)
@@ -260,6 +262,23 @@ export class Mailbox extends DurableObject<Env> {
       const body = encodeFrame({ kind: "cmds", commands: parseCommands(out.commands) });
       await this.ctx.storage.put(CMDS_STORE_KEY, body);
       fanOut(this.peers(roleTag("phone")), body);
+      return;
+    }
+    if (cranePublishedAims(meta.role, out.kind)) {
+      // The goals board, latest wins, replayed on connect like cmds. An
+      // empty board is stored and sent so a screen can clear. With a
+      // `user_id` it is that human's; without, the room's.
+      const frame: WireFrame = { kind: "aims", aims: parseAimsBoard(out.aims) };
+      const links = parseLinks(out.links);
+      if (links.length) {
+        frame.links = links;
+      }
+      if (out.user_id) {
+        frame.user_id = out.user_id;
+      }
+      const body = encodeFrame(frame);
+      await this.ctx.storage.put(aimsStoreKey(out.user_id), body);
+      fanOut(this.peers(out.user_id ? subTag(out.user_id) : roleTag("phone")), body);
       return;
     }
     if (cranePublishedTyping(meta.role, out.kind)) {
@@ -566,6 +585,13 @@ export class Mailbox extends DurableObject<Env> {
       const cmds = await this.ctx.storage.get<string>(CMDS_STORE_KEY);
       if (cmds) {
         ws.send(cmds);
+      }
+      // Goals board after cmds, before the thread: this human's if the crane
+      // named them, else the room's.
+      const aims = (userId ? await this.ctx.storage.get<string>(aimsStoreKey(userId)) : undefined)
+        ?? await this.ctx.storage.get<string>(AIMS_STORE_KEY);
+      if (aims) {
+        ws.send(aims);
       }
       const storedTheme = knownTheme(await this.ctx.storage.get<string>(THEME_STORE_KEY));
       if (storedTheme) {

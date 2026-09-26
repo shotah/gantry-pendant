@@ -5,6 +5,7 @@ import { FontSelect } from "../shared/FontSelect";
 import { SettingsSelect } from "../shared/SettingsSelect";
 import { ThemeSelect } from "../shared/ThemeSelect";
 import type { SlashCommand } from "@/app/lib/slash";
+import type { AimLink, AimRow } from "@/lib/mailbox/aims";
 import { Compose } from "./Compose";
 import { ConfigGapNote } from "./ConfigGapNote";
 import { GeoEnable } from "./GeoEnable";
@@ -12,6 +13,7 @@ import { InstallApp } from "./InstallApp";
 import { KitAvatar } from "./KitAvatar";
 import { MicEnable } from "./MicEnable";
 import { NotifyEnable } from "./NotifyEnable";
+import { GoalsButton, GoalsSheet } from "./GoalsBoard";
 import { SettingsMenu } from "./SettingsMenu";
 import { bubbleFrom, Thread, type ChatBubble } from "./Thread";
 import { mailboxUrl, parseIncoming } from "@/app/lib/socket";
@@ -150,6 +152,9 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [stagedPhoto, setStagedPhoto] = useState<string | null>(null);
   const [sampleEmoji, setSampleEmoji] = useState(false);
   const [catalog, setCatalog] = useState<SlashCommand[]>([]);
+  const [aims, setAims] = useState<AimRow[]>([]);
+  const [aimLinks, setAimLinks] = useState<AimLink[]>([]);
+  const [goalsOpen, setGoalsOpen] = useState(false);
   const [avatarRev, setAvatarRev] = useState(0);
   const [backdropRev, setBackdropRev] = useState(0);
   const [backdropOn, setBackdropOn] = useState(true);
@@ -312,6 +317,8 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     setStatus(scene.status);
     setDraft(scene.draft ?? "");
     setCatalog(scene.catalog ?? []);
+    setAims(scene.aims ?? []);
+    setAimLinks(scene.aimLinks ?? []);
     setTyping(Boolean(scene.typing));
     setSampleEmoji(Boolean(scene.emoji));
     if (scene.gpsHint) {
@@ -700,6 +707,12 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       }
       if (frame.kind === "cmds") {
         setCatalog(frame.commands ?? []);
+        return;
+      }
+      if (frame.kind === "aims") {
+        // The goals board, latest wins; an empty one clears (docs/frontends.md → Aims board).
+        setAims(frame.aims ?? []);
+        setAimLinks(frame.links ?? []);
         return;
       }
       if (frame.kind === "typing") {
@@ -1329,6 +1342,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <InstallApp placement="header" />
+          {phone ? <GoalsButton count={aims.length} open={goalsOpen} onToggle={() => setGoalsOpen((v) => !v)} /> : null}
           {phone && cfg?.voice && recognizer
             ? <VoiceToggle on={voiceOn} speaking={speakPhase === "playing"} onToggle={toggleVoice} />
             : null}
@@ -1490,6 +1504,16 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
           </SettingsMenu>
         </div>
       </header>
+      {goalsOpen
+        ? (
+            <GoalsSheet
+              aims={aims}
+              links={aimLinks}
+              onClose={() => setGoalsOpen(false)}
+              onAsk={(command) => void sendText(command)}
+            />
+          )
+        : null}
       {mouth}
     </div>
   );

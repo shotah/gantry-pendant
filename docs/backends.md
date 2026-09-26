@@ -100,6 +100,7 @@ crane.
 | `draft` | `user_id`, `text` | Fan only. Not queued, not in the transcript, no `seq` | **no** |
 | `react` | `user_id`, `id` (the human's `inbound` id), `text` emoji; empty clears | Stored `r:<sub>` by bubble id (pruned to the transcript), fan to every `sub:<user_id>` socket, replayed after the transcript on phone connect. No queue, no `seq`, no Web Push. Missing `id` / `user_id` or junk text → `error bad frame` | **no** |
 | `cmds` | `commands[]` | Stored; fan to phones; replayed on phone connect | yes |
+| `aims` | `aims[]` — the goals board rows (days, weeks, slope, block, effect) and `links[]` — cross-aim next-day lines; json tags exactly as [frontends.md → Aims board](frontends.md#aims-board-what-every-mouth-must-do-the-same); `user_id` optional | Stored (`aims`, or `aims:<sub>`); fan to phones (or that human's sockets); replayed on phone connect right after `cmds`. Empty `aims` is stored and sent. Send on dial and when the rendered board changed — not per turn | yes |
 | `allow` | `users[]` (`sub` and / or `email`) | Stored room list; KV directory; phones no longer listed get `4401` | yes |
 | `ack` | `id` | Deletes that crane-bound queue row. Unused by Go today | yes |
 | `error` | — | **Do not.** With `user_id` it routes and queues to that phone, which paints it on the human's newest pending bubble as "not sent" | yes |

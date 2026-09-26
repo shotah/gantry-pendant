@@ -1639,6 +1639,30 @@ describe("PhoneShell", () => {
     }
   });
 
+  it("shows the goals board the crane pushed, sends /aims <area> from it, and clears on an empty board", async () => {
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    expect(screen.queryByRole("button", { name: /^goals/ })).toBeNull();
+    act(() => {
+      ws.deliver(JSON.stringify({
+        kind: "aims",
+        aims: [{ area: "training", sentence: "gym 3 mornings/wk", rating30: 1.4, sum7: 6, streak: 2, note: "asked", days: [] }],
+      }));
+    });
+    fireEvent.click(screen.getByRole("button", { name: "goals (1)" }));
+    expect(screen.getByRole("dialog", { name: "Goals" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Ask Kit about training" }));
+    expect(screen.queryByRole("dialog", { name: "Goals" })).toBeNull();
+    await waitFor(() => expect(sentTurns(ws).at(-1)).toMatchObject({ kind: "inbound", text: "/aims training" }));
+
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "aims", aims: [] }));
+    });
+    expect(screen.queryByRole("button", { name: /^goals/ })).toBeNull();
+  });
+
   it("paints Kit's reaction on your bubble, clears it on an empty one, and never moves the cursor", async () => {
     const ws = await connectSpike();
     act(() => {

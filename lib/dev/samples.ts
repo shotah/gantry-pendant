@@ -1,3 +1,4 @@
+import type { AimLink, AimRow } from "@/lib/mailbox/aims";
 import type { SlashCommand } from "@/lib/mailbox/cmds";
 import type { Role } from "@/lib/mailbox/frame";
 
@@ -39,6 +40,9 @@ export type SampleScene = {
   gpsHint?: string;
   draft?: string;
   catalog?: SlashCommand[];
+  /** Goals board rows, as the crane `aims` frame would carry them. */
+  aims?: AimRow[];
+  aimLinks?: AimLink[];
   typing?: boolean;
   emoji?: boolean;
 };
@@ -62,6 +66,70 @@ export const SAMPLE_COMMANDS: SlashCommand[] = [
   { name: "new", hint: "reset this session's history" },
   { name: "status", hint: "uptime, model, history, tools, turns" },
   { name: "brief", hint: "hold a prefix ~6h", args: true },
+];
+
+/** Shot/loopback stand-in only. Live board comes from the crane aims frame. */
+export const SAMPLE_AIMS: AimRow[] = [
+  {
+    area: "training",
+    sentence: "Gym three mornings a week through spring.",
+    rating30: 1.4,
+    sum7: 6,
+    streak: 2,
+    note: "asked",
+    days: [
+      { day: "2026-09-22", score: 2, events: [411] },
+      { day: "2026-09-23", score: -1, events: [413] },
+      { day: "2026-09-24", score: 0, events: [] },
+      { day: "2026-09-25", score: 3, events: [415] },
+      { day: "2026-09-26", score: 2, events: [418] },
+    ],
+    weeks: [
+      { start: "2026-07-26", mean: -0.4, up: 1, against: 3, metrics: [] },
+      { start: "2026-08-02", mean: 0.1, up: 2, against: 2, metrics: [] },
+      { start: "2026-08-09", mean: 0.6, up: 3, against: 1, metrics: [] },
+      { start: "2026-08-16", mean: 0.3, up: 2, against: 1, metrics: [] },
+      { start: "2026-08-23", mean: 1.0, up: 4, against: 0, metrics: [] },
+      { start: "2026-08-30", mean: 0.7, up: 3, against: 1, metrics: [] },
+      { start: "2026-09-06", mean: 1.3, up: 4, against: 0, metrics: [] },
+      { start: "2026-09-13", mean: 0.9, up: 3, against: 1, metrics: [] },
+      { start: "2026-09-20", mean: 1.4, up: 4, against: 1, metrics: [] },
+    ],
+    slope: 0.3,
+    block: { days: 10, up: 4, against: 2, mean: 0.4, pct: 0.4 },
+  },
+  {
+    area: "weight",
+    sentence: "Under 190 by the first climbing trip.",
+    rating30: 0.6,
+    sum7: 1,
+    streak: 0,
+    note: "",
+    days: [
+      { day: "2026-09-22", score: 0, events: [414] },
+      { day: "2026-09-23", score: -1, events: [412] },
+      { day: "2026-09-24", score: 0, events: [] },
+      { day: "2026-09-25", score: 0, events: [] },
+      { day: "2026-09-26", score: 2, events: [419] },
+    ],
+    weeks: [
+      { start: "2026-08-02", mean: 0.0, up: 1, against: 1, metrics: [{ metric: "weight", mean: 193.4, unit: "lb", n: 2 }] },
+      { start: "2026-08-09", mean: 0.3, up: 2, against: 1, metrics: [{ metric: "weight", mean: 193.0, unit: "lb", n: 3 }] },
+      { start: "2026-08-16", mean: -0.1, up: 1, against: 2, metrics: [{ metric: "weight", mean: 193.2, unit: "lb", n: 2 }] },
+      { start: "2026-08-23", mean: 0.6, up: 3, against: 0, metrics: [{ metric: "weight", mean: 192.4, unit: "lb", n: 3 }] },
+      { start: "2026-08-30", mean: 0.4, up: 2, against: 1, metrics: [{ metric: "weight", mean: 192.1, unit: "lb", n: 2 }] },
+      { start: "2026-09-06", mean: 0.9, up: 3, against: 0, metrics: [{ metric: "weight", mean: 191.6, unit: "lb", n: 3 }] },
+      { start: "2026-09-13", mean: 0.7, up: 3, against: 1, metrics: [{ metric: "weight", mean: 191.9, unit: "lb", n: 2 }] },
+      { start: "2026-09-20", mean: 0.6, up: 2, against: 1, metrics: [{ metric: "weight", mean: 191.4, unit: "lb", n: 3 }] },
+    ],
+    slope: 0.1,
+    effect: { a: "weight", b: "", metric: "weight", r: -0.42, n: 8 },
+  },
+];
+
+/** Cross-aim next-day lines, as `links` on the same frame. */
+export const SAMPLE_AIM_LINKS: AimLink[] = [
+  { a: "training", b: "weight", r: 0.38, n: 12 },
 ];
 
 export const MOCK_REPLIES = [
@@ -173,6 +241,8 @@ export function sampleScene(id: SampleId, role: Role): SampleScene {
       bubble("t3", "you", SAMPLE_LINES.threadYouLeave, { at: 3, kind: "inbound", reaction: "👍" }),
       bubble("t4", "kit", SAMPLE_LINES.threadKit, { at: 4, kind: "reply" }),
     ],
+    aims: SAMPLE_AIMS,
+    aimLinks: SAMPLE_AIM_LINKS,
     status: "up",
     gpsHint: role === "phone" ? "pin ±12m this send" : undefined,
   };
