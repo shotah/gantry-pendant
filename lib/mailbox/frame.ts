@@ -1,6 +1,7 @@
 import { CONTEXT_JSON_MAX, FRAME_BYTES_MAX, IMAGE_BYTES_MAX, IMAGE_MAX, TEXT_MAX, utf8Bytes } from "./caps";
 import { parseAllowUsers, type RoomUser } from "./allow";
 import { parseAimsFrame, type AimLink, type AimRow } from "./aims";
+import { parseTodoFrame, type TodoItem } from "./todo";
 import { parseCommands, type SlashCommand } from "./cmds";
 
 export type Role = "phone" | "crane";
@@ -31,7 +32,7 @@ export type PhoneContext = {
 
 export type FrameImage = { url: string };
 
-export type FrameKind = "inbound" | "reply" | "push" | "ack" | "error" | "pin" | "cmds" | "allow" | "typing" | "draft" | "react" | "aims";
+export type FrameKind = "inbound" | "reply" | "push" | "ack" | "error" | "pin" | "cmds" | "allow" | "typing" | "draft" | "react" | "aims" | "todo";
 
 export type WireFrame = {
   text?: string;
@@ -50,6 +51,8 @@ export type WireFrame = {
   aims?: AimRow[];
   /** Crane `aims` only: cross-aim next-day correlations under the whole board. */
   links?: AimLink[];
+  /** Crane `todo` only: the pocket list snapshot (docs/frontends.md → Tasks board). */
+  todo?: TodoItem[];
   /** Hydrate-only. Unread queue flush must not set this. Clients must not send it. */
   replay?: boolean;
   /**
@@ -248,7 +251,7 @@ export function stampReplayOnBody(body: string): string {
   return encodeFrame({ ...parsed.frame, replay: true });
 }
 
-const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds", "allow", "typing", "draft", "react", "aims"]);
+const KINDS = new Set<FrameKind>(["inbound", "reply", "push", "ack", "error", "pin", "cmds", "allow", "typing", "draft", "react", "aims", "todo"]);
 
 /** Parse a mailbox frame. Never logs the body. */
 export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseOpts): ParseResult {
@@ -337,6 +340,9 @@ export function parseFrame(raw: string | ArrayBuffer | Uint8Array, opts?: ParseO
     const board = parseAimsFrame(o);
     frame.aims = board.aims;
     frame.links = board.links;
+  }
+  if (o.kind === "todo") {
+    frame.todo = parseTodoFrame(o);
   }
   if (o.replay === true) {
     frame.replay = true;

@@ -176,6 +176,7 @@ beforeEach(() => {
   window.localStorage.removeItem("pendant.followTheme");
   window.localStorage.removeItem("pendant.roomTheme");
   window.localStorage.removeItem("pendant.aimsSeen");
+  window.localStorage.removeItem("pendant.todoSeen");
   window.localStorage.removeItem("pendant.theme");
   document.documentElement.removeAttribute("data-font");
   document.documentElement.removeAttribute("data-theme");
@@ -196,6 +197,7 @@ afterEach(() => {
   window.localStorage.removeItem("pendant.followTheme");
   window.localStorage.removeItem("pendant.roomTheme");
   window.localStorage.removeItem("pendant.aimsSeen");
+  window.localStorage.removeItem("pendant.todoSeen");
   window.localStorage.removeItem("pendant.theme");
   document.documentElement.removeAttribute("data-font");
   document.documentElement.removeAttribute("data-theme");
@@ -1695,6 +1697,47 @@ describe("PhoneShell", () => {
       ws.deliver(JSON.stringify({ kind: "aims", aims: [{ ...training, sum7: 8 }, weight] }));
     });
     expect(screen.getByRole("button", { name: "goals" })).toBeTruthy();
+  });
+
+  it("shows the tasks board the crane pushed, sends /todo done from the checkbox, ticks it until the next board, and clears on an empty list", async () => {
+    const dentist = { id: 412, slug: "dentist", text: "call to book a cleaning", at: "2026-09-23" };
+    const passport = { id: 418, slug: "passport", text: "renew, by Oct 15", at: "2026-09-26" };
+    const ws = await connectSpike();
+    act(() => {
+      ws.open();
+    });
+    expect(screen.queryByRole("button", { name: /^tasks/ })).toBeNull();
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "todo", todo: [dentist, passport] }));
+    });
+    fireEvent.click(screen.getByRole("button", { name: "tasks (2 changed)" }));
+    expect(screen.getByRole("dialog", { name: "Tasks" })).toBeTruthy();
+
+    // The checkbox is the one kernel write. The drawer stays open, the row is ticked.
+    fireEvent.click(screen.getByRole("checkbox", { name: "done: call to book a cleaning" }));
+    await waitFor(() => expect(sentTurns(ws).at(-1)).toMatchObject({ kind: "inbound", text: "/todo done 412" }));
+    expect(screen.getByRole("dialog", { name: "Tasks" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "done: call to book a cleaning" }).getAttribute("aria-checked")).toBe("true");
+
+    // The next board removes the row and settles the tick.
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "todo", todo: [passport] }));
+    });
+    expect(screen.queryByRole("checkbox", { name: "done: call to book a cleaning" })).toBeNull();
+    expect(screen.getByRole("checkbox", { name: "done: renew, by Oct 15" }).getAttribute("aria-checked")).toBe("false");
+
+    // Adding is plain words to Kit; the sheet closes so the answer is in view.
+    fireEvent.change(screen.getByRole("textbox", { name: "New task" }), { target: { value: "return the box" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(screen.queryByRole("dialog", { name: "Tasks" })).toBeNull();
+    await waitFor(() => expect(sentTurns(ws).at(-1)).toMatchObject({ kind: "inbound", text: "add to my list: return the box" }));
+
+    // Looked at while open: quiet button. Gone row is a change; empty list hides the button.
+    expect(screen.getByRole("button", { name: "tasks" })).toBeTruthy();
+    act(() => {
+      ws.deliver(JSON.stringify({ kind: "todo", todo: [] }));
+    });
+    expect(screen.queryByRole("button", { name: /^tasks/ })).toBeNull();
   });
 
   it("paints Kit's reaction on your bubble, clears it on an empty one, and never moves the cursor", async () => {

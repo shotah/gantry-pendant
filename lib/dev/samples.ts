@@ -1,6 +1,7 @@
 import type { AimLink, AimRow } from "@/lib/mailbox/aims";
 import type { SlashCommand } from "@/lib/mailbox/cmds";
 import type { Role } from "@/lib/mailbox/frame";
+import type { TodoItem } from "@/lib/mailbox/todo";
 
 export const DEV_USER = {
   sub: "118212345678901234567",
@@ -43,6 +44,8 @@ export type SampleScene = {
   /** Goals board rows, as the crane `aims` frame would carry them. */
   aims?: AimRow[];
   aimLinks?: AimLink[];
+  /** Tasks board rows, as the crane `todo` frame would carry them. */
+  todo?: TodoItem[];
   typing?: boolean;
   emoji?: boolean;
 };
@@ -130,6 +133,13 @@ export const SAMPLE_AIMS: AimRow[] = [
 /** Cross-aim next-day lines, as `links` on the same frame. */
 export const SAMPLE_AIM_LINKS: AimLink[] = [
   { a: "training", b: "weight", r: 0.38, n: 12 },
+];
+
+/** The pocket list, oldest first, as the crane `todo` frame carries it (docs/tasks.md §4.4). */
+export const SAMPLE_TODO: TodoItem[] = [
+  { id: 420, slug: "amazon", text: "return the box", at: "2026-09-17" },
+  { id: 412, slug: "dentist", text: "call to book a cleaning", at: "2026-09-23" },
+  { id: 418, slug: "passport", text: "renew, Wed 11am", at: "2026-09-26" },
 ];
 
 export const MOCK_REPLIES = [
@@ -243,6 +253,7 @@ export function sampleScene(id: SampleId, role: Role): SampleScene {
     ],
     aims: SAMPLE_AIMS,
     aimLinks: SAMPLE_AIM_LINKS,
+    todo: SAMPLE_TODO,
     status: "up",
     gpsHint: role === "phone" ? "pin ±12m this send" : undefined,
   };

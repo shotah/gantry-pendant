@@ -23,7 +23,7 @@ function TargetIcon() {
 /**
  * Header button. Nothing when the board is empty — the screen is optional.
  * The badge is a call to action: how many aims changed since the human
- * last opened the drawer (`lib/phone/aimsSeen.ts`), never the board size.
+ * last opened the drawer (`lib/phone/boardSeen.ts`), never the board size.
  */
 export function GoalsButton({ count, changes, open, onToggle }: {
   count: number;

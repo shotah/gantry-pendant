@@ -6,7 +6,8 @@ import { SettingsSelect } from "../shared/SettingsSelect";
 import { ThemeSelect } from "../shared/ThemeSelect";
 import type { SlashCommand } from "@/app/lib/slash";
 import type { AimLink, AimRow } from "@/lib/mailbox/aims";
-import { type AimsSeen, changedAims } from "@/lib/phone/aimsSeen";
+import { todoDoneCommand, type TodoItem } from "@/lib/mailbox/todo";
+import { aimKey, type BoardSeen, changedRows, todoKey } from "@/lib/phone/boardSeen";
 import { Compose } from "./Compose";
 import { ConfigGapNote } from "./ConfigGapNote";
 import { GeoEnable } from "./GeoEnable";
@@ -15,6 +16,7 @@ import { KitAvatar } from "./KitAvatar";
 import { MicEnable } from "./MicEnable";
 import { NotifyEnable } from "./NotifyEnable";
 import { GoalsButton, GoalsSheet } from "./GoalsBoard";
+import { TasksButton, TasksSheet } from "./TasksBoard";
 import { SettingsMenu } from "./SettingsMenu";
 import { bubbleFrom, Thread, type ChatBubble } from "./Thread";
 import { mailboxUrl, parseIncoming } from "@/app/lib/socket";
@@ -46,6 +48,7 @@ import {
   browserGeoPref,
   browserLangPref,
   browserPhotoSizePref,
+  browserTodoSeen,
   browserVoicePref,
   saveAimsSeen,
   saveBackdropPref,
@@ -53,6 +56,7 @@ import {
   saveGeoPref,
   saveLangPref,
   savePhotoSizePref,
+  saveTodoSeen,
   saveVoicePref,
 } from "@/app/lib/prefs";
 import { applyFont, fontFromQuery } from "@/app/lib/font";
@@ -157,8 +161,13 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [catalog, setCatalog] = useState<SlashCommand[]>([]);
   const [aims, setAims] = useState<AimRow[]>([]);
   const [aimLinks, setAimLinks] = useState<AimLink[]>([]);
-  const [aimsSeen, setAimsSeen] = useState<AimsSeen>({});
+  const [aimsSeen, setAimsSeen] = useState<BoardSeen>({});
   const [goalsOpen, setGoalsOpen] = useState(false);
+  const [todo, setTodo] = useState<TodoItem[]>([]);
+  const [todoSeen, setTodoSeen] = useState<BoardSeen>({});
+  const [tasksOpen, setTasksOpen] = useState(false);
+  /** Ids whose `/todo done` went out; ticked in the drawer until the next board says. */
+  const [todoPending, setTodoPending] = useState<number[]>([]);
   const [avatarRev, setAvatarRev] = useState(0);
   const [backdropRev, setBackdropRev] = useState(0);
   const [backdropOn, setBackdropOn] = useState(true);
@@ -323,6 +332,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     setCatalog(scene.catalog ?? []);
     setAims(scene.aims ?? []);
     setAimLinks(scene.aimLinks ?? []);
+    setTodo(scene.todo ?? []);
     setTyping(Boolean(scene.typing));
     setSampleEmoji(Boolean(scene.emoji));
     if (scene.gpsHint) {
@@ -372,6 +382,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     setRecognizer(() => browserRecognizer());
     setVoiceOn(browserVoicePref());
     setAimsSeen(browserAimsSeen());
+    setTodoSeen(browserTodoSeen());
     const tongue = browserLangPref();
     langRef.current = tongue;
     setLang(tongue);
@@ -385,6 +396,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
       setAimsSeen(saveAimsSeen(aims));
     }
   }, [goalsOpen, aims]);
+  useEffect(() => {
+    if (tasksOpen) {
+      setTodoSeen(saveTodoSeen(todo));
+    }
+  }, [tasksOpen, todo]);
 
   function pickLang(raw: string) {
     const next = parseLang(raw);
@@ -726,6 +742,12 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         // The goals board, latest wins; an empty one clears (docs/frontends.md → Aims board).
         setAims(frame.aims ?? []);
         setAimLinks(frame.links ?? []);
+        return;
+      }
+      if (frame.kind === "todo") {
+        // The tasks board, latest wins; a fresh list settles any ticked rows.
+        setTodo(frame.todo ?? []);
+        setTodoPending([]);
         return;
       }
       if (frame.kind === "typing") {
@@ -1359,9 +1381,19 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
             ? (
                 <GoalsButton
                   count={aims.length}
-                  changes={changedAims(aims, aimsSeen)}
+                  changes={changedRows(aims, aimsSeen, aimKey)}
                   open={goalsOpen}
                   onToggle={() => setGoalsOpen((v) => !v)}
+                />
+              )
+            : null}
+          {phone
+            ? (
+                <TasksButton
+                  count={todo.length}
+                  changes={changedRows(todo, todoSeen, todoKey)}
+                  open={tasksOpen}
+                  onToggle={() => setTasksOpen((v) => !v)}
                 />
               )
             : null}
@@ -1533,6 +1565,20 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
               links={aimLinks}
               onClose={() => setGoalsOpen(false)}
               onAsk={(command) => void sendText(command)}
+            />
+          )
+        : null}
+      {tasksOpen
+        ? (
+            <TasksSheet
+              todo={todo}
+              pending={todoPending}
+              onClose={() => setTasksOpen(false)}
+              onDone={(id) => {
+                setTodoPending((p) => (p.includes(id) ? p : [...p, id]));
+                void sendText(todoDoneCommand(id));
+              }}
+              onSend={(text) => void sendText(text)}
             />
           )
         : null}

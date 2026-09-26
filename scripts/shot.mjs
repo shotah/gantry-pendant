@@ -110,6 +110,15 @@ const SHOTS = {
     ready: "[data-shot=phone]",
     readyText: "Leave-by 20:50",
   },
+  tasks: {
+    path: "/?sample=thread",
+    sel: "[role=dialog][aria-label=Tasks]",
+    text: "call to book a cleaning",
+    phone: true,
+    click: "[aria-label^=tasks]",
+    ready: "[data-shot=phone]",
+    readyText: "Leave-by 20:50",
+  },
   crane: {
     path: "/crane?sample=crane",
     sel: "[data-shot=crane]",

@@ -48,6 +48,7 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | `seen` on a phone `ack` (read on another mouth) | Additive `seen: true` on the phone's own `ack`. The Worker copies it to that human's **other** `sub:<userId>` sockets as `{ kind: "ack", seen: true, user_id, since?, id? }` — never a plain ack, which is delivery. A mouth that hears one drops its notification cards. A bare `{ kind: "ack", seen: true }` (no cursor yet) goes to siblings only, not the crane. Old Cab drops the key (`Mouth.ingest` acks by id → no-op) — [Seen](#seen-what-every-mouth-must-do-the-same) |
 | `react` (emoji on a bubble, both ways) | New `kind`, existing fields: `{ kind: "react", user_id, id: <bubble id>, text: "👍" }`; empty `text` clears. Worker stores it per human (`r:<sub>`), fans it to the human's `sub:` sockets (and to the crane when a phone sent it — queued for a down crane), replays it after the transcript on connect. Not a turn: no `seq`, phone queue, push, or cursor move. **Old Cab paints a stray bubble** — it needs `ignoredKind` for `react` before the crane starts reacting — [Reactions](#reactions-what-every-mouth-must-do-the-same) |
 | `aims` (goals board) | New `kind`, crane only: `{ kind: "aims", aims: [{ area, sentence, rating30, sum7, streak, note, days[], weeks?, slope?, block?, effect? }], links? }`. Pushed on dial after `cmds` and when the board changes; the Worker stores the latest (`aims`, or `aims:<sub>` with a `user_id`) and replays it on connect. Empty `aims` clears. Not a turn. Old Cab: no `text`, so no stray bubble — [Aims board](#aims-board-what-every-mouth-must-do-the-same) |
+| `todo` (tasks board) | New `kind`, crane only: `{ kind: "todo", todo: [{ id, slug, text, at }] }`, oldest first, uncapped (phone keeps 100). Pushed on dial after `aims` and when the list changes; the Worker stores the latest (`todo`, or `todo:<sub>`) and replays it on connect. Empty `todo` clears. Not a turn. The checkbox is an ordinary `inbound` `/todo done <id>`. Old Cab: no `text`, so no stray bubble — [Tasks board](#tasks-board-what-every-mouth-must-do-the-same) |
 | `act` (device actions: alarms, timers, DO schedules) — **planned, not on the wire yet** | New `kind`, request/response, not a turn. Crane → phone `{ kind: "act", id, name, turn, device?, input }`, phone → crane the same `id` with `ok` / `output` / `error`. Worker routes by `device`, then the `turn` socket, then any socket on the `sub` with the cap; answers `offline` / `no_device` / `ambiguous` / `timeout` itself; `schedule.*` and `device.list` are Worker-answered. Phones announce `device` / `kind` / `caps` / `label` on the upgrade. Old Cab drops it (no `text`). Contract and checklists for all three repos: Cab [`docs/device_actions.md`](https://github.com/shotah/gantry-cab/blob/main/docs/device_actions.md) |
 | Photo caps, encode ladder, `error` tokens | Every mouth encodes to the same budget and paints refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
 | Face / backdrop blobs and their notices | Cab and Helm refetch `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
@@ -461,10 +462,11 @@ cascade, `/aims block`). Not on an ordinary chat turn.
 Where each mouth stands:
 
 - PWA — shipped. `lib/mailbox/aims.ts` (parse, caps, `signed`,
-  `statsLine`, `linkLine`), `lib/phone/aimsSeen.ts` (`changedAims`,
-  seen pref), `GoalsBoard.tsx` (`GoalsButton`, `GoalsSheet`, week
-  strip), `PhoneShell` (`aims` in → state; asks go through
-  `sendText`). Waiting on the crane to send the frame — ai-gantry
+  `statsLine`, `linkLine`), `lib/phone/boardSeen.ts` (`changedRows`
+  keyed by area, seen pref — shared with the tasks board),
+  `GoalsBoard.tsx` (`GoalsButton`, `GoalsSheet`, week strip),
+  `PhoneShell` (`aims` in → state; asks go through `sendText`).
+  Waiting on the crane to send the frame — ai-gantry
   `docs/aims-progress.md` → Pendant frame.
 - Cab — shipped in tree (2026-09-26), waiting on the crane frame.
   - [x] **`ignoredKind` first.** `Mouth.ingest` handles `aims` before
@@ -474,26 +476,136 @@ Where each mouth stands:
         same caps (5 / 14 / 13 / 3), drops a bad row not the board,
         drops a half-formed `block` / `effect` / week whole; `[]` is a
         clear, a missing array keeps the last board. `ui/GoalsBoard.kt`:
-        header target `goals (n)` only when the board has rows; sheet
+        header target whenever the board has rows (badge rule below); sheet
         with one card per aim (signed `rating30`, sentence, day grid,
         stamp line, week strip, trend line), then the `links` lines —
         same words as `/aims`. **Auto: nothing.**
   - [x] **Ask.** `/aims <area>` / `/aims` / `/aims rubric` through the
         normal send; the sheet closes. `AimsTest` / `MouthTest` /
         `GoalsBoardTest`.
-  - [ ] **Badge = changes, not count.** `goals (n)` with the board size
-        reads as n notifications. Mirror the PWA: keep area → row of
-        the board last opened (DataStore / prefs), badge the count of
-        aims that differ, mark seen on open and while open. Same rule
-        as the section above.
+  - [x] **Badge = changes, not count.** `SharedPreferences("cab")["aimsSeen"]`
+        keeps area → row JSON of the board last opened (`seenAims` /
+        `encodeSeenAims` / `parseSeenAims` in `mailbox/Aims.kt`);
+        `changedAims` counts new + changed + gone, a never-seen board
+        whole. The target is painted whenever the board has rows; the
+        `Badge` and the `goals (n)` label appear only when `changedAims
+        > 0`, else a bare `goals`. Opening the sheet marks seen, and so
+        does a board that lands while it is up (`LaunchedEffect(goalsOpen,
+        aims)`). `AimsTest.badgeCountsChangesSinceTheLastOpenNotAims`.
 - Helm:
   - [ ] Same four items. CarPlay: nothing. Tracked with the rest of
         the iPhone backlog in Cab `docs/helm_parity.md`.
 
-Cover: `test/mailbox/aims.test.ts`, `test/phone/aimsSeen.test.ts`,
+Cover: `test/mailbox/aims.test.ts`, `test/phone/boardSeen.test.ts`,
 `test/worker/mailbox.test.ts` (Mailbox aims board),
 `test/app/components/chat/GoalsBoard.test.tsx`,
 `test/app/components/chat/PhoneShell.test.tsx` (goals board, badge).
+
+---
+
+## Tasks board (what every mouth must do the same)
+
+The crane keeps the human's pocket list — one memory row per task,
+`todo/<slug>`, the words, gone when done
+([ai-gantry `docs/tasks.md`](https://github.com/shotah/ai-gantry/blob/main/docs/tasks.md)).
+Built the way the aims board is: the crane **pushes a snapshot**, the
+mailbox keeps the latest and replays it on connect, a mouth paints it.
+The one write the phone makes is the checkbox, and it is an ordinary
+visible turn: `/todo done <id>`. Adding is plain words to Kit, who
+names the row; there is no `/todo add`.
+
+**One frame, one new `kind`.** Field names are the crane's json tags
+(`docs/tasks.md` §4.4); the pendant parser is `lib/mailbox/todo.ts`.
+
+```json
+{
+  "kind": "todo",
+  "todo": [
+    { "id": 412, "slug": "dentist",  "text": "call to book a cleaning", "at": "2026-09-23" },
+    { "id": 418, "slug": "passport", "text": "renew, by Oct 15",        "at": "2026-09-26" }
+  ]
+}
+```
+
+- `todo` is the whole list, **oldest `updated_at` first** — the thing
+  that has sat nine days is the one to say out loud. The crane does
+  not cap the frame (the `[todo]` stamp is what is capped at 5); the
+  phone tolerates 100 and drops the rest. `{ "kind": "todo", "todo":
+  [] }` is a real frame — the drawer clears.
+- Per row: `id` (the memory row id — positive integer; what the
+  checkbox sends back; **changes when the words change**), `slug` (the
+  key after `todo/`, `[a-z0-9][a-z0-9_-]*`, the identity across
+  rewrites), `text` (the action in the human's words, whitespace
+  collapsed, ≤ 240 runes; "by Friday" stays in here — there is no due
+  field), `at` (local `YYYY-MM-DD` last written; the phone computes
+  the age, the crane does not send it). A row missing `id`, `slug`, or
+  `text`, or repeating either key, is dropped — the row, not the list.
+- `user_id` optional: without it the list is the room's (`todo`); with
+  it, that human's (`todo:<sub>`), which wins on connect.
+- Dial order from the crane is `cmds`, `aims`, `todo`, `allow`; the
+  Worker replays in that order too. Sent again only when the rendered
+  JSON changed — after the turn that stored, rewrote, or forgot a row.
+
+**What a mouth does.**
+
+- On `todo`: replace its list with `todo`; empty → hide the screen.
+  Any rows it had ticked locally are settled by the new list.
+- The screen is optional and **hidden when the list is empty**. PWA:
+  a check-square button in the header → a drawer, one checklist row
+  per task: an unticked box, the words, then `#412 · dentist · 3d ago`
+  (id, slug, age after the first day — the same rule as the stamp).
+  Past 10 open, the footer says `14 open — a pocket list; prune, or
+  use a tracker`, the `/todo` footer's words.
+- **The checkbox is the one kernel write.** Tap → send `/todo done
+  <id>` as a visible turn; the row shows ticked and struck through and
+  will not send twice; **the drawer stays open** so several can be
+  ticked. The next `todo` frame removes the row (or un-ticks it if the
+  kernel answered `#418 is gone — the list was updated`, in which case
+  the new board is the truth anyway). Nothing is asked silently.
+- Adding: a text field, "in your words". Submit sends plain text —
+  `add to my list: <words>` — not a slash command; Kit names the slug
+  and stores the row, and the next board paints it. "Full list" sends
+  `/todo`. Both close the drawer so the answer is in view.
+- **The badge is a call to action, not the list size.** Same rule as
+  the goals board, keyed by **slug** (a rewrite changes the id, not the
+  task): count of tasks that differ from the list the human last had
+  the drawer open on — new, changed, or gone. Opening marks seen; so
+  does a list that lands while open. Persists on the device
+  (`pendant.todoSeen`).
+- Never paint a `todo` frame as a bubble. Never notify or buzz on it.
+  Never reorder — oldest first everywhere.
+
+Where each mouth stands:
+
+- PWA — shipped. `lib/mailbox/todo.ts` (parse, caps, `ageLabel`,
+  `todoDoneCommand`), `lib/phone/boardSeen.ts` (`changedRows` keyed
+  by slug), `TasksBoard.tsx` (`TasksButton`, `TasksSheet`),
+  `PhoneShell` (`todo` in → state + pending ticks; the checkbox and
+  the add field go through `sendText`). Waiting on the crane to send
+  the frame — ai-gantry `docs/tasks.md` §9 Phase 1.
+- Cab:
+  - [ ] **`ignoredKind` first.** `Mouth.ingest` handles `todo` before
+        the bubble path and returns `false`; `movesCursor` excludes it.
+  - [ ] **Paint.** `mailbox/Todo.kt` parses the rows above (id / slug /
+        text / at rules, cap 100, drop the row not the list; `[]` is a
+        clear, a missing array keeps the last list). `ui/TasksBoard.kt`:
+        header check-square only when the list has rows; sheet with one
+        checklist row per task (box, words, `#id · slug · age`); the
+        pocket-list footer past 10. **Auto: nothing.**
+  - [ ] **Tick and add.** Checkbox → `/todo done <id>` through the
+        normal send, row ticked until the next `todo` frame, sheet
+        stays open; add field → `add to my list: <words>` plain text
+        and "Full list" → `/todo`, both close the sheet.
+  - [ ] **Badge = changes, not count**, keyed by slug, seen kept in
+        `SharedPreferences("cab")["todoSeen"]`, same shape as `aimsSeen`.
+- Helm:
+  - [ ] Same four items. CarPlay: nothing. Tracked with the rest of
+        the iPhone backlog in Cab `docs/helm_parity.md`.
+
+Cover: `test/mailbox/todo.test.ts`, `test/phone/boardSeen.test.ts`,
+`test/worker/mailbox.test.ts` (Mailbox tasks board),
+`test/app/components/chat/TasksBoard.test.tsx`,
+`test/app/components/chat/PhoneShell.test.tsx` (tasks board).
 
 ---
 

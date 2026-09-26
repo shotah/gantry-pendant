@@ -1,5 +1,15 @@
 import type { AimRow } from "@/lib/mailbox/aims";
-import { aimsFingerprint, aimsSeenPref, type AimsSeen, writeAimsSeenPref } from "@/lib/phone/aimsSeen";
+import type { TodoItem } from "@/lib/mailbox/todo";
+import {
+  AIMS_SEEN_KEY,
+  aimKey,
+  boardFingerprint,
+  type BoardSeen,
+  boardSeenPref,
+  TODO_SEEN_KEY,
+  todoKey,
+  writeBoardSeenPref,
+} from "@/lib/phone/boardSeen";
 import type { LangId } from "@/lib/phone/lang";
 import type { PhotoSizeId } from "@/lib/phone/photo";
 import {
@@ -101,17 +111,32 @@ export function saveLangPref(id: LangId): void {
   writeLangPref(window.localStorage, id);
 }
 
-export function browserAimsSeen(): AimsSeen {
+export function browserAimsSeen(): BoardSeen {
   if (typeof window === "undefined") {
     return {};
   }
-  return aimsSeenPref(window.localStorage);
+  return boardSeenPref(window.localStorage, AIMS_SEEN_KEY);
 }
 
-/** Mark the board looked at. Returns the fingerprint either way so state can follow. */
-export function saveAimsSeen(aims: AimRow[]): AimsSeen {
+/** Mark the goals board looked at. Returns the fingerprint either way so state can follow. */
+export function saveAimsSeen(aims: AimRow[]): BoardSeen {
   if (typeof window === "undefined") {
-    return aimsFingerprint(aims);
+    return boardFingerprint(aims, aimKey);
   }
-  return writeAimsSeenPref(window.localStorage, aims);
+  return writeBoardSeenPref(window.localStorage, AIMS_SEEN_KEY, aims, aimKey);
+}
+
+export function browserTodoSeen(): BoardSeen {
+  if (typeof window === "undefined") {
+    return {};
+  }
+  return boardSeenPref(window.localStorage, TODO_SEEN_KEY);
+}
+
+/** Mark the tasks board looked at. */
+export function saveTodoSeen(todo: TodoItem[]): BoardSeen {
+  if (typeof window === "undefined") {
+    return boardFingerprint(todo, todoKey);
+  }
+  return writeBoardSeenPref(window.localStorage, TODO_SEEN_KEY, todo, todoKey);
 }

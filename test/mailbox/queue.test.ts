@@ -70,6 +70,8 @@ describe("queue", () => {
     expect(shouldQueue("typing")).toBe(false);
     expect(shouldQueue("draft")).toBe(false);
     expect(shouldQueue("react")).toBe(false); // the Worker queues a phone react for a down crane itself
+    expect(shouldQueue("aims")).toBe(false); // boards are stored latest-wins and replayed, not queued
+    expect(shouldQueue("todo")).toBe(false);
     expect(shouldQueue("inbound")).toBe(true);
     expect(shouldQueue("reply")).toBe(true);
     expect(shouldQueue("push")).toBe(true);

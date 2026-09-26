@@ -92,7 +92,7 @@ export function dropAcked(items: Queued[], opts: { since?: string; userId?: stri
 }
 
 export function shouldQueue(kind?: string): boolean {
-  return kind !== "pin" && kind !== "ack" && kind !== "cmds" && kind !== "typing" && kind !== "draft" && kind !== "react" && kind !== "aims";
+  return kind !== "pin" && kind !== "ack" && kind !== "cmds" && kind !== "typing" && kind !== "draft" && kind !== "react" && kind !== "aims" && kind !== "todo";
 }
 
 export function destKey(to: Role, userId?: string): string {

@@ -18,6 +18,7 @@ import {
 } from "../lib/mailbox/allow";
 import { utf8Bytes } from "../lib/mailbox/caps";
 import { AIMS_STORE_KEY, aimsStoreKey, cranePublishedAims, parseAimsBoard, parseLinks, phoneMustNotPublishAims } from "../lib/mailbox/aims";
+import { cranePublishedTodo, parseTodoBoard, phoneMustNotPublishTodo, TODO_STORE_KEY, todoStoreKey } from "../lib/mailbox/todo";
 import { cranePublishedCmds, CMDS_STORE_KEY, parseCommands, phoneMustNotPublishCmds } from "../lib/mailbox/cmds";
 import { encodeError, encodeFrame, parseFrame, stampOrderOnBody, stampReplayOnBody, stripClientOrder, type Role, type WireFrame } from "../lib/mailbox/frame";
 import {
@@ -247,6 +248,7 @@ export class Mailbox extends DurableObject<Env> {
     if (
       phoneMustNotPublishCmds(meta.role, out.kind)
       || phoneMustNotPublishAims(meta.role, out.kind)
+      || phoneMustNotPublishTodo(meta.role, out.kind)
       || phoneMustNotPublishAllow(meta.role, out.kind)
       || phoneMustNotPublishTyping(meta.role, out.kind)
       || phoneMustNotPublishDraft(meta.role, out.kind)
@@ -278,6 +280,18 @@ export class Mailbox extends DurableObject<Env> {
       }
       const body = encodeFrame(frame);
       await this.ctx.storage.put(aimsStoreKey(out.user_id), body);
+      fanOut(this.peers(out.user_id ? subTag(out.user_id) : roleTag("phone")), body);
+      return;
+    }
+    if (cranePublishedTodo(meta.role, out.kind)) {
+      // The tasks board: same shape as aims — latest wins, replayed on
+      // connect, an empty list stored and sent so the drawer clears.
+      const frame: WireFrame = { kind: "todo", todo: parseTodoBoard(out.todo) };
+      if (out.user_id) {
+        frame.user_id = out.user_id;
+      }
+      const body = encodeFrame(frame);
+      await this.ctx.storage.put(todoStoreKey(out.user_id), body);
       fanOut(this.peers(out.user_id ? subTag(out.user_id) : roleTag("phone")), body);
       return;
     }
@@ -592,6 +606,12 @@ export class Mailbox extends DurableObject<Env> {
         ?? await this.ctx.storage.get<string>(AIMS_STORE_KEY);
       if (aims) {
         ws.send(aims);
+      }
+      // Tasks board after aims — the crane's dial order is cmds, aims, todo.
+      const todo = (userId ? await this.ctx.storage.get<string>(todoStoreKey(userId)) : undefined)
+        ?? await this.ctx.storage.get<string>(TODO_STORE_KEY);
+      if (todo) {
+        ws.send(todo);
       }
       const storedTheme = knownTheme(await this.ctx.storage.get<string>(THEME_STORE_KEY));
       if (storedTheme) {

@@ -575,6 +575,72 @@ describe("Mailbox aims board", () => {
   });
 });
 
+describe("Mailbox tasks board", () => {
+  const list = [
+    { id: 412, slug: "dentist", text: "call to book a cleaning", at: "2026-09-23" },
+    { id: 418, slug: "passport", text: "renew, by Oct 15", at: "2026-09-26" },
+  ];
+
+  it("stores the crane's list, fans it to phones, and replays it on connect after aims", async () => {
+    const { state, crane, phone, say, connect } = room();
+    const ada = phone("1182");
+    await say(crane, { kind: "cmds", commands: [{ name: "todo", hint: "pocket list", args: true }] });
+    await say(crane, { kind: "aims", aims: [] });
+    await say(crane, { kind: "todo", todo: [...list, { id: "x", slug: "junk" }] });
+
+    expect(ada.frames().at(-1)).toEqual({ kind: "todo", todo: list });
+    expect(state.storage.rows.get("todo")).toBe(JSON.stringify({ kind: "todo", todo: list }));
+
+    const fresh = phone("1182");
+    await connect(fresh, "1182");
+    expect(fresh.kinds().slice(0, 3)).toEqual(["cmds", "aims", "todo"]);
+  });
+
+  it("an empty list is a real frame — stored and sent so the drawer clears", async () => {
+    const { state, crane, phone, say, connect } = room();
+    const ada = phone("1182");
+    await say(crane, { kind: "todo", todo: list });
+    await say(crane, { kind: "todo", todo: [] });
+
+    expect(ada.frames().at(-1)).toEqual({ kind: "todo", todo: [] });
+    expect(state.storage.rows.get("todo")).toBe(JSON.stringify({ kind: "todo", todo: [] }));
+    const fresh = phone("1182");
+    await connect(fresh, "1182");
+    expect(fresh.frames().find((f) => f.kind === "todo")).toEqual({ kind: "todo", todo: [] });
+  });
+
+  it("a list naming a human goes only to that human and wins over the room list on connect", async () => {
+    const { crane, phone, say, connect } = room();
+    const ada = phone("1182");
+    const bob = phone("7");
+    await say(crane, { kind: "todo", todo: [] });
+    ada.sent.length = 0;
+    bob.sent.length = 0;
+    await say(crane, { kind: "todo", user_id: "1182", todo: list });
+
+    expect(ada.frames()).toEqual([{ kind: "todo", todo: list, user_id: "1182" }]);
+    expect(bob.sent).toEqual([]);
+
+    const adaAgain = phone("1182");
+    await connect(adaAgain, "1182");
+    expect(adaAgain.frames().filter((f) => f.kind === "todo")).toEqual([{ kind: "todo", todo: list, user_id: "1182" }]);
+    const bobAgain = phone("7");
+    await connect(bobAgain, "7");
+    expect(bobAgain.frames().filter((f) => f.kind === "todo")).toEqual([{ kind: "todo", todo: [] }]);
+  });
+
+  it("refuses a list from a phone; the checkbox is an ordinary /todo done turn", async () => {
+    const { crane, phone, say } = room();
+    const ada = phone("1182");
+    await say(ada, { kind: "todo", todo: list });
+    expect(ada.frames()).toEqual([{ kind: "error", text: "bad frame" }]);
+    expect(crane.sent).toEqual([]);
+
+    await say(ada, { id: "m1", text: "/todo done 412" });
+    expect(crane.frames().at(-1)).toMatchObject({ kind: "inbound", text: "/todo done 412", user_id: "1182" });
+  });
+});
+
 describe("Mailbox reactions", () => {
   it("fans Kit's reaction to the human's mouths, stores it, and hydrates it after the bubble", async () => {
     const { state, crane, phone, say, connect } = room();

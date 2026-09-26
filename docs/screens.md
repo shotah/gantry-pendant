@@ -62,6 +62,8 @@ the Durable Object.
 <p align="center">
   <img src="../assets/docs/goals.png" alt="Goals drawer — aims, day grid, week strip, cross-aim line" width="220">
   &nbsp;
+  <img src="../assets/docs/tasks.png" alt="Tasks drawer — the pocket list as a checklist" width="220">
+  &nbsp;
   <img src="../assets/docs/crane.png" alt="Crane stand-in tab" width="220">
 </p>
 
@@ -83,6 +85,7 @@ the Durable Object.
 | `thread-xl` | `/?sample=thread&font=xl` | Extra-large chat type. Small is the default. |
 | `settings` | `/?sample=empty` | Cog → right-hand drawer, scrolls on its own — Access (mic when voice is on, location, notifications), theme, follow Kit’s mood, font, photo size, backdrop, Install. Scrim, ×, Escape close it. |
 | `goals` | `/?sample=thread` then target | Goals drawer from the crane's `aims` frame — per aim: sentence, 30-day rating, five-day grid, stamp line, week strip, slope / block / effect; cross-aim next-day line under the cards. Every button is a `/aims …` turn. Hidden when the board is empty; the header badge counts only aims changed since the drawer was last opened. |
+| `tasks` | `/?sample=thread` then check-square | Tasks drawer from the crane's `todo` frame — a checklist, oldest first: box, the words, `#id · slug · age`. The box sends `/todo done <id>` and stays open; the add field is plain words to Kit; "Full list" is `/todo`. Hidden when the list is empty; badge counts only tasks changed since last opened. |
 | `crane` | `/crane?sample=crane` | Loopback stand-in for the harness (`PENDANT_DEV`). |
 
 ---
