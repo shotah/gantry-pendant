@@ -5,7 +5,13 @@ import { mintSession, SESSION_COOKIE } from "@/lib/auth/session";
 import { SPEAK_BYTES_MAX } from "@/lib/phone/speakable";
 import { TTS_ENDPOINT, TTS_JSON_MAX } from "@/lib/tts/http";
 
-const mockEnv = vi.hoisted<{ SESSION_SECRET?: string; GOOGLE_TTS_API_KEY?: string; TTS_VOICE?: string; VOICE?: string }>(() => ({}));
+const mockEnv = vi.hoisted<{
+  SESSION_SECRET?: string;
+  GOOGLE_TTS_API_KEY?: string;
+  TTS_VOICE?: string;
+  VOICE?: string;
+  ALLOWED_SUBS?: string;
+}>(() => ({}));
 
 vi.mock("cloudflare:workers", () => ({ env: mockEnv }));
 
@@ -33,6 +39,7 @@ beforeEach(() => {
   mockEnv.GOOGLE_TTS_API_KEY = "gcp-key";
   mockEnv.TTS_VOICE = undefined;
   mockEnv.VOICE = undefined;
+  mockEnv.ALLOWED_SUBS = "1182";
   googleFetch.mockReset();
   googleFetch.mockImplementation(async () => googleOk());
   vi.stubGlobal("fetch", googleFetch);
@@ -70,6 +77,13 @@ describe("tts route", () => {
     const jwe = await mintSession("sess", { sub: "1182" });
     const res = await POST(ttsReq(JSON.stringify({ text: "hi" }), { Authorization: `Bearer ${jwe}` }));
     expect(res.status).toBe(200);
+  });
+
+  it("refuses a signed-in account no crane lists, and does not call Google", async () => {
+    const jwe = await mintSession("sess", { sub: "9999", email: "who@gmail.com", emailVerified: true });
+    const res = await POST(ttsReq(JSON.stringify({ text: "hi" }), { Cookie: `${SESSION_COOKIE}=${jwe}` }));
+    expect(res.status).toBe(403);
+    expect(googleFetch).not.toHaveBeenCalled();
   });
 
   it("proxies the text to Chirp and returns MP3 bytes, key in the header only", async () => {

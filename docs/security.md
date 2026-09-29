@@ -174,9 +174,9 @@ ID tokens do **not** ride later frames. The PWA WebSocket is
 same-origin and sends the httpOnly cookie. Native cab upgrades with
 `Authorization: Bearer` holding that same JWE (minted at
 `POST /api/auth/token` from a Google ID token + nonce). `GET
-/api/auth/nonce` issues a one-time nonce (5 min). POST consumes it
-when present; a missing row still mints (old APK). Replay of a
-consumed server nonce is 401. Crane upgrade sends `Authorization:
+/api/auth/nonce` issues a one-time nonce (5 min). POST accepts only
+that stored nonce. A missing row (old local mint) is 401, same as a
+replay. Crane upgrade sends `Authorization:
 Bearer` too — a **different** token, bound to the slug. Bind DO id to
 the crane slug in that crane bearer (`kit` cannot write `ada`).
 
@@ -257,12 +257,10 @@ from `ChatID` (Google `sub`).
 - Mailbox Worker ≠ Gantree portal Worker. No `docker.sock`, no yard
   session, no `.env` reads.
 
-### Stolen phone / token
+### Stolen phone
 
-1. OS lock / find my device
-2. Google: sign out other sessions
-3. Yank `sub` from allowlist (next frame is 4401), rotate crane bearer
-4. Recreate crane if `.env` leaked
+Lock the phone and yank the `sub` off the crane list. The next frame
+is 4401. Rotate the crane bearer only if that token itself leaked.
 
 ---
 

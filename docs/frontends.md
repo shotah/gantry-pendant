@@ -40,7 +40,7 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | --- | --- |
 | Additive JSON (`seq`, `at`, extra `context`) | Old clients must keep working. Cab `parseFrame` and Helm `parseFrame` drop unknown keys — that is the bar |
 | New required field, new `kind`, or a required header | Cab and Helm must ship in lockstep, or the mailbox must tolerate the old client |
-| Auth (`/api/auth/*`, session JWE, 4401) | Cab and Helm POST the ID token and store the JWE. Spike query creds are PWA loopback only. Cookie CSRF is PWA-only — do not send `pendant_session` from OkHttp or URLSession. Additive `version` and `voice` on `GET /api/auth/config` are dropped today (`AuthConfig` keeps `mode` / `google`). `GET /api/auth/nonce` is issued: both fetch it and mint locally on a failed GET (404 / junk / empty). Close `4401` / handshake 401 drops the stored JWE; 403 does not. `POST /api/auth/token` is `403 { "error": "unauthorized" }` when no crane lists the Google account — no JWE is minted; Cab (`AuthException`) and Helm (`AuthError`) already throw on any non-2xx there, so no native change. Do not **require** stored nonces until those native builds are the sideload |
+| Auth (`/api/auth/*`, session JWE, 4401) | Cab and Helm POST the ID token and store the JWE. Spike query creds are PWA loopback only. Cookie CSRF is PWA-only — do not send `pendant_session` from OkHttp or URLSession. Additive `version` and `voice` on `GET /api/auth/config` are dropped today (`AuthConfig` keeps `mode` / `google`). `GET /api/auth/nonce` is required: `POST /api/auth/token` is 401 unless that nonce is still stored and unused. A locally minted nonce (the old fallback when GET fails) does not sign in. Cab and Helm must send the nonce from that GET. Close `4401` / handshake 401 drops the stored JWE; 403 does not. `POST /api/auth/token` is `403 { "error": "unauthorized" }` when no crane lists the Google account — no JWE is minted; Cab (`AuthException`) and Helm (`AuthError`) already throw on any non-2xx there. `POST /api/tts` is the same door: a session that no crane lists is 403 and Google is not called. |
 | Queue / `ack` / `since` / `seq` | Cab and Helm parse `seq` / `at`, insert like `placeInThread`, ack the highest seq. Transcript hydrate is the same frames plus `replay` — see below |
 | Scroll / draft bounce | Cab already pins with reverseLayout (`ChatScroll.kt`). Helm pins the last bubble. Do not assume either needs the PWA CSS |
 | Draft→reply remount | PWA `live` React key, Cab / Helm `composeKey` (`kit-live`) so Markdown does not remount when `__draft__` becomes `r1`. Not on the wire. |
@@ -583,21 +583,26 @@ Where each mouth stands:
   `PhoneShell` (`todo` in → state + pending ticks; the checkbox and
   the add field go through `sendText`). Waiting on the crane to send
   the frame — ai-gantry `docs/tasks.md` §9 Phase 1.
-- Cab:
-  - [ ] **`ignoredKind` first.** `Mouth.ingest` handles `todo` before
+- Cab — shipped in tree (2026-09-26), waiting on the crane frame.
+  - [x] **`ignoredKind` first.** `Mouth.ingest` handles `todo` before
         the bubble path and returns `false`; `movesCursor` excludes it.
-  - [ ] **Paint.** `mailbox/Todo.kt` parses the rows above (id / slug /
+        A `text` key on the frame is ignored.
+  - [x] **Paint.** `mailbox/Todo.kt` parses the rows above (id / slug /
         text / at rules, cap 100, drop the row not the list; `[]` is a
         clear, a missing array keeps the last list). `ui/TasksBoard.kt`:
         header check-square only when the list has rows; sheet with one
         checklist row per task (box, words, `#id · slug · age`); the
         pocket-list footer past 10. **Auto: nothing.**
-  - [ ] **Tick and add.** Checkbox → `/todo done <id>` through the
-        normal send, row ticked until the next `todo` frame, sheet
-        stays open; add field → `add to my list: <words>` plain text
-        and "Full list" → `/todo`, both close the sheet.
-  - [ ] **Badge = changes, not count**, keyed by slug, seen kept in
+  - [x] **Tick and add.** Checkbox → `/todo done <id>` through the
+        normal send, row ticked and struck through until the next
+        `todo` frame (`settleTicked`), a second tap does not send, the
+        sheet stays open; add field → `add to my list: <words>` plain
+        text and "Full list" → `/todo`, both close the sheet.
+  - [x] **Badge = changes, not count**, keyed by slug
+        (`changedTodo` / `seenTodo`), seen kept in
         `SharedPreferences("cab")["todoSeen"]`, same shape as `aimsSeen`.
+        Marked seen on open and while open. `TodoTest` / `MouthTest` /
+        `TasksBoardTest`.
 - Helm:
   - [ ] Same four items. CarPlay: nothing. Tracked with the rest of
         the iPhone backlog in Cab `docs/helm_parity.md`.

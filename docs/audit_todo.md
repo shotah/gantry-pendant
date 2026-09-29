@@ -13,10 +13,12 @@ the chat wire (headers, cookie CSRF, push host allowlist, config
 `version`, Google return-to, CI token scope). Cron pings that never
 came back lined up with tag collision, unscoped phone acks, and a
 lexical `since` cursor — not with a listed human changing Kit's face.
-Decisions live in [security.md](security.md). Session revocation and
-real CF rate limits are still open. Native nonce is **issued**, not
-required, until the Cab APK that GETs `/api/auth/nonce` is the
-sideload.
+Decisions live in [security.md](security.md). Home lab, not a
+rotation calendar: yank a person off the crane list, and the next
+frame closes. No sign-out-everywhere floor, no quarterly stolen-phone
+drill, no bearer-rotation drill. Real CF rate limits stay optional.
+Native sign-in requires the nonce from `GET /api/auth/nonce`.
+`/api/auth/me` matches email only when Google verified it.
 
 ---
 
@@ -294,11 +296,10 @@ off for a crane.
       101 upgrades are not wrapped. Leftover: script/style hashes for
       the two boot scripts — Vinext still needs `'unsafe-inline'`.
       `test/http/security.test.ts`.
-- [ ] **Session revocation.** Sign-out only clears the cookie; a copied
-      JWE is good until `exp` (7 d). Add a per-`sub` "not before"
-      (`iat` floor) or a `jti` denylist in KV. "Sign out everywhere"
-      and the stolen-phone runbook use it. Pair with the sliding
-      refresh line in todo.md.
+- [x] **Session revocation.** Home lab: sign-out clears the cookie.
+      A copied JWE lasts until `exp` (7 d). Yanking the `sub` off the
+      crane list closes the socket on the next frame. No `iat` floor,
+      no "sign out everywhere".
 - [x] **CSRF defense in depth.** Cookie-bearing mutating `/api/*`
       needs `Sec-Fetch-Site` ∈ `same-origin`/`none` or a matching
       `Origin`. Cab `Authorization` POSTs have no session cookie and
@@ -313,13 +314,16 @@ off for a crane.
       rate-limiting rules (or the Rate Limiting binding) on `/ws/*`,
       `/api/auth/*`, `/api/push`. Keep the DO per-`sub` frame and byte
       buckets.
-- [ ] **Native token nonce is required.** `GET /api/auth/nonce`
-      (5 min, one-time) is issued. POST `/api/auth/token` consumes a
-      stored nonce (`ok`) and still accepts a **missing** row so an
-      old APK that minted locally can sign in. Replay or expired
-      server nonce is 401. Cab already GETs the route and mints
-      locally on a failed GET (404 / junk / empty). **Require** stored
-      nonces after that APK is the sideload. `test/auth/nonce.test.ts`.
+- [x] **`/api/auth/me` ignores an unverified email.** The directory
+      lookup gets the address only when `emailVerified` is set, same
+      as sign-in. `app/api/auth/me/route.ts`,
+      `test/app/api/auth/me/route.test.ts`.
+- [x] **Native token nonce is required.** `POST /api/auth/token` is
+      401 unless the nonce came from `GET /api/auth/nonce` and has not
+      been used or expired. A locally minted nonce does not sign in.
+      Cab and Helm already fetch the route; the local-mint fallback
+      on a failed GET no longer works. `test/auth/nonce.test.ts`,
+      `test/app/api/auth/token/route.test.ts`.
 - [x] **CI hardening** (partial). Workflow default is `contents:
       read`; `contents: write` is the coverage-badge job only.
       `npm audit --omit=dev` is a check step. Leftover: pin actions
@@ -339,12 +343,12 @@ off for a crane.
 
 ### Security — After go-live
 
-Calendar items. None of these block a release.
+Calendar items. None of these block a release. Home lab: no
+rotation calendar and no stolen-phone drill.
 
-- [ ] **Rotation drills.** `SESSION_SECRET` (logs everyone out — add
-      dual-key read first), `CRANE_BEARERS` per slug, Google client
-      secret, VAPID (every phone re-subscribes). Once each, on purpose,
-      before they are needed.
+- [x] **Rotation drills.** Not a schedule. Change `SESSION_SECRET`,
+      a crane bearer, the Google client secret, or VAPID when one of
+      them has actually leaked.
 - [ ] **Counters, not bodies.** 401 / 403 / 429 / 4401 per route via
       Workers Analytics Engine or `observability` with sampling. Alert
       on spikes. Never lat/lon, never text, never endpoints.
@@ -357,8 +361,9 @@ Calendar items. None of these block a release.
 - [ ] **Policy revisits** with real usage: 7 d session, `QUEUE_TTL_MS`
       1 h vs "reload keeps the thread", 30 frames/min, bytes 4 MB burst
       (`RATE_BYTES_BURST`, two photo frames) refilling 256 KB/min.
-- [ ] **Stolen-phone runbook** end to end once a quarter: lock, Google
-      sign-out, yank `sub`, rotate bearer, confirm 4401.
+- [x] **Stolen-phone runbook.** Lock the phone and yank the `sub`
+      off the crane list. The next frame is 4401. No quarterly drill,
+      no bearer rotation as part of it.
 
 ---
 

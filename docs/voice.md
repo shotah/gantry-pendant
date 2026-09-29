@@ -352,8 +352,10 @@ OpenAI voices). `lang` is the phone's Settings → Language (`en` |
 (`ja-JP-Chirp3-HD-Leda`, `cmn-CN-…`, `vi-VN-…`); missing or junk
 keeps `TTS_VOICE` as is
 ([frontends.md](frontends.md#language-what-every-mouth-must-do-the-same)).
-Signed-in session, same rate bucket as `/api/push`,
-404 until the key exists so an unconfigured Worker just stays quiet.
+Signed-in session that some crane still lists (`onSomeCrane`), same
+rate bucket as `/api/push`, 404 until the key exists so an
+unconfigured Worker just stays quiet. A yanked account is 403 and
+Google is not called.
 Nothing is stored, nothing touches the Durable Object, and the
 Worker never logs the text. Where the key actually lives:
 [Turn on the pocket voice](#turn-on-the-pocket-voice).
@@ -671,8 +673,9 @@ strips asterisks here.
 - [x] `speakable()` + `clipForSpeech()`: markdown → words, code →
       "code", image → "photo", emoji dropped
       (`lib/phone/speakable.ts`)
-- [x] `POST /api/tts` → Chirp 3 HD → MP3, session-gated, 404 without
-      the key, never logs (`lib/tts/http.ts`, `app/api/tts/route.ts`)
+- [x] `POST /api/tts` → Chirp 3 HD → MP3, session-gated and still on
+      a crane, 404 without the key, never logs (`lib/tts/http.ts`,
+      `app/api/tts/route.ts`)
 - [x] Speaker gate: the next live `reply` after a hold is read
       aloud, then disarm; `error` disarms; `push` / `replay` /
       drafts / typed turns never speak; a new hold hushes the

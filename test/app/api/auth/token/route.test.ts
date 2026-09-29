@@ -55,11 +55,16 @@ function tokenReq(nonce: string): Request {
 }
 
 describe("native token route", () => {
-  it("mints when the nonce row is missing (old Cab local mint)", async () => {
+  async function issuedNonce(): Promise<string> {
+    const issued = await getNonce(new Request("https://pendant.example/api/auth/nonce"));
+    const body = await issued.json() as { nonce: string };
+    return body.nonce;
+  }
+
+  it("refuses a nonce this Worker never issued", async () => {
     const res = await POST(tokenReq("local-mint"));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ token: "jwe", sub: "1182" });
-    expect(mintNativeSession).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(401);
+    expect(mintNativeSession).not.toHaveBeenCalled();
   });
 
   it("consumes a server nonce once", async () => {
@@ -79,7 +84,7 @@ describe("native token route", () => {
       emailVerified: true,
       exp: 1,
     });
-    const res = await POST(tokenReq("local-mint"));
+    const res = await POST(tokenReq(await issuedNonce()));
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: "unauthorized" });
   });
@@ -91,7 +96,7 @@ describe("native token route", () => {
       emailVerified: false,
       exp: 1,
     });
-    const body = await (await POST(tokenReq("local-mint"))).json() as Record<string, unknown>;
+    const body = await (await POST(tokenReq(await issuedNonce()))).json() as Record<string, unknown>;
     expect(body).not.toHaveProperty("token");
   });
 });

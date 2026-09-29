@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
-import { badFrame, tooLarge, tooMany, unauthorized } from "@/lib/auth/deny";
+import { badFrame, forbidden, tooLarge, tooMany, unauthorized } from "@/lib/auth/deny";
+import { onSomeCrane } from "@/lib/auth/door";
 import { limitAuthRequest } from "@/lib/auth/limit";
 import { readSessionFromRequest } from "@/lib/auth/session";
 import { headerSaysTooLarge } from "@/lib/mailbox/caps";
@@ -8,8 +9,9 @@ import { parseTtsBody, readTts, synthesize, TTS_JSON_MAX, voiceFor, voiceOffered
 export const dynamic = "force-dynamic";
 
 /**
- * Signed-in human posts `{ text, lang? }`, gets MP3 bytes. 404 until voice is
- * offered and the key is set. `lang` swaps the Chirp locale (docs/frontends.md).
+ * Signed-in human who is still on a crane posts `{ text, lang? }`, gets MP3
+ * bytes. 404 until voice is offered and the key is set. `lang` swaps the
+ * Chirp locale (docs/frontends.md).
  */
 export async function POST(req: Request) {
   if (!voiceOffered(env)) {
@@ -32,6 +34,14 @@ export async function POST(req: Request) {
   }
   if (!limitAuthRequest(req, session.sub)) {
     return tooMany();
+  }
+  const listed = await onSomeCrane(env, {
+    sub: session.sub,
+    email: session.emailVerified ? session.email : undefined,
+    emailVerified: session.emailVerified === true,
+  });
+  if (!listed) {
+    return forbidden();
   }
   if (headerSaysTooLarge(req.headers.get("content-length"), TTS_JSON_MAX)) {
     return tooLarge();

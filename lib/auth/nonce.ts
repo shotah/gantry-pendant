@@ -8,9 +8,9 @@ export type NativeNonceRow = { exp: number; used: boolean };
 
 export type NativeNonceTake = "ok" | "missing" | "replay" | "expired";
 
-/** `ok` = server-issued and consumed. `missing` = old Cab that minted locally. */
+/** Only a nonce this Worker issued and has not consumed. A local mint is 401. */
 export function nativeNonceAccepted(take: NativeNonceTake): boolean {
-  return take === "ok" || take === "missing";
+  return take === "ok";
 }
 
 export function nativeNonceKey(nonce: string): string {

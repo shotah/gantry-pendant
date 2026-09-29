@@ -31,9 +31,9 @@ describe("native nonce", () => {
     expect(await consumeNativeNonce(store, issued.nonce, now + 2_000)).toBe("replay");
   });
 
-  it("treats an unknown nonce as a legacy Cab mint, and expired as a deny", () => {
+  it("treats an unknown nonce as a deny, and expired as a deny", () => {
     expect(takeNativeNonceRow(null, 1)).toBe("missing");
-    expect(nativeNonceAccepted("missing")).toBe(true);
+    expect(nativeNonceAccepted("missing")).toBe(false);
     expect(nativeNonceAccepted("ok")).toBe(true);
     expect(nativeNonceAccepted("replay")).toBe(false);
     expect(nativeNonceAccepted("expired")).toBe(false);

@@ -35,7 +35,7 @@ export async function GET(req: Request) {
     slugs: typed ? [typed] : [],
     session: {
       sub: session.sub,
-      email: session.email,
+      email: session.emailVerified ? session.email : undefined,
       emailVerified: session.emailVerified,
     },
     extraSubs: env.ALLOWED_SUBS,
