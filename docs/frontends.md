@@ -331,9 +331,14 @@ Where each mouth stands:
         the set emoji clears. Auto read-only.
   - [x] **Do not** notify, buzz, or move the `since` cursor on a
         `react` (`movesCursor`); it does not clear the draft.
-- Helm:
-  - [ ] Same four items. Context menu on the bubble is the iOS shape;
-        CarPlay read-only.
+- Helm — shipped in tree. Context menu on the bubble is the iOS shape.
+  CarPlay read-only.
+  - [x] **`ignoredKind` first.** `Mouth.ingest` lands a `react` on the
+        named bubble and never paints a stray bubble.
+  - [x] **Paint.** `ChatLine.reaction`; chip on the bubble.
+  - [x] **Send.** Context menu on a Kit bubble → the same palette →
+        `react` out. CarPlay read-only.
+  - [x] **Do not** notify or move the `since` cursor on a `react`.
 
 Cover: `test/mailbox/react.test.ts`, `test/worker/mailbox.test.ts`
 (Mailbox reactions), `test/app/components/chat/Thread.test.tsx`
@@ -492,9 +497,16 @@ Where each mouth stands:
         > 0`, else a bare `goals`. Opening the sheet marks seen, and so
         does a board that lands while it is up (`LaunchedEffect(goalsOpen,
         aims)`). `AimsTest.badgeCountsChangesSinceTheLastOpenNotAims`.
-- Helm:
-  - [ ] Same four items. CarPlay: nothing. Tracked with the rest of
-        the iPhone backlog in Cab `docs/helm_parity.md`.
+- Helm — shipped in tree. CarPlay: nothing.
+  - [x] **`ignoredKind` first.** `Mouth.ingest` handles `aims` before
+        the bubble path; `movesCursor` excludes it.
+  - [x] **Paint.** `Sources/Mailbox/Aims.swift` and `app/Helm/HelmGoals.swift`.
+        Header target when the board has rows. CarPlay: nothing.
+  - [x] **Ask.** `/aims <area>` / `/aims` / `/aims rubric` through the
+        normal send; the sheet closes.
+  - [x] **Badge = changes, not count.** `UserDefaults("helm")["aimsSeen"]`.
+        Opening the sheet marks seen, and so does a board that lands
+        while it is up.
 
 Cover: `test/mailbox/aims.test.ts`, `test/phone/boardSeen.test.ts`,
 `test/worker/mailbox.test.ts` (Mailbox aims board),
@@ -603,9 +615,19 @@ Where each mouth stands:
         `SharedPreferences("cab")["todoSeen"]`, same shape as `aimsSeen`.
         Marked seen on open and while open. `TodoTest` / `MouthTest` /
         `TasksBoardTest`.
-- Helm:
-  - [ ] Same four items. CarPlay: nothing. Tracked with the rest of
-        the iPhone backlog in Cab `docs/helm_parity.md`.
+- Helm — shipped in tree. CarPlay: nothing.
+  - [x] **`ignoredKind` first.** `Mouth.ingest` handles `todo` before
+        the bubble path and returns `false`; `movesCursor` excludes it.
+  - [x] **Paint.** `Sources/Mailbox/Todo.swift` parses the rows (id /
+        slug / text / at, cap 100, drop the row not the list).
+        `app/Helm/HelmTasks.swift`: header check-square only when the
+        list has rows. CarPlay: nothing.
+  - [x] **Tick and add.** Checkbox → `/todo done <id>`, sheet stays
+        open; add → `add to my list: <words>` and "Full list" → `/todo`,
+        both close.
+  - [x] **Badge = changes, not count**, keyed by slug
+        (`changedTodo` / `seenTodo`), `UserDefaults("helm")["todoSeen"]`.
+        Marked seen on open and while open. `TodoTests`.
 
 Cover: `test/mailbox/todo.test.ts`, `test/phone/boardSeen.test.ts`,
 `test/worker/mailbox.test.ts` (Mailbox tasks board),
