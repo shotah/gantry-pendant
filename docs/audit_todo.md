@@ -326,9 +326,11 @@ off for a crane.
       `test/app/api/auth/token/route.test.ts`.
 - [x] **CI hardening** (partial). Workflow default is `contents:
       read`; `contents: write` is the coverage-badge job only.
-      `npm audit --omit=dev` is a check step. Leftover: pin actions
-      by SHA; consider deploying on `v*` tags only.
-- [ ] **`npm audit --omit=dev` fails on the lockfile.** High:
+      `npm audit --omit=dev` runs in check with `continue-on-error`,
+      so a finding is a warning and does not block deploy. Leftover:
+      pin actions by SHA; consider deploying on `v*` tags only.
+- [ ] **`npm audit --omit=dev` reports on the lockfile.** The check
+      step warns and does not fail the job. High:
       `braces` <=3.0.3 (GHSA-vfj7-8cjw-p6xm) has no release newer than
       3.0.3. `vinext` pulls it through `vite-plugin-commonjs` →
       fast-glob, and the worker imports `vinext/server/app-router-entry`,
