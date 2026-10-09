@@ -11,7 +11,8 @@ Other mouths: [frontends.md](frontends.md). Misses:
 [sibling_phones.md](sibling_phones.md). Typing:
 [agent_typing_response_todo.md](agent_typing_response_todo.md). Voice:
 [voice.md](voice.md). Face / mood:
-[agent_ui_controls.md](agent_ui_controls.md). Bugs / security:
+[agent_ui_controls.md](agent_ui_controls.md). Mood palettes:
+[theme_moods.md](theme_moods.md). Bugs / security:
 [audit_todo.md](audit_todo.md).
 
 ## Fit gates

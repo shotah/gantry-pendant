@@ -12,7 +12,7 @@ canned Ada/Kit turns — not a live crane.
 ## Phone
 
 The product viewport is a pocket (390×844). Theme defaults to Boom
-(twelve ids; Paper is the light workshop). Chat type defaults to Small;
+(fifteen ids: Boom, Paper, Ink, and six feelings × dark / light). Chat type defaults to Small;
 Extra large is a shot. Kit’s face is an 82 px circle that hangs off the
 header (tap to replace it). Compose has emoji on the left, attach under
 it — photo sits on the draft until Send. Empty and unsigned screens use
@@ -46,7 +46,7 @@ the Durable Object.
 <p align="center">
   <img src="../assets/docs/down.png" alt="Socket down, compose disabled" width="220">
   &nbsp;
-  <img src="../assets/docs/thread-day.png" alt="Same thread in Lamp theme" width="220">
+  <img src="../assets/docs/thread-day.png" alt="Same thread in Marquee theme" width="220">
   &nbsp;
   <img src="../assets/docs/thread-paper.png" alt="Same thread in Paper theme" width="220">
 </p>
@@ -80,8 +80,14 @@ the Durable Object.
 | `ping` | `/?sample=ping` | Cron `Push` — labeled **ping**. |
 | `photo` | `/?sample=photo` | Inbound image + text. |
 | `down` | `/?sample=down` | Other side gone. Compose locked. |
-| `thread-day` | `/?sample=thread&theme=lamp` | Lamp theme. |
-| `thread-paper` | `/?sample=thread&theme=paper` | Paper (light). Boom / Inlay / Lamp stay shared with gantree. |
+| `thread-day` | `/?sample=thread&theme=marquee` | Marquee (happy, dark). |
+| `thread-paper` | `/?sample=thread&theme=paper` | Paper (neutral light). Boom stays shared with gantree. |
+| `thread-neon` | `/?sample=thread&theme=neon` | Neon (excited, dark). |
+| `thread-fizz` | `/?sample=thread&theme=fizz` | Fizz (excited, light). |
+| `thread-rain` | `/?sample=thread&theme=rain` | Rain (sad, dark). |
+| `thread-fuse` | `/?sample=thread&theme=fuse` | Fuse (frustrated, dark). |
+| `thread-siren` | `/?sample=thread&theme=siren` | Siren (angry, dark). |
+| `thread-static` | `/?sample=thread&theme=static` | Static (anxious, dark). |
 | `thread-xl` | `/?sample=thread&font=xl` | Extra-large chat type. Small is the default. |
 | `settings` | `/?sample=empty` | Cog → right-hand drawer, scrolls on its own — Access (mic when voice is on, location, notifications), theme, follow Kit’s mood, font, photo size, backdrop, Install. Scrim, ×, Escape close it. |
 | `goals` | `/?sample=thread` then target | Goals drawer from the crane's `aims` frame — per aim: sentence, 30-day rating, five-day grid, stamp line, week strip, slope / block / effect; cross-aim next-day line under the cards. Every button is a `/aims …` turn. Hidden when the board is empty; the header badge counts only aims changed since the drawer was last opened. |

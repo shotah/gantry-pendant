@@ -232,8 +232,10 @@ from `ChatID` (Google `sub`).
   to its slug, so an agent can only repaint its own room. Blob writes
   have no rate limit yet — [agent_ui_controls.md](agent_ui_controls.md).
 - Kit's theme (`POST` / `DELETE /api/theme`) is the same door. Body is
-  a catalog id (`boom` / `inlay` / `lamp` / `noir` / `ember` / `tide` /
-  `bloom` / `paper` / `chalk` / `foam` / `petal` / `ink`), never raw hex.
+  a catalog id (`boom` / `paper` / `ink`, or a mood: `marquee` /
+  `lemonade` / `neon` / `fizz` / `rain` / `mist` / `fuse` / `grit` /
+  `siren` / `flare` / `static` / `flicker`), never raw hex. A retired
+  id (`inlay`, `lamp`, `noir`, and the rest) is `bad theme`.
   The human can unfollow (`pendant.followTheme`)
   and keep their own palette.
 - Web Push subscriptions (endpoint + keys) live on the crane's Durable

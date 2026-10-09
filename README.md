@@ -54,7 +54,7 @@ thinks again when the crane has net.
   <img src="assets/docs/settings.png" alt="Theme, font, photo size, backdrop" width="180">
 </p>
 
-Every screen, Lamp, Paper, extra-large type, crane stand-in:
+Every screen, Marquee, Paper, the mood themes, extra-large type, crane stand-in:
 [docs/screens.md](docs/screens.md). Reshoot with `npm run shot`.
 
 ## The household

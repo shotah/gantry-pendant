@@ -875,7 +875,7 @@ no `user_id`):
 | Do not move the `since` cursor; do not toast / HUN / haptic / badge | Not a turn |
 | `backdrop` and `theme` have **no `text`** | A mouth that predates them must drop them. Cab `Mouth.ingest` paints any frame with text as a bubble — a rev or theme id in the thread on every old APK. The face notice predates this rule; do not "fix" it |
 | `rev` is a safe integer ≥ 0; junk → ignore the frame | Same bar as `orderSeq` |
-| `theme` is a known catalog id, or JSON `null` to clear; junk → ignore | Catalog: boom, inlay, lamp, noir, ember, tide, bloom, paper, chalk, foam, petal, ink |
+| `theme` is a known catalog id, or JSON `null` to clear; junk → ignore | Catalog: boom, paper, ink, marquee, lemonade, neon, fizz, rain, mist, fuse, grit, siren, flare, static, flicker. Retired ids (`inlay`, `lamp`, `noir`, `ember`, `tide`, `bloom`, `chalk`, `foam`, `petal`) are junk |
 
 **Paint.** On `face` → refetch `GET /api/avatar?slug&v=<rev>` and swap
 the header circle (PWA `KitAvatar`, Cab `ui/KitAvatar.kt`). On
@@ -960,13 +960,15 @@ Backdrop.
 | --- | --- |
 | Route | `GET` / `POST` / `DELETE /api/theme?slug=<slug>` |
 | Auth | same door as the face (`withSlug`) |
-| GET | `{ "theme": "<id>" \| null, "themes": [ { id, label, mood, canvas, accent } ] }` |
+| GET | `{ "theme": "<id>" \| null, "themes": [ { id, label, feel, scheme, mood, canvas, accent } ] }` |
 | POST | `{ "theme": "<id>" }` → `{ "ok": true, "theme": "<id>" }` |
 | DELETE | clears the room pick; GET `theme` is `null` |
 | 400 body | `{ "error": "bad theme" }` |
 
 `canvas` and `accent` are the two signature hexes (shop floor + tool
-color). `mood` is one English line. That is how a model that cannot
+color). `feel` is `neutral` or one of happy, excited, sad, frustrated,
+angry, anxious. `scheme` is `dark` or `light`. `mood` is one English
+line, `<feel>, <scheme> — <scene>`. That is how a model that cannot
 see the screen chooses. Do not put hex in the id. Do not accept
 arbitrary colors.
 
@@ -975,7 +977,7 @@ frame to every socket, and **flushes it on phone connect** (after
 `cmds`, like the command catalog):
 
 ```text
-{ "kind": "theme", "theme": "noir" }     // set
+{ "kind": "theme", "theme": "siren" }    // set
 { "kind": "theme", "theme": null }       // cleared; NO text
 ```
 
@@ -995,10 +997,24 @@ cache and fall back to `pendant.theme`. A human pick in Settings
 writes `pendant.theme` and sets follow **off**. `?theme=` for shots
 does the same.
 
-Catalog today: `boom` `inlay` `lamp` `noir` `ember` `tide` `bloom`
-`paper` `chalk` `foam` `petal` `ink`. Boom / Inlay / Lamp hexes stay
-shared with gantree. New ids are additive; a mouth that does not know
-`paper` ignores the notice and keeps its current palette.
+Catalog: `boom` `paper` `ink`, then a mood pair per feeling —
+`marquee` / `lemonade` (happy), `neon` / `fizz` (excited), `rain` /
+`mist` (sad), `fuse` / `grit` (frustrated), `siren` / `flare` (angry),
+`static` / `flicker` (anxious). Dark id first in each pair. `boom`
+hexes stay shared with gantree. `feel` and `scheme` on the card are
+additive. Retired ids (`inlay`, `lamp`, `noir`, `ember`, `tide`,
+`bloom`, `chalk`, `foam`, `petal`) are unknown: a mouth that still
+has one paints it locally; the Worker never sends it, and a stored
+one reads as `theme: null`. A mouth that does not know `siren`
+ignores the notice and keeps its current palette. Palettes and the
+picker groups (Plain / Moods): [theme_moods.md](theme_moods.md).
+
+**Picker.** Settings groups the same way on every mouth. Plain is
+`boom` `paper` `ink`. Moods is the six feelings as dark/light pairs.
+The room's current id wears a "Kit" tag while follow is on. A human
+tap still writes the device pick and sets follow off. Cab
+(`CabScreen` chips) and Helm (`HelmScreen` chips) use those two
+headers.
 
 **Cab.** `Look.kt` `THEME_IDS` matches the catalog (hexes in
 `CabPalette.kt`). `Mouth.roomTheme` plus `paintedTheme(follow, room, mine)`

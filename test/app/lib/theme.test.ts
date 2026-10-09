@@ -18,45 +18,55 @@ import {
 } from "@/app/lib/theme";
 import { FOLLOW_THEME_PREF_KEY } from "@/lib/phone/prefs";
 
+const IDS = [
+  "boom",
+  "paper",
+  "ink",
+  "marquee",
+  "lemonade",
+  "neon",
+  "fizz",
+  "rain",
+  "mist",
+  "fuse",
+  "grit",
+  "siren",
+  "flare",
+  "static",
+  "flicker",
+] as const;
+
 describe("theme", () => {
-  it("falls back to boom", () => {
+  it("falls back to boom, including a retired id", () => {
     expect(parseTheme(undefined)).toBe(DEFAULT_THEME);
     expect(parseTheme("nope")).toBe("boom");
-    expect(parseTheme("inlay")).toBe("inlay");
-    expect(themeFromQuery("lamp")).toBe("lamp");
-    expect(themeFromQuery("noir")).toBe("noir");
-    expect(themeFromQuery("nope")).toBeNull();
+    expect(parseTheme("noir")).toBe("boom");
+    expect(parseTheme("paper")).toBe("paper");
+    expect(themeFromQuery("marquee")).toBe("marquee");
+    expect(themeFromQuery("siren")).toBe("siren");
+    expect(themeFromQuery("lamp")).toBeNull();
+    expect(themeFromQuery("noir")).toBeNull();
     expect(themeFromQuery(null)).toBeNull();
   });
 
-  it("ships Boom, Inlay, Lamp, night moods, daylight cousins, and ink", () => {
-    expect(THEMES.map((t) => t.id)).toEqual([
-      "boom",
-      "inlay",
-      "lamp",
-      "noir",
-      "ember",
-      "tide",
-      "bloom",
-      "paper",
-      "chalk",
-      "foam",
-      "petal",
-      "ink",
-    ]);
+  it("ships Boom, Paper, Ink, and a mood dozen", () => {
+    expect(THEMES.map((t) => t.id)).toEqual([...IDS]);
     expect(THEMES.map((t) => t.label)).toEqual([
       "Boom",
-      "Inlay",
-      "Lamp",
-      "Noir",
-      "Ember",
-      "Tide",
-      "Bloom",
       "Paper",
-      "Chalk",
-      "Foam",
-      "Petal",
       "Ink",
+      "Marquee",
+      "Lemonade",
+      "Neon",
+      "Fizz",
+      "Rain",
+      "Mist",
+      "Fuse",
+      "Grit",
+      "Siren",
+      "Flare",
+      "Static",
+      "Flicker",
     ]);
     const css = themeCss();
     expect(css).toContain(':root,[data-theme="boom"]');
@@ -71,34 +81,36 @@ describe("theme", () => {
       expect(css).toContain(`color-scheme:${t.tokens.scheme}`);
     }
     expect(themeOf("paper").tokens.scheme).toBe("light");
+    expect(themeOf("lemonade").tokens.scheme).toBe("light");
     expect(themeOf("ink").tokens.scheme).toBe("dark");
+    expect(themeOf("neon").tokens.scheme).toBe("dark");
     expect(THEME_BOOT).toContain(THEME_KEY);
     expect(THEME_BOOT).toContain(ROOM_THEME_KEY);
     expect(THEME_BOOT).toContain(FOLLOW_THEME_PREF_KEY);
     expect(themeOf("boom").tokens.canvas).toBe("#0e1316");
     expect(themeOf("boom").tokens.accent).toBe("#f07848");
-    expect(themeOf("inlay").tokens.accent).toBe("#e6d3b0");
-    expect(themeOf("lamp").tokens.accent).toBe("#c5d24a");
     expect(themeOf("nope" as "boom").id).toBe("boom");
   });
 
   it("paints a room theme without claiming the human's pick", () => {
     localStorage.setItem(THEME_KEY, "boom");
-    paintTheme("noir");
-    expect(document.documentElement.getAttribute("data-theme")).toBe("noir");
+    paintTheme("siren");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("siren");
     expect(localStorage.getItem(THEME_KEY)).toBe("boom");
-    applyTheme("inlay");
-    expect(document.documentElement.getAttribute("data-theme")).toBe("inlay");
-    expect(localStorage.getItem(THEME_KEY)).toBe("inlay");
-    applyTheme("inlay");
-    applyTheme("lamp");
-    expect(document.documentElement.getAttribute("data-theme")).toBe("lamp");
+    applyTheme("paper");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("paper");
+    expect(localStorage.getItem(THEME_KEY)).toBe("paper");
+    applyTheme("paper");
+    applyTheme("neon");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("neon");
   });
 
   it("caches the last room theme for boot", () => {
-    cacheRoomTheme("tide");
-    expect(localStorage.getItem(ROOM_THEME_KEY)).toBe("tide");
-    expect(cachedRoomTheme()).toBe("tide");
+    cacheRoomTheme("rain");
+    expect(localStorage.getItem(ROOM_THEME_KEY)).toBe("rain");
+    expect(cachedRoomTheme()).toBe("rain");
+    localStorage.setItem(ROOM_THEME_KEY, "lamp");
+    expect(cachedRoomTheme()).toBeNull();
     cacheRoomTheme(null);
     expect(cachedRoomTheme()).toBeNull();
   });

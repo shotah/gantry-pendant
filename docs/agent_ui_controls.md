@@ -62,28 +62,34 @@ He gets a **card**, not an id alone. `GET /api/theme` returns:
 
 ```text
 {
-  "theme": "noir",
+  "theme": "siren",
   "themes": [
     {
-      "id": "noir",
-      "label": "Noir",
-      "mood": "Gotham night — steel sky, ice-blue trim",
-      "canvas": "#0a0c10",
-      "accent": "#8eb4d4"
+      "id": "siren",
+      "label": "Siren",
+      "feel": "angry",
+      "scheme": "dark",
+      "mood": "angry, dark — siren at night: black red, scarlet",
+      "canvas": "#160608",
+      "accent": "#ff2e3f"
     }
   ]
 }
 ```
 
-`canvas` is the shop floor. `accent` is the tool color. Those two hexes
-are the pairing; the rest of the palette is derived and contrast-tested
-so he cannot make the phone unreadable. `mood` is the English he
-actually matches ("be Batman" → noir, not `#8eb4d4`).
+`feel` is how he filters (happy, excited, sad, frustrated, angry,
+anxious, or neutral). `scheme` is `dark` or `light`. `canvas` is the
+shop floor. `accent` is the tool color. Those two hexes are the
+pairing; the rest of the palette is derived and contrast-tested so he
+cannot make the phone unreadable. `mood` is `<feel>, <scheme> — <scene>`,
+the English he matches ("I'm furious" → `feel: angry`, then `siren`
+or `flare` by scheme).
 
-Do **not** stuff hex onto the id (`noir-0a0c10-8eb4d4`). The id is the
+Do **not** stuff hex onto the id (`siren-160608-ff2e3f`). The id is the
 wire contract; the card is documentation the tool result already
 carries. Adding a theme is a new id in `lib/theme/catalog.ts` plus a
 contrast test — Cab maps the id to its own ColorScheme when it cares.
+The fifteen ids and the nine retired ones: [theme_moods.md](theme_moods.md).
 
 Raw colors on the wire are refused. A 22-token dump is how you get
 unreadable fg-on-canvas and a Cab/PWA/gantree split. The catalog is the
@@ -202,13 +208,16 @@ Worker's `{ error }` body verbatim so the model can read them.
   app. Pass `source_path` from `image__photo_generate` (ask for 9:16).
   Use `backdrop_delete` to go back to plain."
 - `theme_list`: "List the color moods you can put on the phone app.
-  Each card has a mood line and two hexes (canvas = background, accent
-  = highlight). Pick one id, then call theme_update. Not for drawing a
-  picture — that is image__photo_generate."
+  Each card has `feel` (happy, excited, sad, frustrated, angry,
+  anxious, or neutral) and `scheme` (dark / light), a mood line, and
+  two hexes (canvas = background, accent = highlight). Filter by how
+  you feel, then by light or dark. Pick one id, then call
+  theme_update. Not for drawing a picture — that is
+  image__photo_generate."
 - `theme_update`: "Set the phone app's color mood. Pass a `theme` id
-  from theme_list. Match the mood line to how you feel (daylight cards
-  are paper, chalk, foam, petal; ink is high-contrast night); do not
-  invent hex. Humans can unfollow and keep their own theme."
+  from theme_list. Pick a card whose `feel` matches, `scheme: light`
+  by day; `neutral` to go plain. Do not invent hex. Humans can
+  unfollow and keep their own theme."
 
 Recipes live in the tool descriptions, not `PERSONA.md`
 (`repos/ai-gantry/docs/persona.md`).
@@ -233,8 +242,11 @@ Recipes live in the tool descriptions, not `PERSONA.md`
   (phone only). A pick in the theme menu writes `pendant.theme` and
   sets follow **off**. `THEME_BOOT` applies `pendant.roomTheme` when
   follow is on so there is no flash of Boom before the socket.
-- Catalog: Boom, Inlay, Lamp (gantree-shared hexes) plus Noir, Ember,
-  Tide, Bloom. Contrast on fg/body/muted/mark is a test.
+- Catalog: Boom, Paper, Ink, plus a mood dozen (happy / excited /
+  sad / frustrated / angry / anxious, each dark + light). Boom hexes
+  stay shared with gantree. Settings groups Plain and Moods. Contrast
+  on the painted pairs is a test; Boom is exempt from two until
+  gantree moves. Palettes: [theme_moods.md](theme_moods.md).
 
 Do not paint the wallpaper on the crane stand-in (`/crane`). Do not put
 it behind the login or waiting-room screens. The crane stand-in keeps
@@ -267,8 +279,9 @@ Worker + PWA + contract. Done here unless unchecked.
       `test/app/components/chat/Backdrop.test.tsx`, `PhoneShell.test.tsx`
       (notice refetches, no bubble, off never fetches).
 - [x] `lib/theme/catalog.ts`: closed ids, mood + canvas/accent cards.
-      Boom / Inlay / Lamp hexes unchanged. Contrast test on painted pairs.
-      Daylight cousins (paper, chalk, foam, petal) plus ink (high-contrast night).
+      Boom hexes unchanged. Contrast test on painted pairs. Paper and
+      Ink stayed; the other neutrals retired for the mood dozen
+      ([theme_moods.md](theme_moods.md)).
 - [x] `lib/theme/store.ts`: textless `encodeThemeNotice`,
       `themeIdFromUnknown` (`null` theme = cleared), `parseThemeWrite`.
 - [x] `app/api/theme/route.ts`: GET / POST / DELETE.
@@ -360,8 +373,8 @@ Real crane, `CHANNEL=pendant`, `image` + `pendant` in `mcp.toml`,
       Mini is now stale — see edge cases.
 - [ ] "Put Gotham behind us." Wallpaper lands behind the thread; bubbles
       stay legible; header and compose unchanged.
-- [ ] "Make it feel like Gotham." After `theme_list`, `theme_update`
-      `noir`. Phone goes ice-blue on steel. Ada's second phone follows.
+- [ ] "I'm furious." After `theme_list`, `theme_update` `siren`.
+      Phone goes scarlet on black red. Ada's second phone follows.
 - [ ] "Clear your backdrop." Plain canvas (Noir still on) on every phone
       in the room.
 - [ ] "Go back to the usual colors." `theme_delete` → Boom (or whatever
@@ -404,7 +417,7 @@ Real crane, `CHANNEL=pendant`, `image` + `pendant` in `mcp.toml`,
   for the car, not Kit's mood).
 - **Unknown id on an old Cab.** Ignore, keep the current scheme. Do not
   fall back to boom (that would flash).
-- **Follow vs `?theme=`.** Shots pass `?theme=lamp` and pin the human
+- **Follow vs `?theme=`.** Shots pass `?theme=marquee` and pin the human
   pick so a live room notice cannot restyle the PNG.
 
 ---

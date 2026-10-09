@@ -26,7 +26,11 @@ export function contrastRatio(a: string, b: string): number {
 
 type Pair = { name: string; fg: keyof ThemeTokens; bg: keyof ThemeTokens; min: number };
 
-/** Text-on-surface pairs a mouth actually paints. AA 4.5 for body, 3.0 for muted. */
+/**
+ * Text-on-surface pairs a mouth actually paints. AA 4.5 for body, 3.0 for
+ * large or non-text UI (`ok` / `danger` status words, the unread badge,
+ * the accent ring).
+ */
 export const THEME_CONTRAST_PAIRS: readonly Pair[] = [
   { name: "fg on canvas", fg: "fg", bg: "canvas", min: 4.5 },
   { name: "fg on panel", fg: "fg", bg: "panel", min: 4.5 },
@@ -36,6 +40,16 @@ export const THEME_CONTRAST_PAIRS: readonly Pair[] = [
   { name: "body on kit", fg: "body", bg: "kit", min: 4.5 },
   { name: "muted on panel", fg: "muted", bg: "panel", min: 3 },
   { name: "mark on accent-soft", fg: "mark", bg: "accentSoft", min: 4.5 },
+  { name: "dim on kit", fg: "dim", bg: "kit", min: 4.5 },
+  { name: "dim on you", fg: "dim", bg: "you", min: 4.5 },
+  { name: "faint on panel", fg: "faint", bg: "panel", min: 3 },
+  { name: "mark on panel", fg: "mark", bg: "panel", min: 4.5 },
+  { name: "mark on canvas", fg: "mark", bg: "canvas", min: 4.5 },
+  { name: "danger on danger-soft", fg: "danger", bg: "dangerSoft", min: 4.5 },
+  { name: "ok on panel", fg: "ok", bg: "panel", min: 3 },
+  { name: "danger on panel", fg: "danger", bg: "panel", min: 3 },
+  { name: "canvas on ok", fg: "canvas", bg: "ok", min: 3 },
+  { name: "accent on canvas", fg: "accent", bg: "canvas", min: 3 },
 ];
 
 export type ContrastFail = { id: string; pair: string; ratio: number; min: number };

@@ -44,11 +44,11 @@ const SHOTS = {
     phone: true,
   },
   "thread-day": {
-    path: "/?sample=thread&theme=lamp",
+    path: "/?sample=thread&theme=marquee",
     sel: "[data-shot=phone]",
     text: "Leave-by 20:50",
     phone: true,
-    theme: "lamp",
+    theme: "marquee",
   },
   "thread-paper": {
     path: "/?sample=thread&theme=paper",
@@ -56,6 +56,48 @@ const SHOTS = {
     text: "Leave-by 20:50",
     phone: true,
     theme: "paper",
+  },
+  "thread-neon": {
+    path: "/?sample=thread&theme=neon",
+    sel: "[data-shot=phone]",
+    text: "Leave-by 20:50",
+    phone: true,
+    theme: "neon",
+  },
+  "thread-fizz": {
+    path: "/?sample=thread&theme=fizz",
+    sel: "[data-shot=phone]",
+    text: "Leave-by 20:50",
+    phone: true,
+    theme: "fizz",
+  },
+  "thread-rain": {
+    path: "/?sample=thread&theme=rain",
+    sel: "[data-shot=phone]",
+    text: "Leave-by 20:50",
+    phone: true,
+    theme: "rain",
+  },
+  "thread-fuse": {
+    path: "/?sample=thread&theme=fuse",
+    sel: "[data-shot=phone]",
+    text: "Leave-by 20:50",
+    phone: true,
+    theme: "fuse",
+  },
+  "thread-siren": {
+    path: "/?sample=thread&theme=siren",
+    sel: "[data-shot=phone]",
+    text: "Leave-by 20:50",
+    phone: true,
+    theme: "siren",
+  },
+  "thread-static": {
+    path: "/?sample=thread&theme=static",
+    sel: "[data-shot=phone]",
+    text: "Leave-by 20:50",
+    phone: true,
+    theme: "static",
   },
   attach: {
     path: "/?sample=empty",
@@ -292,7 +334,7 @@ try {
     const theme = spec.theme || "boom";
     const font = spec.font || "sm";
     // Theme-query shots turn follow off in the app. Reset the rest so a
-    // later settings shot is not leftover from Lamp / Paper.
+    // later settings shot is not leftover from Marquee / Paper.
     const follow = spec.theme ? "off" : "on";
     await evalJson(
       cdp,

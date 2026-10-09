@@ -1352,13 +1352,16 @@ describe("PhoneShell", () => {
       ws.open();
     });
     act(() => {
-      ws.deliver(JSON.stringify({ kind: "theme", theme: "noir" }));
+      ws.deliver(JSON.stringify({ kind: "theme", theme: "siren" }));
     });
-    expect(document.documentElement.getAttribute("data-theme")).toBe("noir");
-    expect(window.localStorage.getItem("pendant.roomTheme")).toBe("noir");
-    expect(window.localStorage.getItem("pendant.theme")).not.toBe("noir");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("siren");
+    expect(window.localStorage.getItem("pendant.roomTheme")).toBe("siren");
+    expect(window.localStorage.getItem("pendant.theme")).not.toBe("siren");
     expect(screen.getByText(/Nothing yet/)).toBeTruthy();
-    expect(screen.queryByText("noir")).toBeNull();
+    expect(screen.queryByText("siren")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "color theme" }));
+    expect(screen.getByRole("option", { name: "Siren" }).textContent).toContain("Kit");
     act(() => {
       ws.deliver(JSON.stringify({ kind: "theme", theme: null }));
     });
@@ -1368,8 +1371,8 @@ describe("PhoneShell", () => {
 
   it("keeps your pick when Follow Kit's mood is off", async () => {
     window.localStorage.setItem("pendant.followTheme", "off");
-    window.localStorage.setItem("pendant.theme", "inlay");
-    document.documentElement.setAttribute("data-theme", "inlay");
+    window.localStorage.setItem("pendant.theme", "paper");
+    document.documentElement.setAttribute("data-theme", "paper");
     const ws = await connectSpike();
     act(() => {
       ws.open();
@@ -1378,13 +1381,13 @@ describe("PhoneShell", () => {
     const toggle = screen.getByLabelText("Follow Kit's mood") as HTMLInputElement;
     expect(toggle.checked).toBe(false);
     act(() => {
-      ws.deliver(JSON.stringify({ kind: "theme", theme: "noir" }));
+      ws.deliver(JSON.stringify({ kind: "theme", theme: "siren" }));
     });
-    expect(document.documentElement.getAttribute("data-theme")).toBe("inlay");
-    expect(window.localStorage.getItem("pendant.roomTheme")).toBe("noir");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("paper");
+    expect(window.localStorage.getItem("pendant.roomTheme")).toBe("siren");
     fireEvent.click(toggle);
     expect(window.localStorage.getItem("pendant.followTheme")).toBe("on");
-    expect(document.documentElement.getAttribute("data-theme")).toBe("noir");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("siren");
   });
 
   it("picking a theme in settings stops following Kit", async () => {
@@ -1393,15 +1396,15 @@ describe("PhoneShell", () => {
       ws.open();
     });
     act(() => {
-      ws.deliver(JSON.stringify({ kind: "theme", theme: "noir" }));
+      ws.deliver(JSON.stringify({ kind: "theme", theme: "siren" }));
     });
-    expect(document.documentElement.getAttribute("data-theme")).toBe("noir");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("siren");
     fireEvent.click(screen.getByRole("button", { name: "settings" }));
     expect((screen.getByLabelText("Follow Kit's mood") as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "color theme" }));
-    fireEvent.click(screen.getByRole("option", { name: "Ember" }));
-    expect(document.documentElement.getAttribute("data-theme")).toBe("ember");
-    expect(window.localStorage.getItem("pendant.theme")).toBe("ember");
+    fireEvent.click(screen.getByRole("option", { name: "Flare" }));
+    expect(document.documentElement.getAttribute("data-theme")).toBe("flare");
+    expect(window.localStorage.getItem("pendant.theme")).toBe("flare");
     expect(window.localStorage.getItem("pendant.followTheme")).toBe("off");
     expect((screen.getByLabelText("Follow Kit's mood") as HTMLInputElement).checked).toBe(false);
   });

@@ -61,7 +61,7 @@ import {
 } from "@/app/lib/prefs";
 import { applyFont, fontFromQuery } from "@/app/lib/font";
 import { RELEASE } from "@/app/lib/release";
-import { applyTheme, cacheRoomTheme, cachedRoomTheme, paintTheme, parseTheme, THEME_KEY, themeFromQuery } from "@/app/lib/theme";
+import { applyTheme, cacheRoomTheme, cachedRoomTheme, paintTheme, parseTheme, THEME_KEY, themeFromQuery, type ThemeId } from "@/app/lib/theme";
 import { browserWakeLock, releaseScreenWake, type WakeLockSentinel } from "@/app/lib/wake";
 import { authDeniedFromQuery, authRetryFromQuery } from "@/lib/auth/bounce";
 import type { ConfigGap } from "@/lib/auth/mode";
@@ -172,6 +172,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
   const [backdropRev, setBackdropRev] = useState(0);
   const [backdropOn, setBackdropOn] = useState(true);
   const [followTheme, setFollowTheme] = useState(true);
+  const [roomTheme, setRoomTheme] = useState<ThemeId | null>(null);
   const [faceHint, setFaceHint] = useState("");
   const [sendHint, setSendHint] = useState("");
   const [speakPhase, setSpeakPhase] = useState<SpeakPhase>("idle");
@@ -378,6 +379,7 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
     const follow = browserFollowThemePref();
     followThemeRef.current = follow;
     setFollowTheme(follow);
+    setRoomTheme(cachedRoomTheme());
     // Updater form: a constructor is a function, and setState would call it.
     setRecognizer(() => browserRecognizer());
     setVoiceOn(browserVoicePref());
@@ -720,16 +722,18 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
         return;
       }
       if (isThemeNotice(frame)) {
-        const roomTheme = themeIdFromUnknown(frame);
-        if (roomTheme === "") {
+        const next = themeIdFromUnknown(frame);
+        if (next === "") {
           cacheRoomTheme(null);
+          setRoomTheme(null);
           if (phone && followThemeRef.current) {
             paintTheme(parseTheme(window.localStorage.getItem(THEME_KEY)));
           }
-        } else if (roomTheme) {
-          cacheRoomTheme(roomTheme);
+        } else if (next) {
+          cacheRoomTheme(next);
+          setRoomTheme(next);
           if (phone && followThemeRef.current) {
-            paintTheme(roomTheme);
+            paintTheme(next);
           }
         }
         return;
@@ -1482,7 +1486,11 @@ export function PhoneShell({ role = "phone" }: { role?: Role }) {
                 : null}
               <div className="flex flex-col gap-1">
                 <span className="text-xs text-muted">Theme</span>
-                <ThemeSelect onHumanPick={phone ? pickHumanTheme : undefined} />
+                <ThemeSelect
+                  onHumanPick={phone ? pickHumanTheme : undefined}
+                  roomTheme={phone ? roomTheme : null}
+                  followTheme={phone ? followTheme : false}
+                />
               </div>
               {phone
                 ? (

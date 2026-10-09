@@ -3,6 +3,10 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { applyTheme, DEFAULT_THEME, parseTheme, THEME_KEY, THEMES, themeOf, type ThemeId } from "@/app/lib/theme";
 
+type ThemeRow = (typeof THEMES)[number];
+
+const MOOD_FEELS = ["happy", "excited", "sad", "frustrated", "angry", "anxious"] as const;
+
 function ThemeDot({ canvas, accent, line }: { canvas: string; accent: string; line: string }) {
   return (
     <span
@@ -17,13 +21,53 @@ function ThemeDot({ canvas, accent, line }: { canvas: string; accent: string; li
   );
 }
 
-export function ThemeSelect({ onHumanPick }: { onHumanPick?: () => void }) {
+function ThemeOption({
+  theme,
+  selected,
+  kit,
+  onPick,
+}: {
+  theme: ThemeRow;
+  selected: boolean;
+  kit: boolean;
+  onPick: (id: ThemeId) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      aria-label={theme.label}
+      title={theme.mood}
+      className={`flex min-w-0 flex-1 items-center gap-2 px-2.5 py-1.5 text-left text-xs text-body hover:bg-track ${selected ? "bg-track" : ""}`}
+      onClick={() => onPick(theme.id)}
+    >
+      <ThemeDot canvas={theme.tokens.canvas} accent={theme.tokens.accent} line={theme.tokens.line} />
+      <span className="min-w-0 truncate">{theme.label}</span>
+      {kit
+        ? <span aria-hidden className="ml-auto shrink-0 text-[10px] font-medium text-mark">Kit</span>
+        : null}
+    </button>
+  );
+}
+
+export function ThemeSelect({
+  onHumanPick,
+  roomTheme = null,
+  followTheme = false,
+}: {
+  onHumanPick?: () => void;
+  /** Room id, so the row Kit picked can wear a tag while the human is following. */
+  roomTheme?: ThemeId | null;
+  followTheme?: boolean;
+}) {
   const [id, setId] = useState<ThemeId>(DEFAULT_THEME);
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLSpanElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const listId = useId();
   const current = themeOf(id);
+  const plain = THEMES.filter((t) => t.feel === "neutral");
 
   useEffect(() => {
     function sync() {
@@ -77,6 +121,18 @@ export function ThemeSelect({ onHumanPick }: { onHumanPick?: () => void }) {
     trigger.current?.focus();
   }
 
+  function option(theme: ThemeRow) {
+    return (
+      <ThemeOption
+        key={theme.id}
+        theme={theme}
+        selected={theme.id === id}
+        kit={followTheme && roomTheme === theme.id}
+        onPick={pick}
+      />
+    );
+  }
+
   return (
     <span ref={root} className="relative block">
       <button
@@ -98,22 +154,20 @@ export function ThemeSelect({ onHumanPick }: { onHumanPick?: () => void }) {
             <span
               id={listId}
               role="listbox"
-              className="absolute inset-x-0 z-50 mt-1 rounded border border-line bg-panel py-1 shadow-lg"
+              className="absolute inset-x-0 z-50 mt-1 max-h-72 overflow-y-auto rounded border border-line bg-panel py-1 shadow-lg"
             >
-              {THEMES.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="option"
-                  aria-selected={t.id === id}
-                  title={t.mood}
-                  className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-body hover:bg-track ${t.id === id ? "bg-track" : ""}`}
-                  onClick={() => pick(t.id)}
-                >
-                  <ThemeDot canvas={t.tokens.canvas} accent={t.tokens.accent} line={t.tokens.line} />
-                  <span className="min-w-0 truncate">{t.label}</span>
-                </button>
-              ))}
+              <span role="group" aria-label="Plain" className="block">
+                <span className="block px-2.5 pt-1 text-[10px] font-medium uppercase tracking-wide text-dim">Plain</span>
+                {plain.map((t) => option(t))}
+              </span>
+              <span role="group" aria-label="Moods" className="block">
+                <span className="block px-2.5 pt-1 text-[10px] font-medium uppercase tracking-wide text-dim">Moods</span>
+                {MOOD_FEELS.map((feel) => (
+                  <span key={feel} className="flex">
+                    {THEMES.filter((t) => t.feel === feel).map((t) => option(t))}
+                  </span>
+                ))}
+              </span>
             </span>
           )
         : null}

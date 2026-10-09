@@ -181,13 +181,36 @@ describe("Mailbox fan-out", () => {
     const res = await box.fetch(new Request("https://mailbox/", {
       method: "PUT",
       headers: { "X-Pendant-Op": "theme", "content-type": "application/json" },
-      body: JSON.stringify({ theme: "noir" }),
+      body: JSON.stringify({ theme: "siren" }),
     }));
 
     expect(res.ok).toBe(true);
     expect(stale.sent).toEqual([]);
-    expect(live.frames()).toEqual([{ kind: "theme", theme: "noir" }]);
-    expect(state.storage.rows.get("theme")).toBe("noir");
+    expect(live.frames()).toEqual([{ kind: "theme", theme: "siren" }]);
+    expect(state.storage.rows.get("theme")).toBe("siren");
+  });
+
+  it("reads a retired room theme as cleared and does not flush it", async () => {
+    const { state, box, phone, connect } = room();
+    await state.storage.put("theme", "noir");
+
+    const got = await box.fetch(new Request("https://mailbox/", {
+      method: "GET",
+      headers: { "X-Pendant-Op": "theme" },
+    }));
+    expect(got.ok).toBe(true);
+    expect((await got.json() as { theme: string | null }).theme).toBeNull();
+
+    const refused = await box.fetch(new Request("https://mailbox/", {
+      method: "PUT",
+      headers: { "X-Pendant-Op": "theme", "content-type": "application/json" },
+      body: JSON.stringify({ theme: "noir" }),
+    }));
+    expect(refused.status).toBe(400);
+
+    const ada = phone("1182");
+    await connect(ada, "1182");
+    expect(ada.sent.join("\n")).not.toContain('"kind":"theme"');
   });
 });
 
