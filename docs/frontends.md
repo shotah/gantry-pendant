@@ -29,6 +29,18 @@ client (Android package / iOS bundle) — walk is on that checkout.
 Cookie CSRF is PWA-only. Neither OkHttp nor URLSession stores
 `pendant_session`.
 
+Sign-in nonce. The happy path already calls `GET /api/auth/nonce`
+and posts that value. `POST /api/auth/token` is 401 for any other
+nonce, including one minted when that GET fails.
+
+- Cab
+  - [x] **No local nonce.** `CabViewModel.signIn` posts only the value
+        from `GET /api/auth/nonce`. A failed GET stops sign-in
+        ("Could not start sign-in") and never opens Google.
+        `mintNonce` is gone. `repos/gantry-cab`.
+- Helm
+  - [ ] Same. `repos/gantry-helm`.
+
 ---
 
 ## When you change this repo
@@ -48,7 +60,7 @@ and Helm before you call it done. A PWA-only paint is not enough.
 | `seen` on a phone `ack` (read on another mouth) | Additive `seen: true` on the phone's own `ack`. The Worker copies it to that human's **other** `sub:<userId>` sockets as `{ kind: "ack", seen: true, user_id, since?, id? }` — never a plain ack, which is delivery. A mouth that hears one drops its notification cards. A bare `{ kind: "ack", seen: true }` (no cursor yet) goes to siblings only, not the crane. Old Cab drops the key (`Mouth.ingest` acks by id → no-op) — [Seen](#seen-what-every-mouth-must-do-the-same) |
 | `react` (emoji on a bubble, both ways) | New `kind`, existing fields: `{ kind: "react", user_id, id: <bubble id>, text: "👍" }`; empty `text` clears. Worker stores it per human (`r:<sub>`), fans it to the human's `sub:` sockets (and to the crane when a phone sent it — queued for a down crane), replays it after the transcript on connect. Not a turn: no `seq`, phone queue, push, or cursor move. **Old Cab paints a stray bubble** — it needs `ignoredKind` for `react` before the crane starts reacting — [Reactions](#reactions-what-every-mouth-must-do-the-same) |
 | `aims` (goals board) | New `kind`, crane only: `{ kind: "aims", aims: [{ area, sentence, rating30, sum7, streak, note, days[], weeks?, slope?, block?, effect? }], links? }`. Pushed on dial after `cmds` and when the board changes; the Worker stores the latest (`aims`, or `aims:<sub>` with a `user_id`) and replays it on connect. Empty `aims` clears. Not a turn. Old Cab: no `text`, so no stray bubble — [Aims board](#aims-board-what-every-mouth-must-do-the-same) |
-| `todo` (tasks board) | New `kind`, crane only: `{ kind: "todo", todo: [{ id, slug, text, at }] }`, oldest first, uncapped (phone keeps 100). Pushed on dial after `aims` and when the list changes; the Worker stores the latest (`todo`, or `todo:<sub>`) and replays it on connect. Empty `todo` clears. Not a turn. The checkbox is an ordinary `inbound` `/todo done <id>`. Old Cab: no `text`, so no stray bubble — [Tasks board](#tasks-board-what-every-mouth-must-do-the-same) |
+| `todo` (tasks board) | New `kind`, crane only: `{ kind: "todo", todo: [{ id, slug, text, at, priority? }] }`, oldest first, uncapped (phone keeps 100). Priority is the `!!` / `!` marker leading `text` (or an additive `priority` key); mouths sort urgent, high, rest at paint. Pushed on dial after `aims` and when the list changes; the Worker stores the latest (`todo`, or `todo:<sub>`) and replays it on connect. Empty `todo` clears. Not a turn. The checkbox is an ordinary `inbound` `/todo done <id>`. Old Cab: no `text`, so no stray bubble — [Tasks board](#tasks-board-what-every-mouth-must-do-the-same) |
 | `act` (device actions: alarms, timers, DO schedules) — **planned, not on the wire yet** | New `kind`, request/response, not a turn. Crane → phone `{ kind: "act", id, name, turn, device?, input }`, phone → crane the same `id` with `ok` / `output` / `error`. Worker routes by `device`, then the `turn` socket, then any socket on the `sub` with the cap; answers `offline` / `no_device` / `ambiguous` / `timeout` itself; `schedule.*` and `device.list` are Worker-answered. Phones announce `device` / `kind` / `caps` / `label` on the upgrade. Old Cab drops it (no `text`). Contract and checklists for all three repos: Cab [`docs/device_actions.md`](https://github.com/shotah/gantry-cab/blob/main/docs/device_actions.md) |
 | Photo caps, encode ladder, `error` tokens | Every mouth encodes to the same budget and paints refusals the same way — [Photos](#photos-what-every-mouth-must-do-the-same) |
 | Face / backdrop blobs and their notices | Cab and Helm refetch `/api/avatar` on `face` and `/api/backdrop` on `backdrop`. Notices are not turns — [Face, backdrop, and theme](#face-backdrop-and-theme-what-every-mouth-must-do-the-same) |
@@ -552,6 +564,14 @@ names the row; there is no `/todo add`.
   field), `at` (local `YYYY-MM-DD` last written; the phone computes
   the age, the crane does not send it). A row missing `id`, `slug`, or
   `text`, or repeating either key, is dropped — the row, not the list.
+- **Priority** rides in the words: a marker leading `text` — `!!`
+  urgent, `!` high, none normal (`"!! file the extension"`), the
+  crane's own notation and what `[todo]` sorts by. The Worker passes
+  `text` through as sent. An optional additive `priority` key
+  (`"urgent"` | `"high"`; anything else is ignored) is also kept and
+  wins over the marker when both are present; old mouths drop it.
+  A mouth strips the marker for display (`!!` alone, or `!` inside the
+  words, is not a marker — words stay as they are).
 - `user_id` optional: without it the list is the room's (`todo`); with
   it, that human's (`todo:<sub>`), which wins on connect.
 - Dial order from the crane is `cmds`, `aims`, `todo`, `allow`; the
@@ -566,8 +586,15 @@ names the row; there is no `/todo add`.
   a check-square button in the header → a drawer, one checklist row
   per task: an unticked box, the words, then `#412 · dentist · 3d ago`
   (id, slug, age after the first day — the same rule as the stamp).
+  The priority mark is painted **ahead of the words, not inside them**
+  — `!!` in the danger colour, `!` in the accent mark colour, nothing
+  for normal — and the checkbox is named by the clean words.
   Past 10 open, the footer says `14 open — a pocket list; prune, or
   use a tracker`, the `/todo` footer's words.
+- **Order is urgent, then high, then the rest; oldest first inside a
+  tier** — the `[todo]` stamp's order. The frame itself still arrives
+  oldest first; the mouth sorts at paint and never rewrites the list it
+  holds (the badge, the ticks, and the stored board keep frame order).
 - **The checkbox is the one kernel write.** Tap → send `/todo done
   <id>` as a visible turn; the row shows ticked and struck through and
   will not send twice; **the drawer stays open** so several can be
@@ -585,7 +612,7 @@ names the row; there is no `/todo add`.
   does a list that lands while open. Persists on the device
   (`pendant.todoSeen`).
 - Never paint a `todo` frame as a bubble. Never notify or buzz on it.
-  Never reorder — oldest first everywhere.
+  No other reorder — priority, then oldest first, everywhere.
 
 Where each mouth stands:
 
@@ -595,7 +622,21 @@ Where each mouth stands:
   `PhoneShell` (`todo` in → state + pending ticks; the checkbox and
   the add field go through `sendText`). Waiting on the crane to send
   the frame — ai-gantry `docs/tasks.md` §9 Phase 1.
+  - [x] **Priority** (2026-10-09). `lib/mailbox/todo.ts`:
+        `todoPriority` (the `priority` key, else the `!!` / `!` marker
+        leading `text`, else normal), `todoWords` (marker stripped),
+        `priorityMark`, `sortTodo` (urgent, high, rest; stable).
+        `parseTodoBoard` keeps a valid `priority` key and leaves `text`
+        as sent, so the Worker fan-out is unchanged for Cab and Helm.
+        `TasksSheet` sorts at paint; `TaskRow` paints the mark ahead of
+        the words and names the checkbox by the clean words. Dev sample
+        `passport` carries `!`. `test/mailbox/todo.test.ts`,
+        `test/app/components/chat/TasksBoard.test.tsx`.
 - Cab — shipped in tree (2026-09-26), waiting on the crane frame.
+  - [ ] **Priority.** Same rules as the PWA box above: read the marker
+        (or the key), strip it for display, sort urgent / high / rest
+        with oldest first inside a tier, paint the mark ahead of the
+        words. In progress in the Cab checkout.
   - [x] **`ignoredKind` first.** `Mouth.ingest` handles `todo` before
         the bubble path and returns `false`; `movesCursor` excludes it.
         A `text` key on the frame is ignored.
@@ -628,6 +669,8 @@ Where each mouth stands:
   - [x] **Badge = changes, not count**, keyed by slug
         (`changedTodo` / `seenTodo`), `UserDefaults("helm")["todoSeen"]`.
         Marked seen on open and while open. `TodoTests`.
+  - [ ] Same four items, plus priority. CarPlay: nothing. Tracked with
+        the rest of the iPhone backlog in Cab `docs/helm_parity.md`.
 
 Cover: `test/mailbox/todo.test.ts`, `test/phone/boardSeen.test.ts`,
 `test/worker/mailbox.test.ts` (Mailbox tasks board),

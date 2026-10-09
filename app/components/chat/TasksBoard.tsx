@@ -1,14 +1,17 @@
 "use client";
 
-import { type FormEvent, useEffect, useId, useRef, useState } from "react";
-import { ageLabel, type TodoItem } from "@/lib/mailbox/todo";
+import { type SubmitEvent, useEffect, useId, useRef, useState } from "react";
+import { ageLabel, priorityMark, sortTodo, type TodoItem, todoPriority, todoWords } from "@/lib/mailbox/todo";
 
 /**
  * The tasks board: the human's pocket list as the mailbox last pushed it
  * (docs/frontends.md → Tasks board; crane `docs/tasks.md`). A checklist.
  * The one kernel write is the checkbox — `/todo done <id>` — and it is a
  * visible turn like everything else here. Adding is plain words to Kit,
- * who names the row; there is no `/todo add`.
+ * who names the row; there is no `/todo add`. Rows sort urgent, high,
+ * then the rest (`sortTodo`), oldest first inside a tier — the same
+ * order as the `[todo]` stamp — with the `!!` / `!` mark painted ahead
+ * of the words instead of inside them.
  */
 
 /** Past this many open, the `/todo` footer says "a pocket list"; so does the drawer. */
@@ -72,6 +75,9 @@ export function metaLine(t: TodoItem, now?: Date): string {
 }
 
 function TaskRow({ task, pending, onDone }: { task: TodoItem; pending: boolean; onDone: (id: number) => void }) {
+  const words = todoWords(task);
+  const priority = todoPriority(task);
+  const mark = priorityMark(priority);
   return (
     <li className="flex items-center gap-1">
       {/* The button is the thumb-sized hit area (globals.css gives phone buttons 44 px); the span is the box. */}
@@ -79,7 +85,7 @@ function TaskRow({ task, pending, onDone }: { task: TodoItem; pending: boolean; 
         type="button"
         role="checkbox"
         aria-checked={pending}
-        aria-label={`done: ${task.text}`}
+        aria-label={`done: ${words}`}
         disabled={pending}
         className="-my-1.5 -ml-1.5 flex h-11 w-9 shrink-0 items-center justify-center"
         onClick={() => onDone(task.id)}
@@ -95,7 +101,19 @@ function TaskRow({ task, pending, onDone }: { task: TodoItem; pending: boolean; 
         </span>
       </button>
       <div className="min-w-0 flex-1">
-        <p className={`text-sm leading-snug ${pending ? "text-dim line-through" : "text-fg"}`}>{task.text}</p>
+        <div className="flex items-baseline gap-1.5">
+          {mark
+            ? (
+                <span
+                  title={priority}
+                  className={`shrink-0 text-xs font-semibold ${priority === "urgent" ? "text-danger" : "text-mark"}`}
+                >
+                  {mark}
+                </span>
+              )
+            : null}
+          <p className={`min-w-0 text-sm leading-snug ${pending ? "text-dim line-through" : "text-fg"}`}>{words}</p>
+        </div>
         <p className="mt-0.5 text-[11px] text-muted">{metaLine(task)}</p>
       </div>
     </li>
@@ -140,7 +158,7 @@ export function TasksSheet({
     onClose();
   };
 
-  const add = (e: FormEvent) => {
+  const add = (e: SubmitEvent) => {
     e.preventDefault();
     const words = draft.replace(/\s+/gu, " ").trim();
     if (!words) {
@@ -178,7 +196,7 @@ export function TasksSheet({
           {todo.length
             ? (
                 <ul className="flex flex-col gap-2.5" aria-label="open tasks">
-                  {todo.map((t) => <TaskRow key={t.slug} task={t} pending={pending.includes(t.id)} onDone={onDone} />)}
+                  {sortTodo(todo).map((t) => <TaskRow key={t.slug} task={t} pending={pending.includes(t.id)} onDone={onDone} />)}
                 </ul>
               )
             : <p className="text-sm text-dim">Nothing on the list.</p>}

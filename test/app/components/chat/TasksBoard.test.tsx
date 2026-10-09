@@ -25,21 +25,41 @@ describe("TasksButton", () => {
 });
 
 describe("TasksSheet", () => {
-  it("lists every task oldest first with its id, slug, and age; the checkbox sends /todo done and stays open", () => {
+  it("lists every task by priority then oldest first with its id, slug, and age; the checkbox sends /todo done and stays open", () => {
     const onDone = vi.fn();
     const onClose = vi.fn();
     render(<TasksSheet todo={SAMPLE_TODO} onClose={onClose} onDone={onDone} onSend={() => {}} />);
     const rows = screen.getByRole("list", { name: "open tasks" }).querySelectorAll("li");
     expect(rows).toHaveLength(3);
-    expect(rows[0]?.textContent).toContain("return the box");
-    expect(rows[0]?.textContent).toContain("#420 · amazon · ");
-    expect(rows[0]?.textContent).toMatch(/\d+d ago/u);
+    // `! renew` is high, so it leads; the two normal rows follow oldest first.
+    expect(rows[0]?.textContent).toContain("renew, Wed 11am");
+    expect(rows[1]?.textContent).toContain("return the box");
+    expect(rows[1]?.textContent).toContain("#420 · amazon · ");
+    expect(rows[1]?.textContent).toMatch(/\d+d ago/u);
+    expect(rows[2]?.textContent).toContain("call to book a cleaning");
 
     const box = screen.getByRole("checkbox", { name: "done: call to book a cleaning" });
     expect(box.getAttribute("aria-checked")).toBe("false");
     fireEvent.click(box);
     expect(onDone).toHaveBeenCalledWith(412);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("paints the marker ahead of the words, not inside them, and names the checkbox by the clean words", () => {
+    const todo = [
+      { id: 1, slug: "plants", text: "water the plants", at: "2026-09-20" },
+      { id: 2, slug: "ext", text: "!! file the extension", at: "2026-09-21" },
+      { id: 3, slug: "keyed", text: "call the bank", at: "2026-09-22", priority: "high" as const },
+    ];
+    render(<TasksSheet todo={todo} onClose={() => {}} onDone={() => {}} onSend={() => {}} />);
+    const rows = screen.getByRole("list", { name: "open tasks" }).querySelectorAll("li");
+    expect(Array.from(rows, (r) => r.querySelector("p")?.textContent)).toEqual(["file the extension", "call the bank", "water the plants"]);
+    expect(screen.getByTitle("urgent").textContent).toBe("!!");
+    expect(screen.getByTitle("urgent").className).toContain("text-danger");
+    expect(screen.getByTitle("high").textContent).toBe("!");
+    expect(screen.queryByText(/^!! /u)).toBeNull();
+    expect(screen.getByRole("checkbox", { name: "done: file the extension" })).toBeTruthy();
+    expect(rows[2]?.querySelector("[title]")).toBeNull();
   });
 
   it("paints a pending row ticked and struck through, and will not send it twice", () => {

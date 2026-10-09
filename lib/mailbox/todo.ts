@@ -19,15 +19,20 @@ export const TODO_MAX = 100;
 export const TODO_SLUG_MAX = 32;
 export const TODO_TEXT_MAX = 240;
 
+/** `!!` urgent, `!` high, bare words normal — the crane's marker, and `[todo]`'s sort. */
+export type TodoPriority = "urgent" | "high" | "normal";
+
 export type TodoItem = {
   /** The memory row id — what `/todo done <id>` takes. Changes on rewrite. */
   id: number;
   /** The key after `todo/`; the noun the agent chose. Stable across rewrites. */
   slug: string;
-  /** The action in the human's words; "by <when>" stays in here. */
+  /** The action in the human's words; "by <when>" stays in here, and so does a leading `!!` / `!`. */
   text: string;
   /** Local `YYYY-MM-DD` the row was last written. The phone shows the age. */
   at: string;
+  /** Only when the crane sent the key; otherwise the marker in `text` says (`todoPriority`). */
+  priority?: Exclude<TodoPriority, "normal">;
 };
 
 export function phoneMustNotPublishTodo(role: Role, kind?: string): boolean {
@@ -80,9 +85,45 @@ export function parseTodoBoard(raw: unknown): TodoItem[] {
     }
     ids.add(id);
     slugs.add(slug);
-    out.push({ id, slug, text, at });
+    const row: TodoItem = { id, slug, text, at };
+    if (o.priority === "urgent" || o.priority === "high") {
+      row.priority = o.priority;
+    }
+    out.push(row);
   }
   return out;
+}
+
+/** `!! file the extension` — one or two bangs leading the words, nothing else. */
+const MARK_RE = /^(!!?)\s*(?=[^\s!])/u;
+
+/** The key when the crane sent one, else the marker in the words, else normal. */
+export function todoPriority(t: Pick<TodoItem, "text" | "priority">): TodoPriority {
+  if (t.priority) {
+    return t.priority;
+  }
+  const m = MARK_RE.exec(t.text);
+  if (!m) {
+    return "normal";
+  }
+  return m[1] === "!!" ? "urgent" : "high";
+}
+
+/** The words without the marker — what a row paints and what the checkbox names. */
+export function todoWords(t: Pick<TodoItem, "text">): string {
+  return t.text.replace(MARK_RE, "");
+}
+
+/** What the row shows in front of the words: `!!`, `!`, or nothing. */
+export function priorityMark(p: TodoPriority): string {
+  return p === "urgent" ? "!!" : p === "high" ? "!" : "";
+}
+
+const PRIORITY_RANK: Record<TodoPriority, number> = { urgent: 0, high: 1, normal: 2 };
+
+/** Urgent, then high, then the rest; inside a tier the crane's order (oldest first) holds. Does not touch the input. */
+export function sortTodo(rows: TodoItem[]): TodoItem[] {
+  return [...rows].sort((a, b) => PRIORITY_RANK[todoPriority(a)] - PRIORITY_RANK[todoPriority(b)]);
 }
 
 /** The frame body from the wire. */

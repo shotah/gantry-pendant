@@ -135,11 +135,11 @@ export const SAMPLE_AIM_LINKS: AimLink[] = [
   { a: "training", b: "weight", r: 0.38, n: 12 },
 ];
 
-/** The pocket list, oldest first, as the crane `todo` frame carries it (docs/tasks.md §4.4). */
+/** The pocket list, oldest first, as the crane `todo` frame carries it (docs/tasks.md §4.4). The drawer sorts by the marker. */
 export const SAMPLE_TODO: TodoItem[] = [
   { id: 420, slug: "amazon", text: "return the box", at: "2026-09-17" },
   { id: 412, slug: "dentist", text: "call to book a cleaning", at: "2026-09-23" },
-  { id: 418, slug: "passport", text: "renew, Wed 11am", at: "2026-09-26" },
+  { id: 418, slug: "passport", text: "! renew, Wed 11am", at: "2026-09-26" },
 ];
 
 export const MOCK_REPLIES = [
