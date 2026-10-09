@@ -328,6 +328,15 @@ off for a crane.
       read`; `contents: write` is the coverage-badge job only.
       `npm audit --omit=dev` is a check step. Leftover: pin actions
       by SHA; consider deploying on `v*` tags only.
+- [ ] **`npm audit --omit=dev` fails on the lockfile.** High:
+      `braces` <=3.0.3 (GHSA-vfj7-8cjw-p6xm) has no release newer than
+      3.0.3. `vinext` pulls it through `vite-plugin-commonjs` →
+      fast-glob, and the worker imports `vinext/server/app-router-entry`,
+      so it stays a production dependency. Moderate: `fflate` 0.7.3
+      (GHSA-px8p-9vwx-vf98) via `@vercel/og` → satori, which vinext pins.
+      `npm audit fix --force` would install vinext 0.2.1. Re-check when
+      braces publishes a fix, or satori depends on fflate >=0.8. Do not
+      override either ahead of that.
 - [ ] **Confirm on the deployed origin** (already in the edgecases
       checklist, restated because it is the go-live gate):
       `MAILBOX_SECRET` and `PENDANT_DEV` unset; `/crane` is 404;
@@ -352,8 +361,9 @@ rotation calendar and no stolen-phone drill.
 - [ ] **Counters, not bodies.** 401 / 403 / 429 / 4401 per route via
       Workers Analytics Engine or `observability` with sampling. Alert
       on spikes. Never lat/lon, never text, never endpoints.
-- [ ] **Dependency cadence.** `jose`, `@pushforge/builder`, `vinext`
-      (beta), `wrangler`. Weekly bot, monthly human look.
+- [ ] **Dependency cadence.** `jose`, `@pushforge/builder`, `vinext`,
+      `wrangler`. Weekly bot, monthly human look. The 2026-10-09 pass
+      moved `vinext` and `@vinext/cloudflare` off beta to 1.1.0.
 - [ ] **Google consent screen** from Testing to Production before the
       test-user cap; scopes stay `openid email profile`.
 - [ ] **DO storage audit** monthly: queue rows, `rate` map size, push
