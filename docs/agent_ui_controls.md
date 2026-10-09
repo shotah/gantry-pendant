@@ -226,8 +226,10 @@ Recipes live in the tool descriptions, not `PERSONA.md`
 
 ## Phone UI
 
-- Header face: unchanged. `face` notice → `avatarRev` → `KitAvatar`
-  refetch. Tap-to-replace stays.
+- Header face: `face` notice → `avatarRev` → `KitAvatar` refetch.
+  Tap opens a sheet: copy the picture on screen, download it, or
+  replace it (`POST /api/avatar`, same JPEG gate). Cab and Helm do
+  not get this sheet — no new frame or field.
 - Backdrop: `app/components/chat/Backdrop.tsx`, absolute behind the
   scroller, `object-cover`, 60 % opacity over the theme canvas.
   Bubbles are opaque (`bg-kit` / `bg-you`) so only the gutter shows it.

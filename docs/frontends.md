@@ -931,7 +931,15 @@ not care.
 | Stroke | 2 px in theme `line` (PWA `border-line`; Cab `CabPalette.line` / `outlineVariant`). Not `panel`, not a shadow ring |
 | Empty / Google door | Stay the centered hero (PWA 64 px, Cab 72.dp). Those do not hang |
 
-PWA: `PhoneShell` header. Cab already hangs the same way: 82.dp
+PWA: `PhoneShell` header. Tap the header circle (only once the human
+is in the room) and a sheet offers copy, download, or replace. Copy
+puts the picture on the clipboard as a PNG. Download saves
+`<slug>-avatar.jpg` (or the type that is actually on screen, including
+the pendant glyph when no JPEG is stored). Replace is the same
+`POST /api/avatar`. Empty and Google-door heroes stay static. Cab and
+Helm do not get this sheet — no new frame or field.
+
+Cab already hangs the same way: 82.dp
 `KitAvatar`, 40×80 `navigationIcon` slot (empty — the circle is not
 inside the bar), nudge **-2.dp x / -4.dp y**, 2.dp `line` stroke. The
 avatar is a Scaffold overlay (`zIndex` above the bar) so `TopAppBar`

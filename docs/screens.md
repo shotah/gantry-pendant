@@ -14,7 +14,7 @@ canned Ada/Kit turns — not a live crane.
 The product viewport is a pocket (390×844). Theme defaults to Boom
 (fifteen ids: Boom, Paper, Ink, and six feelings × dark / light). Chat type defaults to Small;
 Extra large is a shot. Kit’s face is an 82 px circle that hangs off the
-header (tap to replace it). Compose has emoji on the left, attach under
+header (tap to copy, download, or replace it). Compose has emoji on the left, attach under
 it — photo sits on the draft until Send. Empty and unsigned screens use
 the same mark. Fallback is the pendant glyph until a JPEG is saved on
 the Durable Object.

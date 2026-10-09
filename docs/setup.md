@@ -206,8 +206,8 @@ empty `PENDANT_ALLOWED_USERS` fails boot (same as Telegram).
 
 Kit’s photo is `persona/avatar.jpg` on the Mini (Photo fold), same JPEG
 gate as Telegram. When `CHANNEL=pendant`, Gantree also POSTs that file
-to this Worker (`/api/avatar?slug=`). The phone can replace it from the
-header. Chat photos never become the face.
+to this Worker (`/api/avatar?slug=`). The phone can copy, download, or
+replace it from the header. Chat photos never become the face.
 
 After you add a human, recreate Kit. The crane publishes `allow`; the
 room follows. Bearer rotate from the panel is the instant kill if the
@@ -249,9 +249,9 @@ The human does **not** need a Gantree login.
    Settings → Enable notifications after install (iPhone: Add to Home
    Screen first) so cron can lock-screen ping when the app is asleep.
 5. Type. Kit answers when the crane socket is up.
-6. Tap Kit’s face in the header to set the same `avatar.jpg` the yard
-   Photo fold uploads (JPEG, 5MB). The Worker stores it; a chat photo
-   is still a turn, not a face change.
+6. Tap Kit’s face in the header to copy it, download it, or set the
+   same `avatar.jpg` the yard Photo fold uploads (JPEG, 5MB). The
+   Worker stores it; a chat photo is still a turn, not a face change.
 
 If Google works but Kit never answers: they are missing from the crane
 list, or the crane was restarted instead of recreated. If the socket

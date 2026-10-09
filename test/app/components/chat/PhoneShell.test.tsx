@@ -277,7 +277,7 @@ describe("PhoneShell", () => {
     expect(await screen.findByText("Sign in with Google to talk.")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Continue with Google" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Continue with Google" }).getAttribute("href")).toBe("/api/auth/google");
-    expect(screen.queryByRole("button", { name: "Change Kit's photo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Kit's photo" })).toBeNull();
     expect(screen.queryByText(/Add to Home Screen/)).toBeNull();
     expect(screen.queryByText(/Google didn't finish/)).toBeNull();
   });
@@ -360,7 +360,11 @@ describe("PhoneShell", () => {
     expect(screen.queryByText("sending")).toBeNull();
     expect(await screen.findByText(MOCK_REPLIES[0], {}, { timeout: 1000 })).toBeTruthy();
     expect(screen.getByText(/dev/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Change Kit's photo" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Kit's photo" }));
+    expect(screen.getByRole("dialog", { name: "Kit's photo" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Download" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Upload photo" })).toBeTruthy();
   });
 
   it("keeps agent name, theme, and the crane stand-in behind the settings cog", async () => {
