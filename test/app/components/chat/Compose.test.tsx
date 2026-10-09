@@ -163,8 +163,49 @@ describe("Compose", () => {
     fireEvent.click(screen.getByRole("option", { name: /^\/tools / }));
     expect(onSend).not.toHaveBeenCalled();
     expect((screen.getByPlaceholderText("Message Kit") as HTMLTextAreaElement).value).toBe("/tools");
+    expect(screen.queryByRole("listbox", { name: "Harness commands" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(onSend).toHaveBeenCalledWith("/tools");
+  });
+
+  it("Enter selects the command and closes the picker; the next Enter sends", () => {
+    const onSend = vi.fn();
+    const catalog = [
+      { name: "tools", hint: "prefixed tool catalog" },
+      { name: "toolstats", hint: "per-tool call ledger" },
+      { name: "brief", hint: "hold a prefix ~6h", args: true },
+    ];
+    render(<Compose onSend={onSend} commands catalog={catalog} initialText="/tools" placeholder="Message Kit" />);
+    const box = screen.getByPlaceholderText("Message Kit");
+    expect(screen.getByRole("option", { name: /^\/tools / }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(onSend).not.toHaveBeenCalled();
+    expect((box as HTMLTextAreaElement).value).toBe("/tools");
+    expect(screen.queryByRole("listbox", { name: "Harness commands" })).toBeNull();
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(onSend).toHaveBeenCalledExactlyOnceWith("/tools");
+
+    onSend.mockClear();
+    fireEvent.change(box, { target: { value: "/to" } });
+    expect(screen.getByRole("listbox", { name: "Harness commands" })).toBeTruthy();
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(onSend).not.toHaveBeenCalled();
+    expect((box as HTMLTextAreaElement).value).toBe("/tools");
+    expect(screen.queryByRole("listbox", { name: "Harness commands" })).toBeNull();
+
+    fireEvent.change(box, { target: { value: "/tool" } });
+    fireEvent.change(box, { target: { value: "/tools" } });
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(onSend).not.toHaveBeenCalled();
+    expect((box as HTMLTextAreaElement).value).toBe("/toolstats");
+    expect(screen.queryByRole("listbox", { name: "Harness commands" })).toBeNull();
+
+    fireEvent.change(box, { target: { value: "/brief" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(onSend).not.toHaveBeenCalled();
+    expect((box as HTMLTextAreaElement).value).toBe("/brief ");
+    expect(screen.queryByRole("listbox", { name: "Harness commands" })).toBeNull();
   });
 
   it("inserts a trailing space for arg commands and Enter picks the highlight", () => {

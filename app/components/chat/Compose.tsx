@@ -333,6 +333,7 @@ export function Compose({
 
   function pick(cmd: SlashCommand) {
     setDraft(slashInsert(cmd));
+    setDismissed(true);
     boxRef.current?.focus();
   }
 
